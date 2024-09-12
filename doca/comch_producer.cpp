@@ -63,10 +63,7 @@ namespace doca {
 
         if(producer == nullptr) {
             logger->error("got send completion event without comch_producer");
-            return;
-        }
-
-        if(producer->callbacks_.send_completion) {
+        } else if(producer->callbacks_.send_completion) {
             try {
                 producer->callbacks_.send_completion(*producer, task, task_user_data);
             } catch(std::exception &e) {
@@ -89,10 +86,7 @@ namespace doca {
 
         if(producer == nullptr) {
             logger->error("got send error event without comch_producer");
-            return;
-        }
-
-        if(producer->callbacks_.send_completion) {
+        } else if(producer->callbacks_.send_completion) {
             try {
                 producer->callbacks_.send_completion(*producer, task, task_user_data);
             } catch(std::exception &e) {

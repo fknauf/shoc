@@ -12,13 +12,18 @@ add_project_arguments('-std=c++20', language: ['cpp'])
 deps = [ dependency('doca'), dependency('spdlog') ]
 
 common_srcs = [
+    'doca/buffer.cpp',
+    'doca/buffer_inventory.cpp',
+    'doca/buffer_pool.cpp',
     'doca/comch_client.cpp',
     'doca/comch_device.cpp',
+    'doca/comch_producer.cpp',
     'doca/comch_server.cpp',
     'doca/context.cpp',
     'doca/device.cpp',
     'doca/epoll_handle.cpp',
     'doca/logger.cpp',
+    'doca/memory_map.cpp',
     'doca/progress_engine.cpp'
 ]
 

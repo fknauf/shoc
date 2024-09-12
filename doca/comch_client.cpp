@@ -89,15 +89,14 @@ namespace doca {
 
         if(client == nullptr) {
             logger->error("got send completion event without comch_client");
-            return;
-        }
-
-        try {
-            client->send_completion(task, task_user_data);
-        } catch(std::exception &e) {
-            logger->error("comch_client send completion handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_client send completion handler failed with unknown error");
+        } else {
+            try {
+                client->send_completion(task, task_user_data);
+            } catch(std::exception &e) {
+                logger->error("comch_client send completion handler failed: {}", e.what());
+            } catch(...) {
+                logger->error("comch_client send completion handler failed with unknown error");
+            }
         }
 
         doca_task_free(doca_comch_task_send_as_task(task));
@@ -113,15 +112,14 @@ namespace doca {
 
         if(client == nullptr) {
             logger->error("got send error event without comch_client");
-            return;
-        }
-
-        try {
-            client->send_error(task, task_user_data);
-        } catch(std::exception &e) {
-            logger->error("comch_client send error handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_client send error handler failed with unknown error");
+        } else {
+            try {
+                client->send_error(task, task_user_data);
+            } catch(std::exception &e) {
+                logger->error("comch_client send error handler failed: {}", e.what());
+            } catch(...) {
+                logger->error("comch_client send error handler failed with unknown error");
+            }
         }
 
         doca_task_free(doca_comch_task_send_as_task(task));
@@ -140,9 +138,8 @@ namespace doca {
             return;
         }
 
-        auto msg = std::span { recv_buffer, static_cast<std::size_t>(msg_len) };
-
         try {
+            auto msg = std::span { recv_buffer, static_cast<std::size_t>(msg_len) };
             client->msg_recv(msg, comch_connection);
         } catch(std::exception &e) {
             logger->error("comch_client msg recv handler failed: {}", e.what());

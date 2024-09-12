@@ -82,15 +82,14 @@ namespace doca {
 
         if(server == nullptr) {
             logger->error("got send completion event without comch_server");
-            return;
-        }
-
-        try {
-            server->send_completion(task, task_user_data);
-        } catch(std::exception &e) {
-            logger->error("comch_server send completion handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_server send completion handler failed with unknown error");
+        } else {
+            try {
+                server->send_completion(task, task_user_data);
+            } catch(std::exception &e) {
+                logger->error("comch_server send completion handler failed: {}", e.what());
+            } catch(...) {
+                logger->error("comch_server send completion handler failed with unknown error");
+            }
         }
 
         doca_task_free(doca_comch_task_send_as_task(task));
@@ -106,15 +105,14 @@ namespace doca {
 
         if(server == nullptr) {
             logger->error("got send error event without comch_server");
-            return;
-        }
-
-        try {
-            server->send_error(task, task_user_data);
-        } catch(std::exception &e) {
-            logger->error("comch_server send error handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_server send error handler failed with unknown error");
+        } else {
+            try {
+                server->send_error(task, task_user_data);
+            } catch(std::exception &e) {
+                logger->error("comch_server send error handler failed: {}", e.what());
+            } catch(...) {
+                logger->error("comch_server send error handler failed with unknown error");
+            }
         }
 
         doca_task_free(doca_comch_task_send_as_task(task));
