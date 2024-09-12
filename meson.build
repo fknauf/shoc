@@ -14,6 +14,7 @@ deps = [ dependency('doca'), dependency('spdlog') ]
 common_srcs = [
     'doca/comch_client.cpp',
     'doca/comch_device.cpp',
+    'doca/comch_server.cpp',
     'doca/context.cpp',
     'doca/device.cpp',
     'doca/epoll_handle.cpp',
@@ -30,6 +31,12 @@ libdocapp = static_library('doca-cpp-eventbased', common_srcs,
         install: false)
 
 executable('comch_client', [ 'progs/comch_client.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
+executable('comch_server', [ 'progs/comch_server.cpp' ],
         dependencies : deps,
         link_with: libdocapp,
         include_directories: inc_dirs,

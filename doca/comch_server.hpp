@@ -1,0 +1,170 @@
+#pragma once
+
+#include "comch_device.hpp"
+#include "context.hpp"
+#include "device.hpp"
+#include "unique_handle.hpp"
+
+#include <doca_comch.h>
+
+#include <functional>
+#include <span>
+#include <string>
+
+namespace doca {
+    struct comch_server_limits {
+        std::uint32_t num_send_tasks = 1024;
+        std::uint32_t max_msg_size = 4080;
+        std::uint32_t recv_queue_size = 16;
+    };
+
+    class base_comch_server:
+        public context
+    {
+    public:
+        base_comch_server(
+            std::string const &server_name,
+            comch_device &dev,
+            device_representor &rep,
+            comch_server_limits const &limits
+        );
+
+        ~base_comch_server();
+
+        [[nodiscard]] auto as_ctx() const -> doca_ctx* override {
+            return doca_comch_server_as_ctx(handle_.handle());
+        }
+
+        auto send_response(doca_comch_connection *con, std::string_view message) -> void;
+
+    protected:
+        virtual auto send_completion(
+            [[maybe_unused]] doca_comch_task_send *task,
+            [[maybe_unused]] doca_data task_user_data
+        ) -> void {
+        }
+        
+        virtual auto send_error(
+            [[maybe_unused]] doca_comch_task_send *task,
+            [[maybe_unused]] doca_data task_user_data
+        ) -> void {
+        }
+        
+        virtual auto msg_recv(
+            [[maybe_unused]] std::span<std::uint8_t> recv_buffer,
+            [[maybe_unused]] doca_comch_connection *comch_connection
+        ) -> void {
+        }
+
+        virtual auto server_connection(
+            [[maybe_unused]] doca_comch_connection *comch_connection,
+            [[maybe_unused]] std::uint8_t change_successful
+        ) -> void {
+        }
+
+        virtual auto server_disconnection(
+            [[maybe_unused]] doca_comch_connection *comch_connection,
+            [[maybe_unused]] std::uint8_t change_successful
+        ) -> void {
+        }
+
+    private:
+        static auto send_completion_entry(
+            doca_comch_task_send *task,
+            doca_data task_user_data,
+            doca_data ctx_user_data
+        ) -> void;
+
+        static auto send_error_entry(
+            doca_comch_task_send *task,
+            doca_data task_user_data,
+            doca_data ctx_user_data
+        ) -> void;
+
+        static auto msg_recv_entry(
+            doca_comch_event_msg_recv *event,
+            std::uint8_t *recv_buffer,
+            std::uint32_t msg_len,
+            doca_comch_connection *comch_connection
+        ) -> void;
+
+        static auto server_connection_entry(
+            doca_comch_event_connection_status_changed *event,
+            doca_comch_connection *comch_connection,
+            std::uint8_t change_successful
+        ) -> void;
+
+        static auto server_disconnection_entry(
+            doca_comch_event_connection_status_changed *event,
+            doca_comch_connection *comch_connection,
+            std::uint8_t change_successful
+        ) -> void;
+
+        static auto state_changed_entry(
+            doca_data user_data,
+            doca_ctx *ctx,
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void;
+
+        unique_handle<doca_comch_server> handle_ { doca_comch_server_destroy };
+    };    
+
+    class comch_server;
+
+    struct comch_server_callbacks {
+        using state_changed_callback   = std::function<void (comch_server &, doca_ctx_states, doca_ctx_states)>;
+        using send_completion_callback = std::function<void (comch_server &, doca_comch_task_send *task, doca_data)>;
+        using msg_recv_callback        = std::function<void (comch_server &, std::span<std::uint8_t>, doca_comch_connection*)>;
+        using connection_callback      = std::function<void (comch_server &, doca_comch_connection*, std::uint8_t)>;
+
+        state_changed_callback state_changed = {};
+        msg_recv_callback message_received = {};
+        send_completion_callback send_completion = {};
+        send_completion_callback send_error = {};
+        connection_callback server_connection = {};
+        connection_callback server_disconnection = {};
+    };
+
+    class comch_server:
+        public base_comch_server 
+    {
+    public:
+        comch_server(
+            std::string const &server_name,
+            comch_device &dev,
+            device_representor &rep,
+            comch_server_callbacks callbacks,
+            comch_server_limits const &limits = {}
+        );
+
+    protected:
+        auto send_completion(
+            [[maybe_unused]] doca_comch_task_send *task,
+            [[maybe_unused]] doca_data task_user_data
+        ) -> void override;
+        
+        auto send_error(
+            [[maybe_unused]] doca_comch_task_send *task,
+            [[maybe_unused]] doca_data task_user_data
+        ) -> void override;
+        
+        auto msg_recv(
+            [[maybe_unused]] std::span<std::uint8_t> recv_buffer,
+            [[maybe_unused]] doca_comch_connection *comch_connection
+        ) -> void override;
+
+        auto server_connection(
+            [[maybe_unused]] doca_comch_connection *comch_connection,
+            [[maybe_unused]] std::uint8_t change_successful
+        ) -> void override;
+
+        auto server_disconnection(
+            [[maybe_unused]] doca_comch_connection *comch_connection,
+            [[maybe_unused]] std::uint8_t change_successful
+        ) -> void override;
+
+    private:
+        comch_server_callbacks callbacks_;
+    };
+}
