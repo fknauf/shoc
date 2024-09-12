@@ -3,7 +3,6 @@
 #include "comch_device.hpp"
 #include "context.hpp"
 #include "device.hpp"
-#include "progress_engine.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_comch.h>
@@ -26,7 +25,7 @@ namespace doca {
         base_comch_client(
             std::string const &server_name,
             comch_device &dev,
-            comch_client_limits const &limits = {}
+            comch_client_limits const &limits
         );
 
         ~base_comch_client();

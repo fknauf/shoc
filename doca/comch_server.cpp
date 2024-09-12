@@ -82,6 +82,7 @@ namespace doca {
 
         if(server == nullptr) {
             logger->error("got send completion event without comch_server");
+            return;
         }
 
         try {
@@ -105,6 +106,7 @@ namespace doca {
 
         if(server == nullptr) {
             logger->error("got send error event without comch_server");
+            return;
         }
 
         try {
@@ -128,6 +130,7 @@ namespace doca {
 
         if(server == nullptr) {
             logger->error("got msg recv event without comch_server");
+            return;
         }
 
         try {
@@ -168,6 +171,7 @@ namespace doca {
 
         if(server == nullptr) {
             logger->error("got server disconnection event without comch_server");
+            return;
         }
 
         try {
@@ -207,7 +211,7 @@ namespace doca {
         comch_server_limits const &limits
     ):
         base_comch_server { server_name, dev, rep, limits },
-        callbacks_ { callbacks }
+        callbacks_ { std::move(callbacks) }
     {}
 
     auto comch_server::send_completion(

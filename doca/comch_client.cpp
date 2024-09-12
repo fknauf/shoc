@@ -1,6 +1,8 @@
 #include "comch_client.hpp"
 #include "logger.hpp"
 
+#include <doca_pe.h>
+
 namespace doca {
     namespace {
         auto get_comch_client_from_connection(doca_comch_connection *comch_connection) -> base_comch_client* {
@@ -69,8 +71,12 @@ namespace doca {
         doca_task_set_user_data(doca_comch_task_send_as_task(task), task_user_data);
 
         auto base_task = doca_comch_task_send_as_task(task);
+        auto err = doca_task_submit(base_task);
 
-        enforce_success(doca_task_submit(base_task));
+        if(err != DOCA_SUCCESS) {
+            doca_task_free(base_task);
+            throw doca_exception(err);
+        }
     }
 
     auto base_comch_client::send_completion_entry(
@@ -83,6 +89,7 @@ namespace doca {
 
         if(client == nullptr) {
             logger->error("got send completion event without comch_client");
+            return;
         }
 
         try {
@@ -106,6 +113,7 @@ namespace doca {
 
         if(client == nullptr) {
             logger->error("got send error event without comch_client");
+            return;
         }
 
         try {
