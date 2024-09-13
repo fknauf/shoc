@@ -1,6 +1,7 @@
 #pragma once
 
 #include "comch_device.hpp"
+#include "comch_producer.hpp"
 #include "context.hpp"
 #include "device.hpp"
 #include "unique_handle.hpp"
@@ -19,7 +20,8 @@ namespace doca {
     };
 
     class base_comch_server:
-        public context
+        public context,
+        public context_parent<comch_producer>
     {
     public:
         base_comch_server(
@@ -36,6 +38,8 @@ namespace doca {
         }
 
         auto send_response(doca_comch_connection *con, std::string_view message) -> void;
+
+        auto stop() -> void override;
 
     protected:
         virtual auto send_completion(
@@ -67,6 +71,8 @@ namespace doca {
             [[maybe_unused]] std::uint8_t change_successful
         ) -> void {
         }
+
+        auto signal_stopped_child(comch_producer *stopped_child) -> void override;
 
     private:
         static auto send_completion_entry(
@@ -108,6 +114,11 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_comch_server> handle_ { doca_comch_server_destroy };
+
+        auto do_stop_if_able() -> void;
+
+        dependent_contexts<comch_producer> active_producers_;
+        bool stop_requested_ = false;
     };    
 
     class comch_server;
@@ -127,7 +138,7 @@ namespace doca {
     };
 
     class comch_server:
-        public base_comch_server 
+        public base_comch_server
     {
     public:
         comch_server(

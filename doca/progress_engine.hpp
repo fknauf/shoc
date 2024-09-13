@@ -57,47 +57,22 @@ namespace doca {
 
         template<std::derived_from<context> Context, typename... Args>
         auto create_context(Args&&... args) -> Context* {
-            // make sure push_back will not throw an exception
-            if(connected_contexts_.capacity() == connected_contexts_.size()) {
-                auto double_capacity = std::max(std::size_t(8), connected_contexts_.capacity() * 2);
-                connected_contexts_.reserve(double_capacity);
-            }
-
-            auto new_context = std::make_unique<Context>(std::forward<Args>(args)...);
-            new_context->set_progress_engine(this);
-            auto non_owning_ptr = new_context.get();
-
-            enforce_success(connect(non_owning_ptr));
-            
-            auto err = doca_ctx_start(non_owning_ptr->as_ctx());
-
-            if(
-                err != DOCA_SUCCESS && 
-                err != DOCA_ERROR_IN_PROGRESS
-            ) {
-                throw doca_exception(err);
-            }
-
-            connected_contexts_.push_back(std::move(new_context));
-
-            return non_owning_ptr;
+            return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
         }
 
         auto main_loop() -> void;
         auto main_loop_while(std::function<bool()> condition) -> void;
 
-    private:
-        friend class context;
+        auto connect(context *ctx) -> void;
         auto remove_stopped_context(context *ctx) -> void;
 
+    private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
         auto request_notification() -> void;
         auto clear_notification() -> void;
 
-        auto connect(context *ctx) -> doca_error_t;
-
         unique_handle<doca_pe> handle_ { doca_pe_destroy };
         epoll_handle epoll_;
-        std::vector<std::unique_ptr<context>> connected_contexts_;
+        dependent_contexts<context> connected_contexts_;
     };
 }

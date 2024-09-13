@@ -1,5 +1,6 @@
 #pragma once
 
+#include "comch_consumer.hpp"
 #include "comch_device.hpp"
 #include "context.hpp"
 #include "device.hpp"
@@ -19,7 +20,8 @@ namespace doca {
     };
 
     class base_comch_client:
-        public context
+        public context,
+        public context_parent<comch_consumer>
     {
     public:
         base_comch_client(
@@ -45,7 +47,12 @@ namespace doca {
 
         [[nodiscard]] auto handle() const { return handle_.handle(); }
 
+        auto stop() -> void override;
+        auto signal_stopped_child(comch_consumer *stopped_consumer) -> void override;
+
     protected:
+        auto do_stop_if_able() -> void;
+
         virtual auto send_completion(
             [[maybe_unused]] doca_comch_task_send *task,
             [[maybe_unused]] doca_data task_user_data
@@ -109,7 +116,8 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_comch_client> handle_ { doca_comch_client_destroy };
-        //std::vector<std::unique_ptr<comch_consumer>> local_consumers_;
+        dependent_contexts<comch_consumer> active_consumers_;
+        bool stop_requested_ = false;
     };
 
     class comch_client;

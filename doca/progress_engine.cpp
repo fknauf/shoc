@@ -21,15 +21,15 @@ namespace doca {
     }
 
     progress_engine::~progress_engine() {
-        logger->debug("~pe: {} contexts still running, stopping them.", connected_contexts_.size());
+        logger->debug("~pe: {} contexts still running, stopping them.", connected_contexts_.active_contexts().size());
 
-        for(auto &ctx : connected_contexts_) {
+        for(auto &ctx : connected_contexts_.active_contexts()) {
             ctx->stop();
         }
 
         logger->debug("~pe: Waiting for contexts to stop...");
 
-        while(!connected_contexts_.empty()) {
+        while(!connected_contexts_.active_contexts().empty()) {
             request_notification();
             wait(10);
             clear_notification();
@@ -37,7 +37,7 @@ namespace doca {
                 // do nothing
             }
 
-            logger->debug("~pe: {} contexts still running.", connected_contexts_.size());
+            logger->debug("~pe: {} contexts still running.", connected_contexts_.active_contexts().size());
         }
     }
 
@@ -94,21 +94,17 @@ namespace doca {
         }
     }
 
-    auto progress_engine::connect(context *ctx) -> doca_error_t {
-        return doca_pe_connect_ctx(handle(), ctx->as_ctx());
+    auto progress_engine::connect(context *ctx) -> void {
+        enforce_success(doca_pe_connect_ctx(handle(), ctx->as_ctx()));
     }
 
     auto progress_engine::remove_stopped_context(context *ctx) -> void {
-        auto it = std::ranges::find_if(connected_contexts_, [ctx](auto &p) { return p.get() == ctx; });
-
-        if(it != connected_contexts_.end()) {
-            connected_contexts_.erase(it);
-        }
+        connected_contexts_.remove_stopped_context(ctx);
     }
 
     auto progress_engine::main_loop() -> void {
         main_loop_while([this] {
-            return !connected_contexts_.empty();
+            return !connected_contexts_.active_contexts().empty();
         });
     }
 

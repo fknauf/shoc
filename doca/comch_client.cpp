@@ -195,6 +195,28 @@ namespace doca {
         }
     }
 
+    auto base_comch_client::stop() -> void {
+        stop_requested_ = true;
+
+        for(auto &child : active_consumers_.active_contexts()) {
+            child->stop();
+        }
+
+        do_stop_if_able();
+    }
+
+    auto base_comch_client::signal_stopped_child(comch_consumer *stopped_child) -> void {
+        active_consumers_.remove_stopped_context(stopped_child);
+        if(stop_requested_) {
+            do_stop_if_able();
+        }
+    }
+
+    auto base_comch_client::do_stop_if_able() -> void {
+        if(active_consumers_.active_contexts().empty()) {
+            context::stop();
+        }
+    }
 
     comch_client::comch_client(
         std::string const &server_name,

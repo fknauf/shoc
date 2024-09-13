@@ -201,6 +201,31 @@ namespace doca {
         }
     }
 
+    auto base_comch_server::stop() -> void {
+        // when active child contexts exist, stopping the server has to be delayed until they are all stopped.
+        stop_requested_ = true;
+
+        for(auto &child : active_producers_.active_contexts()) {
+            child->stop();
+        }
+
+        do_stop_if_able();
+    }
+
+    auto base_comch_server::signal_stopped_child(comch_producer *stopped_child) -> void {
+        active_producers_.remove_stopped_context(stopped_child);
+
+        if(stop_requested_) {
+            do_stop_if_able();
+        }
+    }
+
+    auto base_comch_server::do_stop_if_able() -> void {
+        if(active_producers_.active_contexts().empty()) {
+            context::stop();
+        }
+    }
+
     comch_server::comch_server(
         std::string const &server_name,
         comch_device &dev,

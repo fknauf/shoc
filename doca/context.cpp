@@ -46,4 +46,11 @@ namespace doca {
     auto context::stop() -> void {
         doca_ctx_stop(as_ctx());
     }
+
+    auto context::connect_to(
+        progress_engine *engine
+    ) -> void {
+        engine_ = engine;
+        engine->connect(this);
+    }
 }
