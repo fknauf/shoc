@@ -4,10 +4,12 @@
 
 namespace doca {
     comch_producer::comch_producer(
+        context_parent<comch_producer> *parent,
         doca_comch_connection *connection,
         std::uint32_t max_tasks,
         comch_producer_callbacks callbacks
     ):
+        parent_ { parent },
         callbacks_ { std::move(callbacks) }
     {
         doca_comch_producer *raw_handle = nullptr;
@@ -50,6 +52,22 @@ namespace doca {
         ) {
             doca_task_free(base_task);
             throw doca_exception(err);
+        }
+    }
+
+    auto comch_producer::state_changed(
+        doca_ctx_states prev_state,
+        doca_ctx_states next_state
+    ) -> void {
+        if(callbacks_.state_changed) {
+            callbacks_.state_changed(*this, prev_state, next_state);
+        }
+
+        if(
+            next_state == DOCA_CTX_STATE_IDLE &&
+            parent_ != nullptr
+        ) {
+            parent_->signal_stopped_child(this);
         }
     }
 
@@ -97,5 +115,9 @@ namespace doca {
         }
 
         doca_task_free(doca_comch_producer_task_send_as_task(task));
+    }
+
+    auto comch_producer::stop() -> void {
+        doca_ctx_stop(as_ctx());
     }
 }

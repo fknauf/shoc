@@ -50,6 +50,12 @@ namespace doca {
         auto stop() -> void override;
         auto signal_stopped_child(comch_consumer *stopped_consumer) -> void override;
 
+        auto create_consumer(
+            memory_map &mmap,
+            std::uint32_t max_tasks,
+            comch_consumer_callbacks callbacks
+        ) -> comch_consumer*;
+
     protected:
         auto do_stop_if_able() -> void;
 

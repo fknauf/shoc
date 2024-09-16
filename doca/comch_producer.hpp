@@ -15,9 +15,11 @@ namespace doca {
 
     struct comch_producer_callbacks {
         using send_completion_callback = std::function<void(comch_producer &, doca_comch_producer_task_send *task, doca_data task_user_data)>;
+        using state_changed_callback = std::function<void(comch_producer &, doca_ctx_states prev_state, doca_ctx_states next_state)>;
 
         send_completion_callback send_completion = {};
         send_completion_callback send_error = {};
+        state_changed_callback state_changed = {};
     };
 
     class comch_producer:
@@ -25,6 +27,7 @@ namespace doca {
     {
     public:
         comch_producer(
+            context_parent<comch_producer> *parent,
             doca_comch_connection *connection,
             std::uint32_t max_tasks,
             comch_producer_callbacks callbacks = {}
@@ -37,12 +40,20 @@ namespace doca {
             return doca_comch_producer_as_ctx(handle_.handle());
         }
 
+        auto stop() -> void override;
+
         auto send(
             buffer buf,
             std::span<std::uint8_t> immediate_data,
             std::uint32_t consumer_id,
             doca_data task_user_data = { .ptr = nullptr }
         ) -> void;
+
+    protected:
+        auto state_changed(
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void override;
 
     private:
         static auto send_completion_entry(
@@ -58,6 +69,7 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_comch_producer> handle_ { doca_comch_producer_destroy };
+        context_parent<comch_producer> *parent_ = nullptr;
         comch_producer_callbacks callbacks_;
     };
 }

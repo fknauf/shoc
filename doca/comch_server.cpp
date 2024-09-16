@@ -53,11 +53,11 @@ namespace doca {
             &base_comch_server::server_connection_entry,
             &base_comch_server::server_disconnection_entry
         ));
-        //enforce_success(doca_comch_server_event_consumer_register(
-        //    handle_.handle(),
-        //    &base_comch_server::new_consumer_entry,
-        //    &base_comch_server::expired_consumer_entry
-        //));
+        enforce_success(doca_comch_server_event_consumer_register(
+            handle_.handle(),
+            &base_comch_server::new_consumer_entry,
+            &base_comch_server::expired_consumer_entry
+        ));
         enforce_success(doca_comch_server_set_max_msg_size(
             handle_.handle(),
             limits.max_msg_size
@@ -69,7 +69,9 @@ namespace doca {
     }
 
     base_comch_server::~base_comch_server() {
-        doca_ctx_stop(as_ctx());
+        // server should already be stopped here because its owned by the progress_engine
+        // that stops and waits for everything to finish before it's destroyed.
+        stop();
     }
 
     auto base_comch_server::send_completion_entry(
@@ -181,6 +183,48 @@ namespace doca {
         }
     }
 
+    auto base_comch_server::new_consumer_entry(
+        [[maybe_unused]] doca_comch_event_consumer *event,
+        doca_comch_connection *comch_connection,
+        std::uint32_t remote_consumer_id
+    ) -> void {
+        auto server = get_comch_server_from_connection(comch_connection);
+
+        if(server == nullptr) {
+            logger->error("got new consumer event without comch_server");
+            return;
+        }
+
+        try {
+            server->new_consumer(comch_connection, remote_consumer_id);
+        } catch(std::exception &e) {
+            logger->error("comch_server new consumer handler failed: {}", e.what());
+        } catch(...) {
+            logger->error("comch_server new consumer handler failed with unknown error");
+        }
+    }
+
+    auto base_comch_server::expired_consumer_entry(
+        [[maybe_unused]] doca_comch_event_consumer *event,
+        doca_comch_connection *comch_connection,
+        std::uint32_t remote_consumer_id
+    ) -> void {
+        auto server = get_comch_server_from_connection(comch_connection);
+
+        if(server == nullptr) {
+            logger->error("got expired consumer event without comch_server");
+            return;
+        }
+
+        try {
+            server->expired_consumer(comch_connection, remote_consumer_id);
+        } catch(std::exception &e) {
+            logger->error("comch_server expired consumer handler failed: {}", e.what());
+        } catch(...) {
+            logger->error("comch_server expired consumer handler failed with unknown error");
+        }
+    }
+
     auto base_comch_server::send_response(doca_comch_connection *con, std::string_view message) -> void {
         doca_comch_task_send *send_task;
 
@@ -238,8 +282,8 @@ namespace doca {
     {}
 
     auto comch_server::send_completion(
-        [[maybe_unused]] doca_comch_task_send *task,
-        [[maybe_unused]] doca_data task_user_data
+        doca_comch_task_send *task,
+        doca_data task_user_data
     ) -> void {
         if(callbacks_.send_completion) {
             callbacks_.send_completion(*this, task, task_user_data);
@@ -247,8 +291,8 @@ namespace doca {
     }
     
     auto comch_server::send_error(
-        [[maybe_unused]] doca_comch_task_send *task,
-        [[maybe_unused]] doca_data task_user_data
+        doca_comch_task_send *task,
+        doca_data task_user_data
     ) -> void {
         if(callbacks_.send_error) {
             callbacks_.send_error(*this, task, task_user_data);
@@ -256,8 +300,8 @@ namespace doca {
     }
     
     auto comch_server::msg_recv(
-        [[maybe_unused]] std::span<std::uint8_t> recv_buffer,
-        [[maybe_unused]] doca_comch_connection *comch_connection
+        std::span<std::uint8_t> recv_buffer,
+        doca_comch_connection *comch_connection
     ) -> void {
         if(callbacks_.message_received) {
             callbacks_.message_received(*this, recv_buffer, comch_connection);
@@ -265,8 +309,8 @@ namespace doca {
     }
 
     auto comch_server::server_connection(
-        [[maybe_unused]] doca_comch_connection *comch_connection,
-        [[maybe_unused]] std::uint8_t change_successful
+        doca_comch_connection *comch_connection,
+        std::uint8_t change_successful
     ) -> void {
         if(callbacks_.server_connection) {
             callbacks_.server_connection(*this, comch_connection, change_successful);
@@ -274,11 +318,29 @@ namespace doca {
     }
 
     auto comch_server::server_disconnection(
-        [[maybe_unused]] doca_comch_connection *comch_connection,
-        [[maybe_unused]] std::uint8_t change_successful
+        doca_comch_connection *comch_connection,
+        std::uint8_t change_successful
     ) -> void {
         if(callbacks_.server_disconnection) {
             callbacks_.server_disconnection(*this, comch_connection, change_successful);
+        }
+    }
+
+    auto comch_server::new_consumer(
+        doca_comch_connection *comch_connection,
+        std::uint32_t remote_consumer_id
+    ) -> void {
+        if(callbacks_.new_consumer) {
+            callbacks_.new_consumer(*this, comch_connection, remote_consumer_id);
+        }
+    }
+
+    auto comch_server::expired_consumer(
+        doca_comch_connection *comch_connection,
+        std::uint32_t remote_consumer_id
+    ) -> void {
+        if(callbacks_.expired_consumer) {
+            callbacks_.expired_consumer(*this, comch_connection, remote_consumer_id);
         }
     }
 }

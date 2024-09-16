@@ -41,6 +41,11 @@ namespace doca {
 
         auto stop() -> void override;
 
+        template<typename... Args>
+        auto create_producer(Args&&... args) {
+            return active_producers_.create_context(engine(), std::forward<Args>(args)...);
+        }
+
     protected:
         virtual auto send_completion(
             [[maybe_unused]] doca_comch_task_send *task,
@@ -69,6 +74,18 @@ namespace doca {
         virtual auto server_disconnection(
             [[maybe_unused]] doca_comch_connection *comch_connection,
             [[maybe_unused]] std::uint8_t change_successful
+        ) -> void {
+        }
+
+        virtual auto new_consumer(
+            [[maybe_unused]] doca_comch_connection *comch_connection,
+            [[maybe_unused]] std::uint32_t remote_consumer_id
+        ) -> void {
+        }
+
+        virtual auto expired_consumer(
+            [[maybe_unused]] doca_comch_connection *comch_connection,
+            [[maybe_unused]] std::uint32_t remote_consumer_id
         ) -> void {
         }
 
@@ -113,6 +130,18 @@ namespace doca {
             doca_ctx_states next_state
         ) -> void;
 
+        static auto new_consumer_entry(
+            doca_comch_event_consumer *event,
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
+        ) -> void;
+
+        static auto expired_consumer_entry(
+            doca_comch_event_consumer *event,
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
+        ) -> void;
+
         unique_handle<doca_comch_server> handle_ { doca_comch_server_destroy };
 
         auto do_stop_if_able() -> void;
@@ -128,6 +157,7 @@ namespace doca {
         using send_completion_callback = std::function<void (comch_server &, doca_comch_task_send *task, doca_data)>;
         using msg_recv_callback        = std::function<void (comch_server &, std::span<std::uint8_t>, doca_comch_connection*)>;
         using connection_callback      = std::function<void (comch_server &, doca_comch_connection*, std::uint8_t)>;
+        using consumer_callback        = std::function<void (comch_server &, doca_comch_connection*, std::uint32_t)>;
 
         state_changed_callback state_changed = {};
         msg_recv_callback message_received = {};
@@ -135,6 +165,8 @@ namespace doca {
         send_completion_callback send_error = {};
         connection_callback server_connection = {};
         connection_callback server_disconnection = {};
+        consumer_callback new_consumer = {};
+        consumer_callback expired_consumer = {};
     };
 
     class comch_server:
@@ -151,28 +183,38 @@ namespace doca {
 
     protected:
         auto send_completion(
-            [[maybe_unused]] doca_comch_task_send *task,
-            [[maybe_unused]] doca_data task_user_data
+            doca_comch_task_send *task,
+            doca_data task_user_data
         ) -> void override;
         
         auto send_error(
-            [[maybe_unused]] doca_comch_task_send *task,
-            [[maybe_unused]] doca_data task_user_data
+            doca_comch_task_send *task,
+            doca_data task_user_data
         ) -> void override;
         
         auto msg_recv(
-            [[maybe_unused]] std::span<std::uint8_t> recv_buffer,
-            [[maybe_unused]] doca_comch_connection *comch_connection
+            std::span<std::uint8_t> recv_buffer,
+            doca_comch_connection *comch_connection
         ) -> void override;
 
         auto server_connection(
-            [[maybe_unused]] doca_comch_connection *comch_connection,
-            [[maybe_unused]] std::uint8_t change_successful
+            doca_comch_connection *comch_connection,
+            std::uint8_t change_successful
         ) -> void override;
 
         auto server_disconnection(
-            [[maybe_unused]] doca_comch_connection *comch_connection,
-            [[maybe_unused]] std::uint8_t change_successful
+            doca_comch_connection *comch_connection,
+            std::uint8_t change_successful
+        ) -> void override;
+
+        auto new_consumer(
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
+        ) -> void override;
+
+        auto expired_consumer(
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
         ) -> void override;
 
     private:

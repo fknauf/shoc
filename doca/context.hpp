@@ -45,6 +45,10 @@ namespace doca {
             doca_ctx_states next_state
         ) -> void;
 
+        auto engine() { 
+            return engine_;
+        }
+
     private:
         template<std::derived_from<context> BaseContext>
         friend class dependent_contexts;

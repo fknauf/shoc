@@ -93,7 +93,7 @@ namespace doca {
             return doca_comch_consumer_as_ctx(handle_.handle());
         }
 
-        auto post_recv(buffer dest, doca_data task_user_data = { .ptr = nullptr }) -> void;
+        auto post_recv_msg(buffer dest, doca_data task_user_data = { .ptr = nullptr }) -> void;
     
     protected:
         auto state_changed(

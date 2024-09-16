@@ -16,6 +16,7 @@ common_srcs = [
     'doca/buffer_inventory.cpp',
     'doca/buffer_pool.cpp',
     'doca/comch_client.cpp',
+    'doca/comch_consumer.cpp',
     'doca/comch_device.cpp',
     'doca/comch_producer.cpp',
     'doca/comch_server.cpp',

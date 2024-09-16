@@ -218,6 +218,14 @@ namespace doca {
         }
     }
 
+    auto base_comch_client::create_consumer(
+        memory_map &mmap,
+        std::uint32_t max_tasks,
+        comch_consumer_callbacks callbacks
+    ) -> comch_consumer* {
+        return active_consumers_.create_context<comch_consumer>(engine(), this, this->get_connection(), mmap, max_tasks, std::move(callbacks));
+    }
+
     comch_client::comch_client(
         std::string const &server_name,
         comch_device &dev,

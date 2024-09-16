@@ -54,6 +54,10 @@ namespace doca {
         ));
     }
 
+    comch_consumer::~comch_consumer() {
+        stop();
+    }
+
     auto comch_consumer::post_recv_msg(buffer dest, doca_data task_user_data) -> void {
         doca_comch_consumer_task_post_recv *task;
 
@@ -87,7 +91,9 @@ namespace doca {
             logger->error("got post_recv completion event without comch_consumer");
         } else {
             try {
-                callbacks_.post_recv_completion(*this, task);
+                if(consumer->callbacks_.post_recv_completion) {
+                    consumer->callbacks_.post_recv_completion(*consumer, task);
+                }
             } catch(std::exception &ex) {
                 logger->error("comch_consumer: post_recv completion event handler failed: {}", ex.what());
             } catch(...) {
@@ -97,7 +103,7 @@ namespace doca {
     }
  
     auto comch_consumer::post_recv_task_error_entry(
-        doca_comch_consumer_task_post_recv *task,
+        doca_comch_consumer_task_post_recv *raw_task,
         doca_data task_user_data,
         doca_data ctx_user_data
     ) -> void {
@@ -110,7 +116,9 @@ namespace doca {
             logger->error("got post_recv error event without comch_consumer");
         } else {
             try {
-                callbacks_.post_recv_error(*this, task);
+                if(consumer->callbacks_.post_recv_error) {
+                    consumer->callbacks_.post_recv_error(*consumer, task);
+                }
             } catch(std::exception &ex) {
                 logger->error("comch_consumer: post_recv error event handler failed: {}", ex.what());
             } catch(...) {
@@ -136,7 +144,6 @@ namespace doca {
     }
 
     auto comch_consumer::stop() -> void {
-        enforce_success(doca_ctx_stop(handle_.handle()));
-        parent_->signal_stopped_child(this);
+        enforce_success(doca_ctx_stop(as_ctx()));
     }
 }
