@@ -72,16 +72,12 @@ int main() {
             std::span<std::uint8_t> msgbuf,
             [[maybe_unused]] doca_comch_connection *con
         ) {
-
-
             auto msg = std::string_view{ reinterpret_cast<char const*>(msgbuf.data()), msgbuf.size() };
             std::cout << msg << std::endl;
 
             if(msg == "ready") {
                 self.create_consumer(mmap, 32, consumer_callbacks);
             }
-
-            self.stop();
         }
     };
 

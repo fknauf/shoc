@@ -61,6 +61,71 @@ namespace doca {
         doca_data user_data_;
     };
 
+    class base_comch_consumer:
+        public context
+    {
+    public:
+        using payload_type = std::span<char>;
+
+        base_comch_consumer(
+            context_parent<base_comch_consumer> *parent,
+            doca_comch_connection *connection,
+            memory_map &user_mmap,
+            std::uint32_t max_tasks
+        );
+
+        ~base_comch_consumer();
+
+        auto stop() -> void override;
+
+        [[nodiscard]]
+        auto as_ctx() const -> doca_ctx* override {
+            return doca_comch_consumer_as_ctx(handle_.handle());
+        }
+
+        auto post_recv_msg(
+            buffer dest,
+            doca_data task_user_data = { .ptr = nullptr }
+        ) -> void;
+
+    protected:
+        auto state_changed(
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void override;
+
+        virtual auto post_recv_task_completion(
+            [[maybe_unused]] comch_consumer_task_post_recv &task
+        ) -> void {
+        }
+
+        virtual auto post_recv_task_error(
+            [[maybe_unused]] comch_consumer_task_post_recv &task
+        ) -> void {
+        }
+
+    private:
+        static auto post_recv_task_completion_entry(
+            doca_comch_consumer_task_post_recv *task,
+            doca_data task_user_data,
+            doca_data ctx_user_data
+        ) -> void;
+
+        static auto post_recv_task_error_entry(
+            doca_comch_consumer_task_post_recv *task,
+            doca_data task_user_data,
+            doca_data ctx_user_data
+        ) -> void;
+
+        auto do_stop_if_able() -> void;
+
+        unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
+        context_parent<base_comch_consumer> *parent_ = nullptr;
+
+        int currently_handling_tasks_ = 0;
+        bool stop_requested_ = false;
+    };
+
     struct comch_consumer_callbacks {
         using state_changed_callback = std::function<void (
             comch_consumer &consumer,
@@ -79,56 +144,31 @@ namespace doca {
     };
 
     class comch_consumer:
-        public context
+        public base_comch_consumer
     {
     public:
-        using payload_type = std::span<char>;
-
         comch_consumer(
-            context_parent<comch_consumer> *parent,
+            context_parent<base_comch_consumer> *parent,
             doca_comch_connection *connection,
             memory_map &user_mmap,
             std::uint32_t max_tasks,
             comch_consumer_callbacks callbacks
         );
 
-        ~comch_consumer();
-
-        auto stop() -> void override;
-
-        [[nodiscard]]
-        auto as_ctx() const -> doca_ctx* override {
-            return doca_comch_consumer_as_ctx(handle_.handle());
-        }
-
-        auto post_recv_msg(buffer dest, doca_data task_user_data = { .ptr = nullptr }) -> void;
-    
     protected:
         auto state_changed(
             doca_ctx_states prev_state,
             doca_ctx_states next_state
         ) -> void override;
 
-    private:
-        static auto post_recv_task_completion_entry(
-            doca_comch_consumer_task_post_recv *task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
+        auto post_recv_task_completion(
+            comch_consumer_task_post_recv &task
+        ) -> void override;
 
-        static auto post_recv_task_error_entry(
-            doca_comch_consumer_task_post_recv *task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
+        auto post_recv_task_error(
+            comch_consumer_task_post_recv &task
+        ) -> void override;
 
-        auto do_stop_if_able() -> void;
-
-        unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
-        context_parent<comch_consumer> *parent_ = nullptr;
         comch_consumer_callbacks callbacks_;
-
-        int currently_handling_tasks_ = 0;
-        bool stop_requested_ = false;
     };
 }

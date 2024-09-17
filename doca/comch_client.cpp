@@ -205,7 +205,7 @@ namespace doca {
         do_stop_if_able();
     }
 
-    auto base_comch_client::signal_stopped_child(comch_consumer *stopped_child) -> void {
+    auto base_comch_client::signal_stopped_child(base_comch_consumer *stopped_child) -> void {
         active_consumers_.remove_stopped_context(stopped_child);
         if(stop_requested_) {
             do_stop_if_able();

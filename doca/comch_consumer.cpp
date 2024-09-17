@@ -24,41 +24,13 @@ namespace {
 }
 
 namespace doca {
-    class task_post_recv {
-    public:
-        task_post_recv(doca_comch_consumer_task_post_recv *task):
-            handle_(task)
-        { }
-
-        ~task_post_recv() {
-            doca_task_free(doca_comch_consumer_task_post_recv_as_task(handle_));
-        }
-
-        auto get_buf() -> buffer {
-            return { doca_comch_consumer_task_post_recv_get_buf(handle_) };
-        }
-
-        auto get_status() const {
-            return doca_task_get_status(as_task());
-        }
-
-    private:
-        auto as_task() const noexcept -> doca_task* {
-            return doca_comch_consumer_task_post_recv_as_task(handle_);
-        }
-
-        doca_comch_consumer_task_post_recv *handle_;
-    };
-
-    comch_consumer::comch_consumer(
-        context_parent<comch_consumer> *parent,
+    base_comch_consumer::base_comch_consumer(
+        context_parent<base_comch_consumer> *parent,
         doca_comch_connection *connection,
         memory_map &user_mmap,
-        std::uint32_t max_tasks,
-        comch_consumer_callbacks callbacks
+        std::uint32_t max_tasks
     ):
-        parent_ { parent },
-        callbacks_ { std::move(callbacks) }
+        parent_ { parent }
     {
         assert(parent_ != nullptr);
 
@@ -71,17 +43,17 @@ namespace doca {
 
         enforce_success(doca_comch_consumer_task_post_recv_set_conf(
             handle_.handle(),
-            &comch_consumer::post_recv_task_completion_entry,
-            &comch_consumer::post_recv_task_error_entry,
+            &base_comch_consumer::post_recv_task_completion_entry,
+            &base_comch_consumer::post_recv_task_error_entry,
             max_tasks
         ));
     }
 
-    comch_consumer::~comch_consumer() {
+    base_comch_consumer::~base_comch_consumer() {
         assert(get_state() == DOCA_CTX_STATE_IDLE);
     }
 
-    auto comch_consumer::post_recv_msg(buffer dest, doca_data task_user_data) -> void {
+    auto base_comch_consumer::post_recv_msg(buffer dest, doca_data task_user_data) -> void {
         doca_comch_consumer_task_post_recv *task;
 
         enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle_.handle(), dest.handle(), &task));
@@ -100,13 +72,13 @@ namespace doca {
         doca_buf_inc_refcount(dest.handle(), nullptr);
     }
 
-    auto comch_consumer::post_recv_task_completion_entry(
+    auto base_comch_consumer::post_recv_task_completion_entry(
         doca_comch_consumer_task_post_recv *raw_task,
         doca_data task_user_data,
         doca_data ctx_user_data
     ) -> void {
         auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto consumer = static_cast<comch_consumer*>(base_context);
+        auto consumer = static_cast<base_comch_consumer*>(base_context);
 
         {
             auto guard = counter_guard { consumer->currently_handling_tasks_ };
@@ -116,9 +88,7 @@ namespace doca {
                 logger->error("got post_recv completion event without comch_consumer");
             } else {
                 try {
-                    if(consumer->callbacks_.post_recv_completion) {
-                        consumer->callbacks_.post_recv_completion(*consumer, task);
-                    }
+                    consumer->post_recv_task_completion(task);
                 } catch(std::exception &ex) {
                     logger->error("comch_consumer: post_recv completion event handler failed: {}", ex.what());
                 } catch(...) {
@@ -132,13 +102,13 @@ namespace doca {
         }
     }
  
-    auto comch_consumer::post_recv_task_error_entry(
+    auto base_comch_consumer::post_recv_task_error_entry(
         doca_comch_consumer_task_post_recv *raw_task,
         doca_data task_user_data,
         doca_data ctx_user_data
     ) -> void {
         auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto consumer = static_cast<comch_consumer*>(base_context);
+        auto consumer = static_cast<base_comch_consumer*>(base_context);
 
         {
             auto guard = counter_guard { consumer->currently_handling_tasks_ };
@@ -148,9 +118,7 @@ namespace doca {
                 logger->error("got post_recv error event without comch_consumer");
             } else {
                 try {
-                    if(consumer->callbacks_.post_recv_error) {
-                        consumer->callbacks_.post_recv_error(*consumer, task);
-                    }
+                    consumer->post_recv_task_error(task);
                 } catch(std::exception &ex) {
                     logger->error("comch_consumer: post_recv error event handler failed: {}", ex.what());
                 } catch(...) {
@@ -164,16 +132,10 @@ namespace doca {
         }
     }
 
-    auto comch_consumer::state_changed(
-        doca_ctx_states prev_state,
+    auto base_comch_consumer::state_changed(
+        [[maybe_unused]] doca_ctx_states prev_state,
         doca_ctx_states next_state
     ) -> void {
-        logger->debug("consumer state changed {} -> {}", prev_state, next_state);
-
-        if(callbacks_.state_changed) {
-            callbacks_.state_changed(*this, prev_state, next_state);
-        }
-
         if(
             next_state == DOCA_CTX_STATE_IDLE &&
             parent_ != nullptr
@@ -182,12 +144,12 @@ namespace doca {
         }
     }
 
-    auto comch_consumer::stop() -> void {
+    auto base_comch_consumer::stop() -> void {
         stop_requested_ = true;
         do_stop_if_able();
     }
 
-    auto comch_consumer::do_stop_if_able() -> void {
+    auto base_comch_consumer::do_stop_if_able() -> void {
         if(currently_handling_tasks_ > 0) {
             return;
         }
@@ -198,4 +160,44 @@ namespace doca {
             throw doca_exception(err);
         }
     }
+
+    comch_consumer::comch_consumer(
+        context_parent<base_comch_consumer> *parent,
+        doca_comch_connection *connection,
+        memory_map &user_mmap,
+        std::uint32_t max_tasks,
+        comch_consumer_callbacks callbacks
+    ):
+        base_comch_consumer { parent, connection, user_mmap, max_tasks },
+        callbacks_ { std::move(callbacks ) }
+    {
+    }
+
+    auto comch_consumer::state_changed(
+        doca_ctx_states prev_state,
+        doca_ctx_states next_state
+    ) -> void {
+        if(callbacks_.state_changed) {
+            callbacks_.state_changed(*this, prev_state, next_state);
+        }
+
+        base_comch_consumer::state_changed(prev_state, next_state);
+    }
+
+    auto comch_consumer::post_recv_task_completion(
+        comch_consumer_task_post_recv &task
+    ) -> void {
+        if(callbacks_.post_recv_completion) {
+            callbacks_.post_recv_completion(*this, task);
+        }
+    }
+
+    auto comch_consumer::post_recv_task_error(
+        comch_consumer_task_post_recv &task
+    ) -> void {
+        if(callbacks_.post_recv_error) {
+            callbacks_.post_recv_error(*this, task);
+        }
+    }
+
 }
