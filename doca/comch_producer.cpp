@@ -2,6 +2,8 @@
 
 #include "logger.hpp"
 
+#include <cassert>
+
 namespace doca {
     comch_producer::comch_producer(
         context_parent<comch_producer> *parent,
@@ -24,6 +26,10 @@ namespace doca {
             &comch_producer::send_error_entry,
             max_tasks
         ));
+    }
+
+    comch_producer::~comch_producer() {
+        assert(get_state() == DOCA_CTX_STATE_IDLE);
     }
 
     auto comch_producer::send(

@@ -53,3 +53,9 @@ executable('comch_data_client', [ 'progs/comch_data_client.cpp' ],
         link_with: libdocapp,
         include_directories: inc_dirs,
         install: false)
+
+executable('comch_data_server', [ 'progs/comch_data_server.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
