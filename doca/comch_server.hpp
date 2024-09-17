@@ -43,7 +43,7 @@ namespace doca {
 
         template<typename... Args>
         auto create_producer(Args&&... args) {
-            return active_producers_.create_context(engine(), std::forward<Args>(args)...);
+            return active_producers_.create_context<doca::comch_producer>(engine(), this, std::forward<Args>(args)...);
         }
 
     protected:
