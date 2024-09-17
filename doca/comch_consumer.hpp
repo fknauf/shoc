@@ -25,7 +25,7 @@ namespace doca {
         { }
 
         ~comch_consumer_task_post_recv() {
-            doca_task_free(doca_comch_consumer_task_post_recv_as_task(handle_));
+            doca_task_free(as_task());
         }
 
         auto buf() const {
@@ -47,27 +47,35 @@ namespace doca {
             return user_data_;
         }
 
+        auto status() const {
+            return doca_task_get_status(as_task());
+        }
+
     private:
+        auto as_task() const -> doca_task* {
+            return doca_comch_consumer_task_post_recv_as_task(handle_);
+        }
+
         doca_comch_consumer_task_post_recv *handle_;
         buffer buf_;
         doca_data user_data_;
     };
 
     struct comch_consumer_callbacks {
-        using post_recv_completion_callback = std::function<void (
-            comch_consumer &consumer,
-            comch_consumer_task_post_recv &task
-        )>;
-
         using state_changed_callback = std::function<void (
             comch_consumer &consumer,
             doca_ctx_states prev_state,
             doca_ctx_states next_state
         )>;
 
+        using post_recv_completion_callback = std::function<void (
+            comch_consumer &consumer,
+            comch_consumer_task_post_recv &task
+        )>;
+
+        state_changed_callback state_changed = {};
         post_recv_completion_callback post_recv_completion = {};
         post_recv_completion_callback post_recv_error = {};
-        state_changed_callback state_changed = {};
     };
 
     class comch_consumer:
@@ -114,8 +122,13 @@ namespace doca {
             doca_data ctx_user_data
         ) -> void;
 
+        auto do_stop_if_able() -> void;
+
         unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
         context_parent<comch_consumer> *parent_ = nullptr;
         comch_consumer_callbacks callbacks_;
+
+        int currently_handling_tasks_ = 0;
+        bool stop_requested_ = false;
     };
 }

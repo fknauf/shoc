@@ -14,12 +14,20 @@ namespace doca {
     class comch_producer;
 
     struct comch_producer_callbacks {
-        using send_completion_callback = std::function<void(comch_producer &, doca_comch_producer_task_send *task, doca_data task_user_data)>;
-        using state_changed_callback = std::function<void(comch_producer &, doca_ctx_states prev_state, doca_ctx_states next_state)>;
+        using state_changed_callback = std::function<void(
+            comch_producer &self,
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        )>;
+        using send_completion_callback = std::function<void(
+            comch_producer &self, 
+            doca_comch_producer_task_send *task,
+            doca_data task_user_data
+        )>;
 
+        state_changed_callback state_changed = {};
         send_completion_callback send_completion = {};
         send_completion_callback send_error = {};
-        state_changed_callback state_changed = {};
     };
 
     class comch_producer:

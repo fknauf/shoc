@@ -153,11 +153,35 @@ namespace doca {
     class comch_server;
 
     struct comch_server_callbacks {
-        using state_changed_callback   = std::function<void (comch_server &, doca_ctx_states, doca_ctx_states)>;
-        using send_completion_callback = std::function<void (comch_server &, doca_comch_task_send *task, doca_data)>;
-        using msg_recv_callback        = std::function<void (comch_server &, std::span<std::uint8_t>, doca_comch_connection*)>;
-        using connection_callback      = std::function<void (comch_server &, doca_comch_connection*, std::uint8_t)>;
-        using consumer_callback        = std::function<void (comch_server &, doca_comch_connection*, std::uint32_t)>;
+        using state_changed_callback   = std::function<void(
+            comch_server &self,
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        )>;
+        
+        using send_completion_callback = std::function<void(
+            comch_server &self,
+            doca_comch_task_send *task,
+            doca_data task_user_data
+        )>;
+        
+        using msg_recv_callback = std::function<void(
+            comch_server &self,
+            std::span<std::uint8_t> data_range,
+            doca_comch_connection *comch_connection
+        )>;
+        
+        using connection_callback = std::function<void(
+            comch_server &self,
+            doca_comch_connection *comch_connection,
+            std::uint8_t change_successful
+        )>;
+        
+        using consumer_callback = std::function<void(
+            comch_server &self,
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
+        )>;
 
         state_changed_callback state_changed = {};
         msg_recv_callback message_received = {};

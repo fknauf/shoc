@@ -129,9 +129,23 @@ namespace doca {
     class comch_client;
 
     struct comch_client_callbacks {
-        using state_changed_callback   = std::function<void (comch_client &client, doca_ctx_states prev_state, doca_ctx_states next_state)>;
-        using send_completion_callback = std::function<void (comch_client &client, doca_comch_task_send *task, doca_data)>;
-        using msg_recv_callback        = std::function<void (comch_client &client, std::span<std::uint8_t>, doca_comch_connection *)>;
+        using state_changed_callback = std::function<void(
+            comch_client &self, 
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        )>;
+
+        using send_completion_callback = std::function<void(
+            comch_client &self, 
+            doca_comch_task_send *task,
+            doca_data task_user_data
+        )>;
+
+        using msg_recv_callback = std::function<void(
+            comch_client &self, 
+            std::span<std::uint8_t> data_range,
+            doca_comch_connection *comch_connection
+        )>;
 
         state_changed_callback state_changed = {};
         msg_recv_callback message_received = {};
