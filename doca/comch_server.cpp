@@ -256,7 +256,7 @@ namespace doca {
         do_stop_if_able();
     }
 
-    auto base_comch_server::signal_stopped_child(comch_producer *stopped_child) -> void {
+    auto base_comch_server::signal_stopped_child(base_comch_producer *stopped_child) -> void {
         active_producers_.remove_stopped_context(stopped_child);
 
         if(stop_requested_) {

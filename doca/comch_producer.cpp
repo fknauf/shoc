@@ -5,14 +5,12 @@
 #include <cassert>
 
 namespace doca {
-    comch_producer::comch_producer(
-        context_parent<comch_producer> *parent,
+    base_comch_producer::base_comch_producer(
+        context_parent<base_comch_producer> *parent,
         doca_comch_connection *connection,
-        std::uint32_t max_tasks,
-        comch_producer_callbacks callbacks
+        std::uint32_t max_tasks
     ):
-        parent_ { parent },
-        callbacks_ { std::move(callbacks) }
+        parent_ { parent }
     {
         doca_comch_producer *raw_handle = nullptr;
         enforce_success(doca_comch_producer_create(connection, &raw_handle));
@@ -22,17 +20,17 @@ namespace doca {
 
         enforce_success(doca_comch_producer_task_send_set_conf(
             handle_.handle(),
-            &comch_producer::send_completion_entry,
-            &comch_producer::send_error_entry,
+            &base_comch_producer::send_completion_entry,
+            &base_comch_producer::send_error_entry,
             max_tasks
         ));
     }
 
-    comch_producer::~comch_producer() {
+    base_comch_producer::~base_comch_producer() {
         assert(get_state() == DOCA_CTX_STATE_IDLE);
     }
 
-    auto comch_producer::send(
+    auto base_comch_producer::send(
         buffer buf,
         std::span<std::uint8_t> immediate_data,
         std::uint32_t consumer_id,
@@ -61,14 +59,10 @@ namespace doca {
         }
     }
 
-    auto comch_producer::state_changed(
-        doca_ctx_states prev_state,
+    auto base_comch_producer::state_changed(
+        [[maybe_unused]] doca_ctx_states prev_state,
         doca_ctx_states next_state
     ) -> void {
-        if(callbacks_.state_changed) {
-            callbacks_.state_changed(*this, prev_state, next_state);
-        }
-
         if(
             next_state == DOCA_CTX_STATE_IDLE &&
             parent_ != nullptr
@@ -77,19 +71,19 @@ namespace doca {
         }
     }
 
-    auto comch_producer::send_completion_entry(
+    auto base_comch_producer::send_completion_entry(
         [[maybe_unused]] doca_comch_producer_task_send *task,
         doca_data task_user_data,
         doca_data ctx_user_data
     ) -> void {
         auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto producer = static_cast<comch_producer*>(base_context);
+        auto producer = static_cast<base_comch_producer*>(base_context);
 
         if(producer == nullptr) {
             logger->error("got send completion event without comch_producer");
-        } else if(producer->callbacks_.send_completion) {
+        } else {
             try {
-                producer->callbacks_.send_completion(*producer, task, task_user_data);
+                producer->send_completion(task, task_user_data);
             } catch(std::exception &e) {
                 logger->error("comch_producer send completion event handler failed: {}", e.what());
             } catch(...) {
@@ -100,19 +94,19 @@ namespace doca {
         doca_task_free(doca_comch_producer_task_send_as_task(task));
     }
         
-    auto comch_producer::send_error_entry(
+    auto base_comch_producer::send_error_entry(
         doca_comch_producer_task_send *task,
         doca_data task_user_data,
         doca_data ctx_user_data
     ) -> void {
         auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto producer = static_cast<comch_producer*>(base_context);
+        auto producer = static_cast<base_comch_producer*>(base_context);
 
         if(producer == nullptr) {
             logger->error("got send error event without comch_producer");
-        } else if(producer->callbacks_.send_completion) {
+        } else {
             try {
-                producer->callbacks_.send_completion(*producer, task, task_user_data);
+                producer->send_error(task, task_user_data);
             } catch(std::exception &e) {
                 logger->error("comch_producer send error event handler failed: {}", e.what());
             } catch(...) {
@@ -123,7 +117,46 @@ namespace doca {
         doca_task_free(doca_comch_producer_task_send_as_task(task));
     }
 
-    auto comch_producer::stop() -> void {
-        doca_ctx_stop(as_ctx());
+    auto base_comch_producer::stop() -> void {
+        enforce_success(doca_ctx_stop(as_ctx()));
+    }
+
+    comch_producer::comch_producer(
+        context_parent<base_comch_producer> *parent,
+        doca_comch_connection *connection,
+        std::uint32_t max_tasks,
+        comch_producer_callbacks callbacks
+    ):
+        base_comch_producer { parent, connection, max_tasks },
+        callbacks_ { std::move(callbacks) }
+    {}
+
+    auto comch_producer::state_changed(
+        doca_ctx_states prev_state,
+        doca_ctx_states next_state
+    ) -> void {
+        if(callbacks_.state_changed) {
+            callbacks_.state_changed(*this, prev_state, next_state);
+        }
+
+        base_comch_producer::state_changed(prev_state, next_state);
+    }
+
+    auto comch_producer::send_completion(
+        doca_comch_producer_task_send *task,
+        doca_data task_user_data
+    ) -> void {
+        if(callbacks_.send_completion) {
+            callbacks_.send_completion(*this, task, task_user_data);
+        }
+    }
+
+    auto comch_producer::send_error(
+        doca_comch_producer_task_send *task,
+        doca_data task_user_data
+    ) -> void {
+        if(callbacks_.send_completion) {
+            callbacks_.send_error(*this, task, task_user_data);
+        }
     }
 }

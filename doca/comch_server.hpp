@@ -21,7 +21,7 @@ namespace doca {
 
     class base_comch_server:
         public context,
-        public context_parent<comch_producer>
+        public context_parent<base_comch_producer>
     {
     public:
         base_comch_server(
@@ -89,7 +89,7 @@ namespace doca {
         ) -> void {
         }
 
-        auto signal_stopped_child(comch_producer *stopped_child) -> void override;
+        auto signal_stopped_child(base_comch_producer *stopped_child) -> void override;
 
     private:
         static auto send_completion_entry(
@@ -146,7 +146,7 @@ namespace doca {
 
         auto do_stop_if_able() -> void;
 
-        dependent_contexts<comch_producer> active_producers_;
+        dependent_contexts<base_comch_producer> active_producers_;
         bool stop_requested_ = false;
     };    
 
