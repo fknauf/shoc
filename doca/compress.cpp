@@ -93,7 +93,6 @@ namespace doca {
         doca_data task_user_data,
         doca_data ctx_user_data
     ) -> void {
-        auto task = compress_task_compress_deflate { compress_task, task_user_data };
         auto base_context = static_cast<context*>(ctx_user_data.ptr);
         auto self = static_cast<base_compress_context*>(base_context);
 

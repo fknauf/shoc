@@ -49,6 +49,9 @@ namespace doca {
             return parent_->engine();
         }
 
+        [[nodiscard]]
+        auto inflight_tasks() const -> std::size_t;
+
     protected:
         auto init_state_changed_callback() -> void;
 

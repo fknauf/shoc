@@ -52,4 +52,10 @@ namespace doca {
     auto context::connect() -> void {
         engine()->connect(this);
     }
+
+    auto context::inflight_tasks() const -> std::size_t {
+        std::size_t tasks;
+        enforce_success(doca_ctx_get_num_inflight_tasks(as_ctx(), &tasks));
+        return tasks;
+    }
 }
