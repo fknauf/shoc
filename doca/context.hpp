@@ -8,6 +8,7 @@
 #include <concepts>
 #include <functional>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace doca {
@@ -58,50 +59,58 @@ namespace doca {
         progress_engine *engine_ = nullptr;
     };
 
-    template<std::derived_from<context> BaseContext>
+    template<std::derived_from<context> BaseContext = context>
     class dependent_contexts {
     public:
-        auto remove_stopped_context(BaseContext *stopped_ctx) {
-            auto it = std::ranges::find_if(
-                active_contexts_,
-                [stopped_ctx](auto &p) {
-                    return p.get() == stopped_ctx;
-                }
-            );
-
-            if(it != active_contexts_.end()) {
-                active_contexts_.erase(it);
-            }            
+        dependent_contexts() {
+            active_contexts_.max_load_factor(0.75);
         }
 
-        template<std::derived_from<BaseContext> ConcreteContext, typename... Args>
-        auto create_context(progress_engine *engine, Args&&... args) -> ConcreteContext * {
-            // make sure push_back will not throw an exception
-            if(active_contexts_.capacity() == active_contexts_.size()) {
-                auto double_capacity = std::max(std::size_t(8), active_contexts_.capacity() * 2);
-                active_contexts_.reserve(double_capacity);
-            }
+        auto remove_stopped_context(BaseContext *stopped_ctx) -> void {
+            active_contexts_.erase(stopped_ctx);
+        }
 
+        template<
+            std::derived_from<BaseContext> ConcreteContext,
+            typename... Args
+        > auto create_context(
+            progress_engine *engine,
+            Args&&... args
+        ) -> ConcreteContext * {
             auto new_context = std::make_unique<ConcreteContext>(std::forward<Args>(args)...);
+            auto non_owning_ptr = new_context.get();
+
+            // make sure slot exists so inserting will not throw later.
+            auto &slot = active_contexts_[non_owning_ptr];
+
             new_context->connect_to(engine);
-            
             enforce_success(doca_ctx_start(new_context->as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
 
-            auto non_owning_ptr = new_context.get();
-            active_contexts_.push_back(std::move(new_context));
+            slot = std::move(new_context);
 
             return non_owning_ptr;
         }
 
-        auto &active_contexts() {
-            return active_contexts_;
+        auto size() const noexcept {
+            return active_contexts_.size();
+        }
+
+        auto empty() const noexcept -> bool {
+            return active_contexts_.empty();
+        }
+
+        auto stop_all() -> void {
+            for(auto &child : active_contexts_) {
+                child.second->stop();
+            }
         }
 
     private:
-        std::vector<std::unique_ptr<BaseContext>> active_contexts_;
+        //std::vector<std::unique_ptr<BaseContext>> active_contexts_;
+        std::unordered_map<BaseContext*, std::unique_ptr<BaseContext>> active_contexts_;
     };
 
-    template<typename ChildContext>
+    template<typename ChildContext = context>
     class context_parent {
     public:
         context_parent() {

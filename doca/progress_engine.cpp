@@ -21,15 +21,13 @@ namespace doca {
     }
 
     progress_engine::~progress_engine() {
-        logger->debug("~pe: {} contexts still running, stopping them.", connected_contexts_.active_contexts().size());
+        logger->debug("~pe: {} contexts still running, stopping them.", connected_contexts_.size());
 
-        for(auto &ctx : connected_contexts_.active_contexts()) {
-            ctx->stop();
-        }
+        connected_contexts_.stop_all();
 
         logger->debug("~pe: Waiting for contexts to stop...");
 
-        while(!connected_contexts_.active_contexts().empty()) {
+        while(!connected_contexts_.empty()) {
             request_notification();
             wait(10);
             clear_notification();
@@ -37,7 +35,7 @@ namespace doca {
                 // do nothing
             }
 
-            logger->debug("~pe: {} contexts still running.", connected_contexts_.active_contexts().size());
+            logger->debug("~pe: {} contexts still running.", connected_contexts_.size());
         }
     }
 
@@ -104,7 +102,7 @@ namespace doca {
 
     auto progress_engine::main_loop() -> void {
         main_loop_while([this] {
-            return !connected_contexts_.active_contexts().empty();
+            return !connected_contexts_.empty();
         });
     }
 

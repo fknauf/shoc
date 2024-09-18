@@ -197,11 +197,7 @@ namespace doca {
 
     auto base_comch_client::stop() -> void {
         stop_requested_ = true;
-
-        for(auto &child : active_consumers_.active_contexts()) {
-            child->stop();
-        }
-
+        active_consumers_.stop_all();
         do_stop_if_able();
     }
 
@@ -213,7 +209,7 @@ namespace doca {
     }
 
     auto base_comch_client::do_stop_if_able() -> void {
-        if(active_consumers_.active_contexts().empty()) {
+        if(active_consumers_.empty()) {
             context::stop();
         }
     }
