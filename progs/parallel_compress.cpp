@@ -17,7 +17,7 @@
 auto compress_file(std::istream &in, std::ostream &out) {
     std::uint32_t batches;
     std::uint32_t batchsize;
-    std::uint32_t const parallelism = 16;
+    std::uint32_t const parallelism = 32;
 
     in.read(reinterpret_cast<char *>(&batches), sizeof batches);
     in.read(reinterpret_cast<char *>(&batchsize), sizeof batchsize);
@@ -33,8 +33,6 @@ auto compress_file(std::istream &in, std::ostream &out) {
     out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
     out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
 
-    auto start = std::chrono::steady_clock::now();
-
     auto dev = doca::compress_device{};
     auto mmap_src = doca::memory_map { dev, src_data };
     auto mmap_dst = doca::memory_map { dev, dst_data };
@@ -46,6 +44,9 @@ auto compress_file(std::istream &in, std::ostream &out) {
 
     src_buffers.reserve(batches);
     dst_buffers.reserve(batches);
+
+    std::chrono::time_point<std::chrono::steady_clock> start;
+    std::chrono::time_point<std::chrono::steady_clock> end;
 
     for(auto i : std::ranges::views::iota(0u, batches)) {
         auto offset = i * batchsize;
@@ -65,6 +66,8 @@ auto compress_file(std::istream &in, std::ostream &out) {
                 doca::logger->debug("compress changed state {} -> {}", prev_state, next_state);
 
                 if(next_state == DOCA_CTX_STATE_RUNNING) {
+                    start = std::chrono::steady_clock::now();
+
                     for(auto i : std::ranges::views::iota(0u, parallelism)) {
                         self.compress(src_buffers[i], dst_buffers[i], { .u64 = i });
                     }
@@ -89,6 +92,7 @@ auto compress_file(std::istream &in, std::ostream &out) {
                         { .u64 = next_chunk_no }
                     );
                 } else if(self.inflight_tasks() == 0) {
+                    end = std::chrono::steady_clock::now();
                     self.stop();
                 }
             },
@@ -109,7 +113,6 @@ auto compress_file(std::istream &in, std::ostream &out) {
 
     engine.main_loop();
 
-    auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
     doca::logger->info("elapsed time: {} us", elapsed.count());
