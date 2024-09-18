@@ -20,11 +20,11 @@ namespace doca {
     };
 
     class base_comch_client:
-        public context,
-        public context_parent
+        public context
     {
     public:
         base_comch_client(
+            context_parent *parent,
             std::string const &server_name,
             comch_device &dev,
             comch_client_limits const &limits
@@ -158,6 +158,7 @@ namespace doca {
     {
     public:
         comch_client(
+            context_parent *parent,
             std::string const &server_name,
             comch_device &dev,
             comch_client_callbacks callbacks = {},

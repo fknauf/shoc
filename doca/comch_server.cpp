@@ -26,11 +26,14 @@ namespace doca {
     }
 
     base_comch_server::base_comch_server(
+        context_parent *parent,
         std::string const &server_name,
         comch_device &dev,
         device_representor &rep,
         comch_server_limits const &limits
-    ) {
+    ):
+        context { parent }
+    {
         doca_comch_server *doca_server;
 
         enforce_success(doca_comch_server_create(dev.handle(), rep.handle(), server_name.c_str(), &doca_server));
@@ -269,13 +272,14 @@ namespace doca {
     }
 
     comch_server::comch_server(
+        context_parent *parent,
         std::string const &server_name,
         comch_device &dev,
         device_representor &rep,
         comch_server_callbacks callbacks,
         comch_server_limits const &limits
     ):
-        base_comch_server { server_name, dev, rep, limits },
+        base_comch_server { parent, server_name, dev, rep, limits },
         callbacks_ { std::move(callbacks) }
     {}
 

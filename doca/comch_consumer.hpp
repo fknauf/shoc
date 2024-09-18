@@ -89,11 +89,6 @@ namespace doca {
         ) -> void;
 
     protected:
-        auto state_changed(
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void override;
-
         virtual auto post_recv_task_completion(
             [[maybe_unused]] comch_consumer_task_post_recv &task
         ) -> void {
@@ -120,7 +115,6 @@ namespace doca {
         auto do_stop_if_able() -> void;
 
         unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
-        context_parent *parent_ = nullptr;
 
         int currently_handling_tasks_ = 0;
         bool stop_requested_ = false;

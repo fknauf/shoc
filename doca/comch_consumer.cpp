@@ -30,10 +30,8 @@ namespace doca {
         memory_map &user_mmap,
         std::uint32_t max_tasks
     ):
-        parent_ { parent }
+        context { parent }
     {
-        assert(parent_ != nullptr);
-
         doca_comch_consumer* raw_consumer = nullptr;
 
         enforce_success(doca_comch_consumer_create(connection, user_mmap.handle(), &raw_consumer));
@@ -129,18 +127,6 @@ namespace doca {
 
         if(consumer->stop_requested_) {
             consumer->do_stop_if_able();
-        }
-    }
-
-    auto base_comch_consumer::state_changed(
-        [[maybe_unused]] doca_ctx_states prev_state,
-        doca_ctx_states next_state
-    ) -> void {
-        if(
-            next_state == DOCA_CTX_STATE_IDLE &&
-            parent_ != nullptr
-        ) {
-            parent_->signal_stopped_child(this);
         }
     }
 

@@ -31,7 +31,7 @@ namespace doca {
      * possible, e.g. when offloading tasks sequentially).
      */
     class progress_engine:
-        context_parent
+        public context_parent
     {
     public:
         progress_engine();
@@ -65,7 +65,10 @@ namespace doca {
         auto main_loop_while(std::function<bool()> condition) -> void;
 
         auto connect(context *ctx) -> void;
-        auto signal_stopped_child(context *ctx) -> void;
+        auto signal_stopped_child(context *ctx) -> void override;
+        auto engine() -> progress_engine* override {
+            return this;
+        }
 
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;

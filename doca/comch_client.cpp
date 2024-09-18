@@ -24,10 +24,13 @@ namespace doca {
     }
 
     base_comch_client::base_comch_client(
+        context_parent *parent,
         std::string const &server_name,
         comch_device &dev,
         comch_client_limits const &limits
-    ) {
+    ):
+        context { parent }
+    {
         doca_comch_client *doca_client;
 
         enforce_success(doca_comch_client_create(dev.handle(), server_name.c_str(), &doca_client));
@@ -219,16 +222,17 @@ namespace doca {
         std::uint32_t max_tasks,
         comch_consumer_callbacks callbacks
     ) -> comch_consumer* {
-        return active_children_.create_context<comch_consumer>(engine(), this, this->get_connection(), mmap, max_tasks, std::move(callbacks));
+        return active_children_.create_context<comch_consumer>(this, this->get_connection(), mmap, max_tasks, std::move(callbacks));
     }
 
     comch_client::comch_client(
+        context_parent *parent,
         std::string const &server_name,
         comch_device &dev,
         comch_client_callbacks callbacks,
         comch_client_limits const &limits
     ):
-        base_comch_client { server_name, dev, limits },
+        base_comch_client { parent, server_name, dev, limits },
         callbacks_ { std::move(callbacks) }
     { }
 

@@ -2,7 +2,15 @@
 #include "error.hpp"
 #include "progress_engine.hpp"
 
+#include <cassert>
+
 namespace doca {
+    context::context(context_parent *parent):
+        parent_ { parent }
+    {
+        assert(parent != nullptr);
+    }
+
     auto context::init_state_changed_callback() -> void {
         auto ctx = as_ctx();
 
@@ -18,23 +26,17 @@ namespace doca {
         doca_ctx_states next_state
     ) -> void {
         auto obj = static_cast<context*>(user_data.ptr);
-        obj->state_changed(prev_state, next_state);
-    }
 
-    auto context::state_changed(
-        [[maybe_unused]] doca_ctx_states prev_state,
-        doca_ctx_states next_state
-    ) -> void {
+        assert(obj != nullptr);
+
+        obj->state_changed(prev_state, next_state);
+
         if(
             next_state == DOCA_CTX_STATE_IDLE &&
-            engine_ != nullptr
+            obj->parent_ != nullptr
         ) {
-            signal_context_stopped();
+            obj->parent_->signal_stopped_child(obj);
         }
-    }    
-
-    auto context::signal_context_stopped() -> void {
-        engine_->signal_stopped_child(this);
     }
 
     auto context::get_state() const -> doca_ctx_states {
@@ -44,13 +46,10 @@ namespace doca {
     }
 
     auto context::stop() -> void {
-        doca_ctx_stop(as_ctx());
+        enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
     }
 
-    auto context::connect_to(
-        progress_engine *engine
-    ) -> void {
-        engine_ = engine;
-        engine->connect(this);
+    auto context::connect() -> void {
+        engine()->connect(this);
     }
 }

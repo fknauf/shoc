@@ -12,10 +12,23 @@
 #include <vector>
 
 namespace doca {
+    class context;
     class progress_engine;
 
-    class context {
+    class context_parent {
     public:
+        virtual ~context_parent() = default;
+
+        virtual auto signal_stopped_child(context *stopped_child) -> void = 0;
+        virtual auto engine() -> progress_engine* = 0;
+    };
+
+    class context:
+        public context_parent
+    {
+    public:
+        context(context_parent *parent);
+
         virtual ~context() = default;
 
         context(context const &) = delete;
@@ -29,10 +42,25 @@ namespace doca {
         [[nodiscard]]
         auto get_state() const -> doca_ctx_states;
 
+        auto signal_stopped_child([[maybe_unused]] context *stopped_child) -> void override {}
+
+        [[nodiscard]]
+        auto engine() -> progress_engine* override {
+            return parent_->engine();
+        }
+
     protected:
-        context() = default;
         auto init_state_changed_callback() -> void;
-        auto signal_context_stopped() -> void;
+
+        virtual auto state_changed(
+            [[maybe_unused]] doca_ctx_states prev_state,
+            [[maybe_unused]] doca_ctx_states next_state
+        ) -> void {
+        }
+
+    private:
+        template<std::derived_from<context> BaseContext>
+        friend class dependent_contexts;
 
         static auto state_changed_entry(
             doca_data user_data,
@@ -41,22 +69,9 @@ namespace doca {
             doca_ctx_states next_state
         ) -> void;
 
-        virtual auto state_changed(
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void;
+        auto connect() -> void;
 
-        auto engine() { 
-            return engine_;
-        }
-
-    private:
-        template<std::derived_from<context> BaseContext>
-        friend class dependent_contexts;
-
-        auto connect_to(progress_engine *engine) -> void;
-
-        progress_engine *engine_ = nullptr;
+        context_parent *parent_ = nullptr;
     };
 
     template<std::derived_from<context> BaseContext = context>
@@ -74,7 +89,6 @@ namespace doca {
             std::derived_from<BaseContext> ConcreteContext,
             typename... Args
         > auto create_context(
-            progress_engine *engine,
             Args&&... args
         ) -> ConcreteContext * {
             auto new_context = std::make_unique<ConcreteContext>(std::forward<Args>(args)...);
@@ -83,7 +97,7 @@ namespace doca {
             // make sure slot exists so inserting will not throw later.
             auto &slot = active_contexts_[non_owning_ptr];
 
-            new_context->connect_to(engine);
+            new_context->connect();
             enforce_success(doca_ctx_start(new_context->as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
 
             slot = std::move(new_context);
@@ -108,11 +122,5 @@ namespace doca {
     private:
         //std::vector<std::unique_ptr<BaseContext>> active_contexts_;
         std::unordered_map<BaseContext*, std::unique_ptr<BaseContext>> active_contexts_;
-    };
-
-    class context_parent {
-    public:
-        virtual ~context_parent() = default;
-        virtual auto signal_stopped_child(context *stopped_child) -> void = 0;
     };
 }

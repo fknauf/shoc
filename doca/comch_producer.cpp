@@ -10,7 +10,7 @@ namespace doca {
         doca_comch_connection *connection,
         std::uint32_t max_tasks
     ):
-        parent_ { parent }
+        context { parent }
     {
         doca_comch_producer *raw_handle = nullptr;
         enforce_success(doca_comch_producer_create(connection, &raw_handle));
@@ -56,18 +56,6 @@ namespace doca {
         ) {
             doca_task_free(base_task);
             throw doca_exception(err);
-        }
-    }
-
-    auto base_comch_producer::state_changed(
-        [[maybe_unused]] doca_ctx_states prev_state,
-        doca_ctx_states next_state
-    ) -> void {
-        if(
-            next_state == DOCA_CTX_STATE_IDLE &&
-            parent_ != nullptr
-        ) {
-            parent_->signal_stopped_child(this);
         }
     }
 

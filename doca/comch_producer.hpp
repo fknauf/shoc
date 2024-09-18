@@ -38,11 +38,6 @@ namespace doca {
         ) -> void;
 
     protected:
-        auto state_changed(
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void override;
-
         virtual auto send_completion(
             [[maybe_unused]] doca_comch_producer_task_send *task,
             [[maybe_unused]] doca_data task_user_data
@@ -69,7 +64,6 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_comch_producer> handle_ { doca_comch_producer_destroy };
-        context_parent *parent_ = nullptr;
     };
 
     class comch_producer;

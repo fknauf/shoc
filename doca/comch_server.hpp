@@ -21,11 +21,11 @@ namespace doca {
     };
 
     class base_comch_server:
-        public context,
-        public context_parent
+        public context
     {
     public:
         base_comch_server(
+            context_parent *parent,
             std::string const &server_name,
             comch_device &dev,
             device_representor &rep,
@@ -44,12 +44,12 @@ namespace doca {
 
         template<typename... Args>
         auto create_producer(Args&&... args) {
-            return active_children_.create_context<doca::comch_producer>(engine(), this, std::forward<Args>(args)...);
+            return active_children_.create_context<doca::comch_producer>(this, std::forward<Args>(args)...);
         }
 
         template<typename... Args>
         auto create_consumer(Args&&... args) {
-            return active_children_.create_context<doca::comch_consumer>(engine(), this, std::forward<Args>(args)...);
+            return active_children_.create_context<doca::comch_consumer>(this, std::forward<Args>(args)...);
         }
 
     protected:
@@ -204,6 +204,7 @@ namespace doca {
     {
     public:
         comch_server(
+            context_parent *parent,
             std::string const &server_name,
             comch_device &dev,
             device_representor &rep,
