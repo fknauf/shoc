@@ -22,8 +22,7 @@ namespace doca {
 
     class base_comch_server:
         public context,
-        public context_parent<base_comch_producer>,
-        public context_parent<base_comch_consumer>
+        public context_parent
     {
     public:
         base_comch_server(
@@ -45,12 +44,12 @@ namespace doca {
 
         template<typename... Args>
         auto create_producer(Args&&... args) {
-            return active_producers_.create_context<doca::comch_producer>(engine(), this, std::forward<Args>(args)...);
+            return active_children_.create_context<doca::comch_producer>(engine(), this, std::forward<Args>(args)...);
         }
 
         template<typename... Args>
         auto create_consumer(Args&&... args) {
-            return active_consumers_.create_context<doca::comch_consumer>(engine(), this, std::forward<Args>(args)...);
+            return active_children_.create_context<doca::comch_consumer>(engine(), this, std::forward<Args>(args)...);
         }
 
     protected:
@@ -96,8 +95,7 @@ namespace doca {
         ) -> void {
         }
 
-        auto signal_stopped_child(base_comch_producer *stopped_child) -> void override;
-        auto signal_stopped_child(base_comch_consumer *stopped_child) -> void override;
+        auto signal_stopped_child(context *stopped_child) -> void override;
 
     private:
         static auto send_completion_entry(
@@ -154,8 +152,7 @@ namespace doca {
 
         auto do_stop_if_able() -> void;
 
-        dependent_contexts<base_comch_producer> active_producers_;
-        dependent_contexts<base_comch_consumer> active_consumers_;
+        dependent_contexts<context> active_children_;
         bool stop_requested_ = false;
     };    
 

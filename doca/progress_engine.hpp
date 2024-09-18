@@ -30,7 +30,8 @@ namespace doca {
      * completion events (or at least when the program is certain no concurrent completion events are
      * possible, e.g. when offloading tasks sequentially).
      */
-    class progress_engine
+    class progress_engine:
+        context_parent
     {
     public:
         progress_engine();
@@ -64,7 +65,7 @@ namespace doca {
         auto main_loop_while(std::function<bool()> condition) -> void;
 
         auto connect(context *ctx) -> void;
-        auto remove_stopped_context(context *ctx) -> void;
+        auto signal_stopped_child(context *ctx) -> void;
 
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;

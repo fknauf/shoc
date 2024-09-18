@@ -110,14 +110,9 @@ namespace doca {
         std::unordered_map<BaseContext*, std::unique_ptr<BaseContext>> active_contexts_;
     };
 
-    template<typename ChildContext = context>
     class context_parent {
     public:
-        context_parent() {
-            static_assert(std::derived_from<ChildContext, context>);
-        }
-
         virtual ~context_parent() = default;
-        virtual auto signal_stopped_child(ChildContext *stopped_child) -> void = 0;
+        virtual auto signal_stopped_child(context *stopped_child) -> void = 0;
     };
 }

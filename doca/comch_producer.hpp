@@ -16,7 +16,7 @@ namespace doca {
     {
     public:
         base_comch_producer(
-            context_parent<base_comch_producer> *parent,
+            context_parent *parent,
             doca_comch_connection *connection,
             std::uint32_t max_tasks
         );
@@ -69,7 +69,7 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_comch_producer> handle_ { doca_comch_producer_destroy };
-        context_parent<base_comch_producer> *parent_ = nullptr;
+        context_parent *parent_ = nullptr;
     };
 
     class comch_producer;
@@ -96,7 +96,7 @@ namespace doca {
     {
     public:
         comch_producer(
-            context_parent<base_comch_producer> *parent,
+            context_parent *parent,
             doca_comch_connection *connection,
             std::uint32_t max_tasks,
             comch_producer_callbacks callbacks

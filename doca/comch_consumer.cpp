@@ -25,7 +25,7 @@ namespace {
 
 namespace doca {
     base_comch_consumer::base_comch_consumer(
-        context_parent<base_comch_consumer> *parent,
+        context_parent *parent,
         doca_comch_connection *connection,
         memory_map &user_mmap,
         std::uint32_t max_tasks
@@ -158,7 +158,7 @@ namespace doca {
     }
 
     comch_consumer::comch_consumer(
-        context_parent<base_comch_consumer> *parent,
+        context_parent *parent,
         doca_comch_connection *connection,
         memory_map &user_mmap,
         std::uint32_t max_tasks,

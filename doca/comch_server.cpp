@@ -249,22 +249,13 @@ namespace doca {
         // when active child contexts exist, stopping the server has to be delayed until they are all stopped.
         stop_requested_ = true;
 
-        active_producers_.stop_all();
-        active_consumers_.stop_all();
+        active_children_.stop_all();
 
         do_stop_if_able();
     }
 
-    auto base_comch_server::signal_stopped_child(base_comch_producer *stopped_child) -> void {
-        active_producers_.remove_stopped_context(stopped_child);
-
-        if(stop_requested_) {
-            do_stop_if_able();
-        }
-    }
-
-    auto base_comch_server::signal_stopped_child(base_comch_consumer *stopped_child) -> void {
-        active_consumers_.remove_stopped_context(stopped_child);
+    auto base_comch_server::signal_stopped_child(context *stopped_child) -> void {
+        active_children_.remove_stopped_context(stopped_child);
 
         if(stop_requested_) {
             do_stop_if_able();
@@ -272,10 +263,7 @@ namespace doca {
     }
 
     auto base_comch_server::do_stop_if_able() -> void {
-        if(
-            active_consumers_.empty() &&
-            active_producers_.empty()
-        ) {
+        if(active_children_.empty()) {
             context::stop();
         }
     }

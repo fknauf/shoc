@@ -21,7 +21,7 @@ namespace doca {
 
     class base_comch_client:
         public context,
-        public context_parent<base_comch_consumer>
+        public context_parent
     {
     public:
         base_comch_client(
@@ -48,7 +48,7 @@ namespace doca {
         [[nodiscard]] auto handle() const { return handle_.handle(); }
 
         auto stop() -> void override;
-        auto signal_stopped_child(base_comch_consumer *stopped_consumer) -> void override;
+        auto signal_stopped_child(context *stopped_child) -> void override;
 
         auto create_consumer(
             memory_map &mmap,
@@ -122,7 +122,7 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_comch_client> handle_ { doca_comch_client_destroy };
-        dependent_contexts<base_comch_consumer> active_consumers_;
+        dependent_contexts<context> active_children_;
         bool stop_requested_ = false;
     };
 

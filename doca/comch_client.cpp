@@ -197,19 +197,19 @@ namespace doca {
 
     auto base_comch_client::stop() -> void {
         stop_requested_ = true;
-        active_consumers_.stop_all();
+        active_children_.stop_all();
         do_stop_if_able();
     }
 
-    auto base_comch_client::signal_stopped_child(base_comch_consumer *stopped_child) -> void {
-        active_consumers_.remove_stopped_context(stopped_child);
+    auto base_comch_client::signal_stopped_child(context *stopped_child) -> void {
+        active_children_.remove_stopped_context(stopped_child);
         if(stop_requested_) {
             do_stop_if_able();
         }
     }
 
     auto base_comch_client::do_stop_if_able() -> void {
-        if(active_consumers_.empty()) {
+        if(active_children_.empty()) {
             context::stop();
         }
     }
@@ -219,7 +219,7 @@ namespace doca {
         std::uint32_t max_tasks,
         comch_consumer_callbacks callbacks
     ) -> comch_consumer* {
-        return active_consumers_.create_context<comch_consumer>(engine(), this, this->get_connection(), mmap, max_tasks, std::move(callbacks));
+        return active_children_.create_context<comch_consumer>(engine(), this, this->get_connection(), mmap, max_tasks, std::move(callbacks));
     }
 
     comch_client::comch_client(

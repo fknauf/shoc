@@ -6,7 +6,7 @@
 
 namespace doca {
     base_comch_producer::base_comch_producer(
-        context_parent<base_comch_producer> *parent,
+        context_parent *parent,
         doca_comch_connection *connection,
         std::uint32_t max_tasks
     ):
@@ -122,7 +122,7 @@ namespace doca {
     }
 
     comch_producer::comch_producer(
-        context_parent<base_comch_producer> *parent,
+        context_parent *parent,
         doca_comch_connection *connection,
         std::uint32_t max_tasks,
         comch_producer_callbacks callbacks

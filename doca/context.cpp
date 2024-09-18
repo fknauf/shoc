@@ -34,7 +34,7 @@ namespace doca {
     }    
 
     auto context::signal_context_stopped() -> void {
-        engine_->remove_stopped_context(this);
+        engine_->signal_stopped_child(this);
     }
 
     auto context::get_state() const -> doca_ctx_states {

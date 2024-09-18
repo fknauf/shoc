@@ -96,7 +96,7 @@ namespace doca {
         enforce_success(doca_pe_connect_ctx(handle(), ctx->as_ctx()));
     }
 
-    auto progress_engine::remove_stopped_context(context *ctx) -> void {
+    auto progress_engine::signal_stopped_child(context *ctx) -> void {
         connected_contexts_.remove_stopped_context(ctx);
     }
 

@@ -68,7 +68,7 @@ namespace doca {
         using payload_type = std::span<char>;
 
         base_comch_consumer(
-            context_parent<base_comch_consumer> *parent,
+            context_parent *parent,
             doca_comch_connection *connection,
             memory_map &user_mmap,
             std::uint32_t max_tasks
@@ -120,7 +120,7 @@ namespace doca {
         auto do_stop_if_able() -> void;
 
         unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
-        context_parent<base_comch_consumer> *parent_ = nullptr;
+        context_parent *parent_ = nullptr;
 
         int currently_handling_tasks_ = 0;
         bool stop_requested_ = false;
@@ -148,7 +148,7 @@ namespace doca {
     {
     public:
         comch_consumer(
-            context_parent<base_comch_consumer> *parent,
+            context_parent *parent,
             doca_comch_connection *connection,
             memory_map &user_mmap,
             std::uint32_t max_tasks,
