@@ -1,5 +1,4 @@
 #include "doca/buffer_inventory.hpp"
-#include "doca/buffer_pool.hpp"
 #include "doca/compress.hpp"
 #include "doca/logger.hpp"
 #include "doca/memory_map.hpp"
@@ -24,16 +23,28 @@ auto compress_file(std::istream &in, std::ostream &out) {
 
     doca::logger->info("compressing {} batches of size {}", batches, batchsize);
 
+    auto filesize = batches * batchsize;
+    std::vector<char> src_data(filesize);
+    std::vector<char> dst_data(filesize);
+
+    in.read(src_data.data(), filesize);
+
     out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
     out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
 
-    auto dev = doca::compress_device{};
-    auto engine = doca::progress_engine {};
-    auto buf_pool = doca::buffer_pool{dev, 2, batchsize};
-    auto src_buf = buf_pool.allocate_buffer(batchsize);
-    auto dst_buf = buf_pool.allocate_buffer();
+    auto start = std::chrono::steady_clock::now();
 
-    auto src_data = src_buf.data();
+    auto dev = doca::compress_device{};
+    auto mmap_src = doca::memory_map { dev, src_data };
+    auto mmap_dst = doca::memory_map { dev, dst_data };
+    auto engine = doca::progress_engine {};
+    auto buf_inv = doca::buffer_inventory { batches * 2 };
+
+    auto src_buffers = std::vector<doca::buffer>{};
+    auto dst_buffers = std::vector<doca::buffer>{};
+
+    src_buffers.reserve(batches);
+    dst_buffers.reserve(batches);
 
     engine.create_context<doca::compress_context>(
         dev,
@@ -46,7 +57,13 @@ auto compress_file(std::istream &in, std::ostream &out) {
                 doca::logger->debug("compress changed state {} -> {}", prev_state, next_state);
 
                 if(next_state == DOCA_CTX_STATE_RUNNING) {
+                    auto src_buf = buf_inv.buf_get_by_data(mmap_src, src_data.data(), batchsize);
+                    auto dst_buf = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data(), batchsize);
+
                     self.compress(src_buf, dst_buf, { .u64 = 0 });
+
+                    src_buffers.push_back(std::move(src_buf));
+                    dst_buffers.push_back(std::move(dst_buf));
                 }
             },
             .compress_completed = [&](
@@ -59,18 +76,18 @@ auto compress_file(std::istream &in, std::ostream &out) {
                     task.adler_cs()
                 );
 
-                auto dst_data = task.dst().data();
-
-                std::uint32_t dst_size = dst_data.size();
-                out.write(reinterpret_cast<char const *>(&dst_size), sizeof(dst_size));
-                out.write(dst_data.data(), dst_data.size());
-
                 auto next_chunk_no = task.user_data().u64 + 1;
 
                 if(next_chunk_no < batches) {
-                    dst_buf.set_data(0);
-                    in.read(src_data.data(), src_data.size());
+                    auto offset = next_chunk_no * batchsize;
+
+                    auto src_buf = buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize);
+                    auto dst_buf = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize);
+
                     self.compress(src_buf, dst_buf, { .u64 = next_chunk_no });
+
+                    src_buffers.push_back(std::move(src_buf));
+                    dst_buffers.push_back(std::move(dst_buf));
                 } else {
                     self.stop();
                 }
@@ -90,9 +107,20 @@ auto compress_file(std::istream &in, std::ostream &out) {
         16
     );
 
-    in.read(src_data.data(), src_data.size());
-
     engine.main_loop();
+
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    doca::logger->info("elapsed time: {} us", elapsed.count());
+
+    for(auto &buf : dst_buffers) {
+        auto data = buf.data();
+        std::uint32_t size = data.size();
+
+        out.write(reinterpret_cast<char const*>(&size), sizeof size);
+        out.write(data.data(), data.size());
+    }
 }
 
 auto main(int argc, char *argv[]) -> int try {
@@ -100,9 +128,9 @@ auto main(int argc, char *argv[]) -> int try {
 
     doca_log_backend_create_standard();
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
+    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
-    doca::logger->set_level(spdlog::level::debug);
+    doca::logger->set_level(spdlog::level::info);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
@@ -112,14 +140,7 @@ auto main(int argc, char *argv[]) -> int try {
     auto in  = std::ifstream(argv[1], std::ios::binary);
     auto out = std::ofstream(argv[2], std::ios::binary);
 
-    auto start = std::chrono::steady_clock::now();
-
     compress_file(in, out);
-
-    auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    doca::logger->info("elapsed time: {} us", elapsed.count());
 } catch(doca::doca_exception &ex) {
     doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }
