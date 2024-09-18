@@ -154,11 +154,7 @@ namespace doca {
             return;
         }
 
-        auto err = doca_ctx_stop(as_ctx());
-
-        if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
-            throw doca_exception(err);
-        }
+        enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS});
     }
 
     comch_consumer::comch_consumer(

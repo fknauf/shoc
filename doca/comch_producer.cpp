@@ -118,7 +118,7 @@ namespace doca {
     }
 
     auto base_comch_producer::stop() -> void {
-        enforce_success(doca_ctx_stop(as_ctx()));
+        enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
     }
 
     comch_producer::comch_producer(

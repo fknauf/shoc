@@ -85,14 +85,7 @@ namespace doca {
             auto new_context = std::make_unique<ConcreteContext>(std::forward<Args>(args)...);
             new_context->connect_to(engine);
             
-            auto err = doca_ctx_start(new_context->as_ctx());
-
-            if(
-                err != DOCA_SUCCESS && 
-                err != DOCA_ERROR_IN_PROGRESS
-            ) {
-                throw doca_exception(err);
-            }
+            enforce_success(doca_ctx_start(new_context->as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
 
             auto non_owning_ptr = new_context.get();
             active_contexts_.push_back(std::move(new_context));

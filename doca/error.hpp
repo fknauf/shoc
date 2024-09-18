@@ -4,6 +4,8 @@
 #include <doca_error.h>
 #include <doca_log.h>
 
+#include <algorithm>
+
 namespace doca {
     class doca_exception: public std::runtime_error {
     public:
@@ -20,8 +22,14 @@ namespace doca {
         doca_error_t err_;
     };
 
-    inline auto enforce_success(doca_error result, doca_error expected = DOCA_SUCCESS) -> void {
+    inline auto enforce_success(doca_error_t result, doca_error_t expected = DOCA_SUCCESS) -> void {
         if(result != expected) {
+            throw doca_exception(result);
+        }
+    }
+
+    inline auto enforce_success(doca_error_t result, std::initializer_list<int> expected) -> void {
+        if(std::ranges::count(expected, result) == 0) {
             throw doca_exception(result);
         }
     }
