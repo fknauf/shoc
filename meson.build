@@ -20,6 +20,7 @@ common_srcs = [
     'doca/comch_device.cpp',
     'doca/comch_producer.cpp',
     'doca/comch_server.cpp',
+    'doca/compress.cpp',
     'doca/context.cpp',
     'doca/device.cpp',
     'doca/epoll_handle.cpp',
@@ -58,4 +59,13 @@ executable('comch_data_server', [ 'progs/comch_data_server.cpp' ],
         dependencies : deps,
         link_with: libdocapp,
         include_directories: inc_dirs,
+        install: false)
+
+executable('simple_compress', [ 'progs/simple_compress.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
+executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)

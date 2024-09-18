@@ -28,6 +28,9 @@ namespace doca {
             doca_task_free(as_task());
         }
 
+        comch_consumer_task_post_recv(comch_consumer_task_post_recv const &) = delete;
+        comch_consumer_task_post_recv &operator=(comch_consumer_task_post_recv const &) = delete;
+
         auto buf() const {
             return buf_;
         }
