@@ -126,8 +126,6 @@ namespace doca {
         if(callbacks_.state_changed) {
             callbacks_.state_changed(*this, prev_state, next_state);
         }
-
-        base_comch_producer::state_changed(prev_state, next_state);
     }
 
     auto comch_producer::send_completion(
