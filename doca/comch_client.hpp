@@ -2,6 +2,7 @@
 
 #include "comch_consumer.hpp"
 #include "comch_device.hpp"
+#include "comch_producer.hpp"
 #include "context.hpp"
 #include "device.hpp"
 #include "unique_handle.hpp"
@@ -50,11 +51,15 @@ namespace doca {
         auto stop() -> void override;
         auto signal_stopped_child(context *stopped_child) -> void override;
 
-        auto create_consumer(
-            memory_map &mmap,
-            std::uint32_t max_tasks,
-            comch_consumer_callbacks callbacks
-        ) -> comch_consumer*;
+        template<std::derived_from<base_comch_consumer> ContextType, typename... Args>
+        auto create_consumer(Args&&... args) -> ContextType* {
+            return active_children_.create_context<ContextType>(this, this->get_connection(), std::forward<Args>(args)...);
+        }
+
+        template<std::derived_from<base_comch_producer> ContextType, typename... Args>
+        auto create_producer(Args&&... args) -> ContextType* {
+            return active_children_.create_context<ContextType>(this, this->get_connection(), std::forward<Args>(args)...);
+        }
 
     protected:
         auto do_stop_if_able() -> void;

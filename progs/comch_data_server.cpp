@@ -68,7 +68,7 @@ int main() {
                 }
             };
 
-            self.create_producer(comch_connection, 32, std::move(producer_callbacks));
+            self.create_producer<doca::comch_producer>(comch_connection, 32, std::move(producer_callbacks));
         }
     };
 

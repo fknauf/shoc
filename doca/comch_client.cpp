@@ -217,14 +217,6 @@ namespace doca {
         }
     }
 
-    auto base_comch_client::create_consumer(
-        memory_map &mmap,
-        std::uint32_t max_tasks,
-        comch_consumer_callbacks callbacks
-    ) -> comch_consumer* {
-        return active_children_.create_context<comch_consumer>(this, this->get_connection(), mmap, max_tasks, std::move(callbacks));
-    }
-
     comch_client::comch_client(
         context_parent *parent,
         std::string const &server_name,

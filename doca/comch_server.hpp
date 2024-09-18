@@ -42,14 +42,14 @@ namespace doca {
 
         auto stop() -> void override;
 
-        template<typename... Args>
+        template<std::derived_from<base_comch_producer> ContextType, typename... Args>
         auto create_producer(Args&&... args) {
-            return active_children_.create_context<doca::comch_producer>(this, std::forward<Args>(args)...);
+            return active_children_.create_context<ContextType>(this, std::forward<Args>(args)...);
         }
 
-        template<typename... Args>
+        template<std::derived_from<base_comch_consumer> ContextType, typename... Args>
         auto create_consumer(Args&&... args) {
-            return active_children_.create_context<doca::comch_consumer>(this, std::forward<Args>(args)...);
+            return active_children_.create_context<ContextType>(this, std::forward<Args>(args)...);
         }
 
     protected:

@@ -76,7 +76,7 @@ int main() {
             std::cout << msg << std::endl;
 
             if(msg == "ready") {
-                self.create_consumer(mmap, 32, consumer_callbacks);
+                self.create_consumer<doca::comch_consumer>(mmap, 32, consumer_callbacks);
             }
         }
     };
