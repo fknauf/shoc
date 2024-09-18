@@ -105,6 +105,7 @@ auto compress_file(std::istream &in, std::ostream &out) {
                     doca_error_get_name(task.status()),
                     doca_error_get_descr(task.status())
                 );
+                end = std::chrono::steady_clock::now();
                 self.stop();
             }
         },

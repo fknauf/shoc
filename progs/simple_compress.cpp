@@ -32,7 +32,8 @@ auto compress_file(std::istream &in, std::ostream &out) {
     out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
     out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
 
-    auto start = std::chrono::steady_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> start;
+    std::chrono::time_point<std::chrono::steady_clock> end;
 
     auto dev = doca::compress_device{};
     auto mmap_src = doca::memory_map { dev, src_data };
@@ -64,6 +65,7 @@ auto compress_file(std::istream &in, std::ostream &out) {
                 doca::logger->debug("compress changed state {} -> {}", prev_state, next_state);
 
                 if(next_state == DOCA_CTX_STATE_RUNNING) {
+                    start = std::chrono::steady_clock::now();
                     self.compress(src_buffers[0], dst_buffers[0], { .u64 = 0 });
                 }
             },
@@ -86,6 +88,7 @@ auto compress_file(std::istream &in, std::ostream &out) {
                         { .u64 = next_chunk_no }
                     );
                 } else {
+                    end = std::chrono::steady_clock::now();
                     self.stop();
                 }
             },
@@ -98,6 +101,7 @@ auto compress_file(std::istream &in, std::ostream &out) {
                     doca_error_get_name(task.status()),
                     doca_error_get_descr(task.status())
                 );
+                end = std::chrono::steady_clock::now();
                 self.stop();
             }
         },
@@ -106,7 +110,6 @@ auto compress_file(std::istream &in, std::ostream &out) {
 
     engine.main_loop();
 
-    auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
     doca::logger->info("elapsed time: {} us", elapsed.count());
