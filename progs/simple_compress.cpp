@@ -46,6 +46,13 @@ auto compress_file(std::istream &in, std::ostream &out) {
     src_buffers.reserve(batches);
     dst_buffers.reserve(batches);
 
+    for(auto i : std::ranges::views::iota(0u, batches)) {
+        auto offset = i * batchsize;
+
+        src_buffers.push_back(buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize));
+        dst_buffers.push_back(buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize));
+    }
+
     engine.create_context<doca::compress_context>(
         dev,
         (doca::compress_callbacks) {
@@ -57,13 +64,7 @@ auto compress_file(std::istream &in, std::ostream &out) {
                 doca::logger->debug("compress changed state {} -> {}", prev_state, next_state);
 
                 if(next_state == DOCA_CTX_STATE_RUNNING) {
-                    auto src_buf = buf_inv.buf_get_by_data(mmap_src, src_data.data(), batchsize);
-                    auto dst_buf = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data(), batchsize);
-
-                    self.compress(src_buf, dst_buf, { .u64 = 0 });
-
-                    src_buffers.push_back(std::move(src_buf));
-                    dst_buffers.push_back(std::move(dst_buf));
+                    self.compress(src_buffers[0], dst_buffers[0], { .u64 = 0 });
                 }
             },
             .compress_completed = [&](
@@ -79,15 +80,11 @@ auto compress_file(std::istream &in, std::ostream &out) {
                 auto next_chunk_no = task.user_data().u64 + 1;
 
                 if(next_chunk_no < batches) {
-                    auto offset = next_chunk_no * batchsize;
-
-                    auto src_buf = buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize);
-                    auto dst_buf = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize);
-
-                    self.compress(src_buf, dst_buf, { .u64 = next_chunk_no });
-
-                    src_buffers.push_back(std::move(src_buf));
-                    dst_buffers.push_back(std::move(dst_buf));
+                    self.compress(
+                        src_buffers[next_chunk_no],
+                        dst_buffers[next_chunk_no],
+                        { .u64 = next_chunk_no }
+                    );
                 } else {
                     self.stop();
                 }
