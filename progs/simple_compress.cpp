@@ -31,6 +31,7 @@ auto compress_file(
     auto filesize = batches * batchsize;
     std::vector<char> src_data(filesize);
     std::vector<char> dst_data(filesize);
+    std::vector<std::span<char>> dst_ranges(batches);
 
     in.read(src_data.data(), filesize);
 
@@ -40,20 +41,7 @@ auto compress_file(
     auto dev = doca::compress_device{};
     auto mmap_src = doca::memory_map { dev, src_data };
     auto mmap_dst = doca::memory_map { dev, dst_data };
-    auto buf_inv = doca::buffer_inventory { batches * 2 };
-
-    auto src_buffers = std::vector<doca::buffer>{};
-    auto dst_buffers = std::vector<doca::buffer>{};
-
-    src_buffers.reserve(batches);
-    dst_buffers.reserve(batches);
-
-    for(auto i : std::ranges::views::iota(0u, batches)) {
-        auto offset = i * batchsize;
-
-        src_buffers.push_back(buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize));
-        dst_buffers.push_back(buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize));
-    }
+    auto buf_inv = doca::buffer_inventory { 2 };
 
     doca::logger->debug("engine = {}", static_cast<void*>(engine));
 
@@ -62,9 +50,15 @@ auto compress_file(
     auto start = std::chrono::steady_clock::now();
 
     for(auto i : std::ranges::views::iota(0u, batches)) {
+        auto offset = i * batchsize;
+        auto src = buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize);
+        auto dst = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize);
+
         doca::logger->debug("compressing chunk {}...", i);
-        auto result = co_await compress->compress(src_buffers[i], dst_buffers[i]);
+        auto result = co_await compress->compress(src, dst);
         doca::logger->debug("compress_chunk complete: {}, crc = {}, adler = {}", i, result.crc_cs(), result.adler_cs());
+
+        dst_ranges[i] = result.dst().data();
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -73,8 +67,7 @@ auto compress_file(
 
     co_await compress->stop();
 
-    for(auto &buf : dst_buffers) {
-        auto data = buf.data();
+    for(auto &data : dst_ranges) {
         std::uint32_t size = data.size();
 
         out.write(reinterpret_cast<char const*>(&size), sizeof size);
