@@ -28,7 +28,7 @@ namespace doca {
     ):
         range_(range)
     {
-        logger->debug("mapping base = {:p}, size = {}", range_.data(), range_.size());
+        logger->debug("mapping base = {}, size = {}", static_cast<void*>(range_.data()), range_.size());
 
         doca_mmap *map = nullptr;
 

@@ -24,7 +24,7 @@ namespace doca {
         return size;
     }
 
-    base_compress_context::base_compress_context(
+    compress_context::compress_context(
         progress_engine *parent,
         compress_device const &dev,
         std::uint32_t max_tasks
@@ -38,153 +38,82 @@ namespace doca {
         context::init_state_changed_callback();
         enforce_success(doca_compress_task_compress_deflate_set_conf(
             handle_.handle(),
-            &base_compress_context::task_completion_compress_deflate_entry,
-            &base_compress_context::task_error_compress_deflate_entry,
+            &compress_context::task_completion_compress_deflate_entry,
+            &compress_context::task_error_compress_deflate_entry,
             max_tasks
         ));
         enforce_success(doca_compress_task_decompress_deflate_set_conf(
             handle_.handle(),
-            &base_compress_context::task_completion_decompress_deflate_entry,
-            &base_compress_context::task_error_decompress_deflate_entry,
+            &compress_context::task_completion_decompress_deflate_entry,
+            &compress_context::task_error_decompress_deflate_entry,
             max_tasks
         ));
     }
 
-    base_compress_context::~base_compress_context() {
+    compress_context::~compress_context() {
     }
 
-    auto base_compress_context::as_ctx() const -> doca_ctx * {
+    auto compress_context::as_ctx() const -> doca_ctx * {
         return doca_compress_as_ctx(handle_.handle());
     }
 
-    auto base_compress_context::stop() -> void {
-        stop_requested_ = true;
-        do_stop_if_able();
-    }
-
-    auto base_compress_context::do_stop_if_able() -> void {
-        if(currently_handling_tasks_.value() == 0) {
-            enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
-        }
-    }
-
-    auto base_compress_context::task_completion_compress_deflate_entry(
+    auto compress_context::task_completion_compress_deflate_entry(
         doca_compress_task_compress_deflate *compress_task,
         doca_data task_user_data,
-        doca_data ctx_user_data
+        [[maybe_unused]] doca_data ctx_user_data
     ) -> void {
-        auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto self = static_cast<base_compress_context*>(base_context);
+        logger->trace(__PRETTY_FUNCTION__);
 
-        {
-            auto guard = self->currently_handling_tasks_.guard();
-            auto task = compress_task_compress_deflate { compress_task, task_user_data };
+        auto dest = static_cast<coro::receptable<compress_result>*>(task_user_data.ptr);
 
-            self->task_completion_compress_deflate(task);
-        }
+        dest->value = compress_result { compress_task };
+        doca_task_free(compress_task_helpers<doca_compress_task_compress_deflate>::as_task(compress_task));
 
-        if(self->stop_requested_) {
-            self->do_stop_if_able();
-        }
+        dest->coro_handle.resume();
     }
-    
-    auto base_compress_context::task_error_compress_deflate_entry(
+
+    auto compress_context::task_error_compress_deflate_entry(
         doca_compress_task_compress_deflate *compress_task,
         doca_data task_user_data,
-        doca_data ctx_user_data
+        [[maybe_unused]] doca_data ctx_user_data
     ) -> void {
-        auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto self = static_cast<base_compress_context*>(base_context);
+        logger->trace(__PRETTY_FUNCTION__);
 
-        {
-            auto guard = self->currently_handling_tasks_.guard();
-            auto task = compress_task_compress_deflate { compress_task, task_user_data };
+        auto dest = static_cast<coro::receptable<compress_result>*>(task_user_data.ptr);
 
-            self->task_error_compress_deflate(task);
-        }
+        dest->value = compress_result { compress_task };
+        doca_task_free(compress_task_helpers<doca_compress_task_compress_deflate>::as_task(compress_task));
 
-        if(self->stop_requested_) {
-            self->do_stop_if_able();
-        }
+        dest->coro_handle.resume();
     }
-    
-    auto base_compress_context::task_completion_decompress_deflate_entry(
+
+    auto compress_context::task_completion_decompress_deflate_entry(
         doca_compress_task_decompress_deflate *compress_task,
         doca_data task_user_data,
-        doca_data ctx_user_data
+        [[maybe_unused]] doca_data ctx_user_data
     ) -> void {
-        auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto self = static_cast<base_compress_context*>(base_context);
+        logger->trace(__PRETTY_FUNCTION__);
 
-        {
-            auto guard = self->currently_handling_tasks_.guard();
-            auto task = compress_task_decompress_deflate { compress_task, task_user_data };
+        auto dest = static_cast<coro::receptable<compress_result>*>(task_user_data.ptr);
 
-            self->task_completion_decompress_deflate(task);
-        }
+        dest->value = compress_result { compress_task };
+        doca_task_free(compress_task_helpers<doca_compress_task_decompress_deflate>::as_task(compress_task));
 
-        if(self->stop_requested_) {
-            self->do_stop_if_able();
-        }
+        dest->coro_handle.resume();
     }
-    
-    auto base_compress_context::task_error_decompress_deflate_entry(
+
+    auto compress_context::task_error_decompress_deflate_entry(
         doca_compress_task_decompress_deflate *compress_task,
         doca_data task_user_data,
-        doca_data ctx_user_data
+        [[maybe_unused]] doca_data ctx_user_data
     ) -> void {
-        auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto self = static_cast<base_compress_context*>(base_context);
+        logger->trace(__PRETTY_FUNCTION__);
 
-        {
-            auto guard = self->currently_handling_tasks_.guard();
-            auto task = compress_task_decompress_deflate { compress_task, task_user_data };
+        auto dest = static_cast<coro::receptable<compress_result>*>(task_user_data.ptr);
 
-            self->task_error_decompress_deflate(task);
-        }
+        dest->value = compress_result { compress_task };
+        doca_task_free(compress_task_helpers<doca_compress_task_decompress_deflate>::as_task(compress_task));
 
-        if(self->stop_requested_) {
-            self->do_stop_if_able();
-        }
-    }
-
-    compress_context::compress_context(
-        progress_engine *parent,
-        compress_device const &dev,
-        compress_callbacks callbacks,
-        std::uint32_t max_tasks
-    ):
-        base_compress_context { parent, dev, max_tasks },
-        callbacks_ { std::move(callbacks) }
-    {}
-
-    auto compress_context::state_changed(doca_ctx_states prev_state, doca_ctx_states next_state) -> void {
-        if(callbacks_.state_changed) {
-            callbacks_.state_changed(*this, prev_state, next_state);
-        }
-    }
-
-    auto compress_context::task_completion_compress_deflate(compress_task_compress_deflate &task) -> void {
-        if(callbacks_.compress_completed) {
-            callbacks_.compress_completed(*this, task);
-        }
-    }
-
-    auto compress_context::task_error_compress_deflate(compress_task_compress_deflate &task) -> void {
-        if(callbacks_.compress_error) {
-            callbacks_.compress_error(*this, task);
-        }
-    }
-
-    auto compress_context::task_completion_decompress_deflate(compress_task_decompress_deflate &task) -> void {
-        if(callbacks_.decompress_completed) {
-            callbacks_.decompress_completed(*this, task);
-        }
-    }
-
-    auto compress_context::task_error_decompress_deflate(compress_task_decompress_deflate &task) -> void {
-        if(callbacks_.decompress_error) {
-            callbacks_.decompress_error(*this, task);
-        }
+        dest->coro_handle.resume();
     }
 }

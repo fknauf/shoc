@@ -1,6 +1,7 @@
 #pragma once
 
 #include "context.hpp"
+#include "coroutine.hpp"
 #include "epoll_handle.hpp"
 #include "error.hpp"
 #include "unique_handle.hpp"
@@ -20,11 +21,11 @@ namespace doca {
     /**
      * RAII wrapper around a doca_pe (progress engine) handle. Manages its lifetime, can wait for
      * events with epoll.
-     * 
+     *
      * This class is mainly intended to be used inside the event_thread class for background handling
      * completion events (because we assume that the completion events will mainly trigger the completion
      * of promise/future pairs), but synchronous polling is also possible.
-     * 
+     *
      * IMPORTANT: According to the DOCA documentation, doca_pe (which this class wraps) is not threadsafe.
      * In particular, as I understand it, tasks need to be submitted in the same thread that handles the
      * completion events (or at least when the program is certain no concurrent completion events are
@@ -47,7 +48,7 @@ namespace doca {
 
         /**
          * Process events for completed tasks.
-         * 
+         *
          * @return number of completed tasks that were handled
          */
         [[nodiscard]]
@@ -57,7 +58,8 @@ namespace doca {
         auto submit_task(doca_task *) -> void;
 
         template<std::derived_from<context> Context, typename... Args>
-        auto create_context(Args&&... args) -> Context* {
+        auto create_context(Args&&... args) {
+            logger->trace("pe create_context this = {}", static_cast<void*>(this));
             return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
         }
 

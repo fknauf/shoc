@@ -14,7 +14,12 @@
 
 #include <doca_log.h>
 
-auto compress_file(std::istream &in, std::ostream &out) {
+auto compress_file(
+    doca::progress_engine *engine,
+    std::istream &in,
+    std::ostream &out
+) -> doca::coro::basic_coroutine
+{
     std::uint32_t batches;
     std::uint32_t batchsize;
 
@@ -32,13 +37,9 @@ auto compress_file(std::istream &in, std::ostream &out) {
     out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
     out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
 
-    std::chrono::time_point<std::chrono::steady_clock> start;
-    std::chrono::time_point<std::chrono::steady_clock> end;
-
     auto dev = doca::compress_device{};
     auto mmap_src = doca::memory_map { dev, src_data };
     auto mmap_dst = doca::memory_map { dev, dst_data };
-    auto engine = doca::progress_engine {};
     auto buf_inv = doca::buffer_inventory { batches * 2 };
 
     auto src_buffers = std::vector<doca::buffer>{};
@@ -54,65 +55,22 @@ auto compress_file(std::istream &in, std::ostream &out) {
         dst_buffers.push_back(buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize));
     }
 
-    engine.create_context<doca::compress_context>(
-        dev,
-        (doca::compress_callbacks) {
-            .state_changed = [&](
-                doca::compress_context &self,
-                doca_ctx_states prev_state,
-                doca_ctx_states next_state
-            ) {
-                doca::logger->debug("compress changed state {} -> {}", prev_state, next_state);
+    doca::logger->debug("engine = {}", static_cast<void*>(engine));
 
-                if(next_state == DOCA_CTX_STATE_RUNNING) {
-                    start = std::chrono::steady_clock::now();
-                    self.compress(src_buffers[0], dst_buffers[0], { .u64 = 0 });
-                }
-            },
-            .compress_completed = [&](
-                doca::compress_context &self,
-                doca::compress_task_compress_deflate &task
-            ) {
-                doca::logger->debug("compress chunk complete: {}, crc = {}, adler = {}",
-                    task.user_data().u64,
-                    task.crc_cs(),
-                    task.adler_cs()
-                );
+    auto compress = co_await engine->create_context<doca::compress_context>(dev, 16);
 
-                auto next_chunk_no = task.user_data().u64 + 1;
+    auto start = std::chrono::steady_clock::now();
 
-                if(next_chunk_no < batches) {
-                    self.compress(
-                        src_buffers[next_chunk_no],
-                        dst_buffers[next_chunk_no],
-                        { .u64 = next_chunk_no }
-                    );
-                } else {
-                    end = std::chrono::steady_clock::now();
-                    self.stop();
-                }
-            },
-            .compress_error = [&](
-                doca::compress_context &self,
-                doca::compress_task_compress_deflate &task
-            ) {
-                doca::logger->error("compression error on chunk {}: Code {}, {}", 
-                    task.user_data().u64,
-                    doca_error_get_name(task.status()),
-                    doca_error_get_descr(task.status())
-                );
-                end = std::chrono::steady_clock::now();
-                self.stop();
-            }
-        },
-        16
-    );
+    for(auto i : std::ranges::views::iota(0u, batches)) {
+        auto result = co_await compress->compress(src_buffers[i], dst_buffers[i]);
+        doca::logger->debug("compress_chunk complete: {}, crc = {}, adler = {}", i, result.crc_cs(), result.adler_cs());
+    }
 
-    engine.main_loop();
-
+    auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
     doca::logger->info("elapsed time: {} us", elapsed.count());
+
+    co_await compress->stop();
 
     for(auto &buf : dst_buffers) {
         auto data = buf.data();
@@ -121,6 +79,8 @@ auto compress_file(std::istream &in, std::ostream &out) {
         out.write(reinterpret_cast<char const*>(&size), sizeof size);
         out.write(data.data(), data.size());
     }
+
+    co_return;
 }
 
 auto main(int argc, char *argv[]) -> int try {
@@ -130,7 +90,10 @@ auto main(int argc, char *argv[]) -> int try {
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
     doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
-    doca::logger->set_level(spdlog::level::info);
+    doca::logger->set_level(spdlog::level::debug);
+
+    static_cast<void>(argc);
+    static_cast<void>(argv);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
@@ -139,8 +102,13 @@ auto main(int argc, char *argv[]) -> int try {
 
     auto in  = std::ifstream(argv[1], std::ios::binary);
     auto out = std::ofstream(argv[2], std::ios::binary);
+    auto engine = doca::progress_engine {};
 
-    compress_file(in, out);
+    compress_file(&engine, in, out);
+
+    doca::logger->trace("spawned coroutine, starting main loop");
+
+    engine.main_loop();
 } catch(doca::doca_exception &ex) {
     doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

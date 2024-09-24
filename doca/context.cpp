@@ -1,5 +1,6 @@
 #include "context.hpp"
 #include "error.hpp"
+#include "logger.hpp"
 #include "progress_engine.hpp"
 
 #include <cassert>
@@ -9,6 +10,8 @@ namespace doca {
         parent_ { parent }
     {
         assert(parent != nullptr);
+
+        logger->trace("context::context parent = {}", static_cast<void*>(parent));
     }
 
     auto context::init_state_changed_callback() -> void {
@@ -29,24 +32,40 @@ namespace doca {
 
         assert(obj != nullptr);
 
+        obj->current_state_ = next_state;
         obj->state_changed(prev_state, next_state);
 
-        if(
-            next_state == DOCA_CTX_STATE_IDLE &&
-            obj->parent_ != nullptr
-        ) {
+        if(next_state == DOCA_CTX_STATE_RUNNING) {
+            logger->debug("context started");
+
+            if(obj->coro_start_) {
+                logger->debug("continuing start coroutine");
+                obj->coro_start_.resume();
+            }
+        } else if(next_state == DOCA_CTX_STATE_IDLE ) {
+            logger->debug("context stopped");
+
             obj->parent_->signal_stopped_child(obj);
+
+            if(obj->coro_stop_) {
+                logger->debug("continuing stop coroutine");
+                obj->coro_stop_.resume();
+            }
         }
     }
 
-    auto context::get_state() const -> doca_ctx_states {
-        doca_ctx_states state;
-        enforce_success(doca_ctx_get_state(as_ctx(), &state));
-        return state;
+    auto context::start() -> context_state_awaitable {
+        logger->trace("requesting context start, this = {}, as_ctx() = {}", static_cast<void*>(this), static_cast<void*>(as_ctx()));
+        enforce_success(doca_ctx_start(as_ctx()));
+        logger->trace("context start requested");
+
+        return { this, DOCA_CTX_STATE_RUNNING };
     }
 
-    auto context::stop() -> void {
+    auto context::stop() -> context_state_awaitable {
         enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
+
+        return { this, DOCA_CTX_STATE_IDLE };
     }
 
     auto context::connect() -> void {
@@ -57,5 +76,22 @@ namespace doca {
         std::size_t tasks;
         enforce_success(doca_ctx_get_num_inflight_tasks(as_ctx(), &tasks));
         return tasks;
+    }
+
+    auto context_state_awaitable::await_ready() const noexcept -> bool {
+        return ctx_->get_state() == desired_state_;
+    }
+
+    auto context_state_awaitable::await_suspend(std::coroutine_handle<> caller) noexcept -> void {
+        switch(desired_state_) {
+            case DOCA_CTX_STATE_RUNNING:
+                ctx_->coro_start_ = caller;
+                break;
+            case DOCA_CTX_STATE_IDLE:
+                ctx_->coro_stop_ = caller;
+                break;
+            default:
+                break;
+        }
     }
 }

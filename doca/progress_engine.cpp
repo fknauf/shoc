@@ -77,7 +77,7 @@ namespace doca {
         using namespace std::chrono_literals;
 
         doca_error_t status;
-        
+
         do {
             status = doca_task_submit(task);
             if(status == DOCA_ERROR_AGAIN) {

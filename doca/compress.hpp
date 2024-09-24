@@ -2,6 +2,7 @@
 
 #include "buffer.hpp"
 #include "context.hpp"
+#include "coroutine.hpp"
 #include "device.hpp"
 #include "logger.hpp"
 #include "progress_engine.hpp"
@@ -50,50 +51,36 @@ namespace doca {
         static auto constexpr get_dst      = doca_compress_task_decompress_deflate_get_dst;
     };
 
-    template<typename TaskType>
-    class generic_compress_task {
+    class compress_result {
     public:
-        generic_compress_task(TaskType *task, doca_data task_user_data):
-            handle_ { task },
+        compress_result() = default;
+
+        template<typename TaskType>
+        compress_result(TaskType *task):
             dst_ { compress_task_helpers<TaskType>::get_dst(task) },
-            task_user_data_ { task_user_data }
+            status_ { doca_task_get_status(compress_task_helpers<TaskType>::as_task(task)) },
+            crc_cs_ { compress_task_helpers<TaskType>::get_crc_cs(task) },
+            adler_cs_ { compress_task_helpers<TaskType>::get_adler_cs(task) }
         {
         }
 
-        generic_compress_task(generic_compress_task const &) = delete;
-        generic_compress_task(generic_compress_task &&) = delete;
-        generic_compress_task &operator=(generic_compress_task const &) = delete;
-        generic_compress_task &operator=(generic_compress_task &&) = delete;
-
-        ~generic_compress_task() {
-            doca_task_free(as_task());
-        }
-
         auto &dst() { return dst_; }
-        auto status() const { return doca_task_get_status(as_task()); }
-        auto crc_cs() const { return compress_task_helpers<TaskType>::get_crc_cs(handle_); }
-        auto adler_cs() const { return compress_task_helpers<TaskType>::get_adler_cs(handle_); }
-        auto user_data() const { return task_user_data_; }
+        auto const &dst() const { return dst_; }
+        auto status() const { return status_; }
+        auto crc_cs() const { return crc_cs_; }
+        auto adler_cs() const { return adler_cs_; }
 
     private:
-        TaskType *handle;
-
-        auto as_task() const {
-            return compress_task_helpers<TaskType>::as_task(handle_);
-        }
-
-        TaskType *handle_;
         buffer dst_;
-        doca_data task_user_data_;
+        std::uint32_t status_ = DOCA_ERROR_EMPTY;
+        std::uint32_t crc_cs_ = 0;
+        std::uint32_t adler_cs_ = 0;
     };
-
-    using compress_task_compress_deflate = generic_compress_task<doca_compress_task_compress_deflate>;
-    using compress_task_decompress_deflate = generic_compress_task<doca_compress_task_decompress_deflate>;
 
     /**
      * Context for compression tasks.
      */
-    class base_compress_context:
+    class compress_context:
         public context
     {
     public:
@@ -101,12 +88,12 @@ namespace doca {
          * @param dev device on which the submitted tasks will run
          * @param engine engine that processes the completion events
          */
-        base_compress_context(
+        compress_context(
             progress_engine *parent,
             compress_device const &dev,
             std::uint32_t max_tasks = 1
         );
-        ~base_compress_context();
+        ~compress_context();
 
         /**
          * Compress the data in src, write the results to dest. Returns immediately; the result of the call is a future that'll be completed
@@ -116,8 +103,8 @@ namespace doca {
          * @param dest destination data buffer
          * @return a future that will be completed when the tasks completes
          */
-        auto compress(buffer const &src, buffer &dest, doca_data task_user_data = { .ptr = nullptr }) -> void {
-            submit_task<doca_compress_task_compress_deflate>(src, dest, task_user_data);
+        auto compress(buffer const &src, buffer &dest) -> coro::task<compress_result> {
+            return submit_task<doca_compress_task_compress_deflate>(src, dest);
         }
 
         /**
@@ -128,24 +115,27 @@ namespace doca {
          * @param dest destination data buffer
          * @return a future that will be completed when the tasks completes
          */
-        auto decompress(buffer const &src, buffer &dest, doca_data task_user_data = { .ptr = nullptr }) -> void {
-            submit_task<doca_compress_task_decompress_deflate>(src, dest, task_user_data);
+        auto decompress(buffer const &src, buffer &dest) -> coro::task<compress_result> {
+            return submit_task<doca_compress_task_decompress_deflate>(src, dest);
         }
 
         [[nodiscard]] auto as_ctx() const -> doca_ctx * override;
 
-        auto stop() -> void override;
-
-    protected:
-        virtual auto task_completion_compress_deflate([[maybe_unused]] compress_task_compress_deflate &task) -> void {}
-        virtual auto task_error_compress_deflate([[maybe_unused]] compress_task_compress_deflate &task) -> void {}
-        virtual auto task_completion_decompress_deflate([[maybe_unused]] compress_task_decompress_deflate &task) -> void {}
-        virtual auto task_error_decompress_deflate([[maybe_unused]] compress_task_decompress_deflate &task) -> void {}
+        // auto stop() -> void override;
 
     private:
         template<typename TaskType>
-        auto submit_task(buffer const &src, buffer &dest, doca_data task_user_data) -> void {
+        auto submit_task(buffer src, buffer dest) -> coro::task<compress_result> {
+            logger->trace(__PRETTY_FUNCTION__);
+
+            auto result = coro::receptable<compress_result> { };
+
             TaskType *compress_task;
+            doca_data task_user_data = {
+                .ptr = std::addressof(result)
+            };
+
+            logger->trace("{} dest = {}", __PRETTY_FUNCTION__, task_user_data.ptr);
 
             enforce_success(compress_task_helpers<TaskType>::alloc_init(
                 handle_.handle(),
@@ -164,28 +154,34 @@ namespace doca {
             } else {
                 doca_buf_inc_refcount(dest.handle(), nullptr);
             }
-        }
 
-        auto do_stop_if_able() -> void;
+            logger->trace("{} co_awaiting, coro = {}", __PRETTY_FUNCTION__, result.coro_handle.address());
+
+            co_await coro::receptable_awaiter<compress_result> { &result };
+
+            logger->trace("{} co_await done", __PRETTY_FUNCTION__);
+
+            co_return result.value;
+        }
 
         static auto task_completion_compress_deflate_entry(
             doca_compress_task_compress_deflate *compress_task,
             doca_data task_user_data,
             doca_data ctx_user_data
         ) -> void;
-        
+
         static auto task_error_compress_deflate_entry(
             doca_compress_task_compress_deflate *compress_task,
             doca_data task_user_data,
             doca_data ctx_user_data
         ) -> void;
-        
+
         static auto task_completion_decompress_deflate_entry(
             doca_compress_task_decompress_deflate *compress_task,
             doca_data task_user_data,
             doca_data ctx_user_data
         ) -> void;
-        
+
         static auto task_error_decompress_deflate_entry(
             doca_compress_task_decompress_deflate *compress_task,
             doca_data task_user_data,
@@ -193,56 +189,5 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_compress> handle_ { doca_compress_destroy };
-        scoped_counter<> currently_handling_tasks_;
-        bool stop_requested_ = false;
-    };
-
-    class compress_context;
-
-    struct compress_callbacks {
-        using state_changed_callback = std::function<void(
-            compress_context &self,
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        )>;
-
-        using compress_completion_callback = std::function<void(
-            compress_context &self,
-            compress_task_compress_deflate &task
-        )>;
-        
-        using decompress_completion_callback = std::function<void(
-            compress_context &self,
-            compress_task_decompress_deflate &task
-        )>;
-
-        state_changed_callback state_changed = {};
-        compress_completion_callback compress_completed = {};
-        compress_completion_callback compress_error = {};
-        decompress_completion_callback decompress_completed = {};
-        decompress_completion_callback decompress_error = {};
-    };
-
-    class compress_context:
-        public base_compress_context
-    {
-    public:
-        compress_context(
-            progress_engine *parent,
-            compress_device const &dev,
-            compress_callbacks callbacks,
-            std::uint32_t max_tasks = 1
-        );
-
-    protected:
-        auto state_changed(doca_ctx_states prev_state, doca_ctx_states next_state) -> void override;
-
-        auto task_completion_compress_deflate(compress_task_compress_deflate &task) -> void override;
-        auto task_error_compress_deflate(compress_task_compress_deflate &task) -> void override;
-        auto task_completion_decompress_deflate(compress_task_decompress_deflate &task) -> void override;
-        auto task_error_decompress_deflate(compress_task_decompress_deflate &task) -> void override;
-
-    private:
-        compress_callbacks callbacks_;
     };
 }

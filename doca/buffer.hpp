@@ -29,8 +29,19 @@ namespace doca {
     {
     public:
         buffer(doca_buf *handle = nullptr);
+        ~buffer();
 
-        [[nodiscard]] auto handle() const noexcept -> doca_buf* { return ref_.get(); }
+        buffer(buffer const &);
+        buffer(buffer &&);
+
+        auto operator=(buffer const&) -> buffer&;
+        auto operator=(buffer &&) -> buffer&;
+
+        auto swap(buffer &other) -> void {
+            std::swap(handle_, other.handle_);
+        }
+
+        [[nodiscard]] auto handle() const noexcept -> doca_buf* { return handle_; }
         [[nodiscard]] auto has_value() const noexcept -> bool { return handle() != nullptr; }
 
         /**
@@ -104,8 +115,6 @@ namespace doca {
             return { base, base + len };
         }
 
-        // shared_ptr instead of doca_buf_inc_refcount/doca_buf_dec_refcount because
-        // those aren't thread-safe.
-        std::shared_ptr<doca_buf> ref_;
+        doca_buf *handle_ = nullptr;
     };
 }

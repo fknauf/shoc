@@ -1,11 +1,13 @@
 #pragma once
 
+#include "coroutine.hpp"
 #include "error.hpp"
 
 #include <doca_ctx.h>
 
 #include <algorithm>
 #include <concepts>
+#include <coroutine>
 #include <functional>
 #include <memory>
 #include <unordered_map>
@@ -23,10 +25,30 @@ namespace doca {
         virtual auto engine() -> progress_engine* = 0;
     };
 
+    class [[nodiscard]] context_state_awaitable {
+    public:
+        context_state_awaitable(context *ctx, doca_ctx_states desired_state):
+            ctx_(ctx), desired_state_(desired_state)
+        {
+            logger->trace("context_state_awaitable ctx = {}, desired_state = {}", static_cast<void*>(ctx_), desired_state_);
+        }
+
+        auto await_ready() const noexcept -> bool;
+        auto await_resume() const noexcept {}
+
+        auto await_suspend(std::coroutine_handle<> caller) noexcept -> void;
+
+    private:
+        context *ctx_;
+        doca_ctx_states desired_state_;
+    };
+
     class context:
         public context_parent
     {
     public:
+        friend class context_state_awaitable;
+
         context(context_parent *parent);
 
         virtual ~context() = default;
@@ -34,13 +56,19 @@ namespace doca {
         context(context const &) = delete;
         context &operator=(context const &) = delete;
 
-        virtual auto stop() -> void;
+        [[nodiscard]]
+        auto start() -> context_state_awaitable;
+
+        [[nodiscard]]
+        virtual auto stop() -> context_state_awaitable;
 
         [[nodiscard]]
         virtual auto as_ctx() const -> doca_ctx* = 0;
 
         [[nodiscard]]
-        auto get_state() const -> doca_ctx_states;
+        auto get_state() const -> doca_ctx_states {
+            return current_state_;
+        }
 
         auto signal_stopped_child([[maybe_unused]] context *stopped_child) -> void override {}
 
@@ -75,6 +103,10 @@ namespace doca {
         auto connect() -> void;
 
         context_parent *parent_ = nullptr;
+        doca_ctx_states current_state_ = DOCA_CTX_STATE_IDLE;
+
+        std::coroutine_handle<> coro_start_;
+        std::coroutine_handle<> coro_stop_;
     };
 
     template<std::derived_from<context> BaseContext = context>
@@ -90,22 +122,29 @@ namespace doca {
 
         template<
             std::derived_from<BaseContext> ConcreteContext,
+            std::derived_from<context_parent> Parent,
             typename... Args
         > auto create_context(
+            Parent *parent,
             Args&&... args
-        ) -> ConcreteContext * {
-            auto new_context = std::make_unique<ConcreteContext>(std::forward<Args>(args)...);
-            auto non_owning_ptr = new_context.get();
+        ) -> coro::task<ConcreteContext*> {
+            logger->trace("dependent_contexts::create_context, parent = {}", static_cast<void*>(parent));
 
-            // make sure slot exists so inserting will not throw later.
+            auto new_context = std::make_unique<ConcreteContext>(parent, std::forward<Args>(args)...);
+            new_context->connect();
+
+            return create_context_coro(std::move(new_context));
+        }
+
+        template<std::derived_from<BaseContext> ConcreteContext>
+        auto create_context_coro(std::unique_ptr<ConcreteContext> new_context) -> coro::task<ConcreteContext*> {
+            auto non_owning_ptr = new_context.get();
             auto &slot = active_contexts_[non_owning_ptr];
 
-            new_context->connect();
-            enforce_success(doca_ctx_start(new_context->as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
-
+            co_await new_context->start();
             slot = std::move(new_context);
 
-            return non_owning_ptr;
+            co_return non_owning_ptr;
         }
 
         auto size() const noexcept {
@@ -118,7 +157,7 @@ namespace doca {
 
         auto stop_all() -> void {
             for(auto &child : active_contexts_) {
-                child.second->stop();
+                doca_ctx_stop(child.second->as_ctx());
             }
         }
 
