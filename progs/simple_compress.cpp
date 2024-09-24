@@ -62,6 +62,7 @@ auto compress_file(
     auto start = std::chrono::steady_clock::now();
 
     for(auto i : std::ranges::views::iota(0u, batches)) {
+        doca::logger->debug("compressing chunk {}...", i);
         auto result = co_await compress->compress(src_buffers[i], dst_buffers[i]);
         doca::logger->debug("compress_chunk complete: {}, crc = {}, adler = {}", i, result.crc_cs(), result.adler_cs());
     }
@@ -90,10 +91,7 @@ auto main(int argc, char *argv[]) -> int try {
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
     doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
-    doca::logger->set_level(spdlog::level::debug);
-
-    static_cast<void>(argc);
-    static_cast<void>(argv);
+    doca::logger->set_level(spdlog::level::trace);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
@@ -104,11 +102,15 @@ auto main(int argc, char *argv[]) -> int try {
     auto out = std::ofstream(argv[2], std::ios::binary);
     auto engine = doca::progress_engine {};
 
-    compress_file(&engine, in, out);
+    doca::logger->debug("starting compress_file");
 
-    doca::logger->trace("spawned coroutine, starting main loop");
+    [[maybe_unused]] auto compress_task = compress_file(&engine, in, out);
+
+    doca::logger->debug("spawned coroutine, starting main loop");
 
     engine.main_loop();
+
+    doca::logger->debug("main loop finished.");
 } catch(doca::doca_exception &ex) {
     doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

@@ -37,6 +37,8 @@ namespace doca {
 
             logger->debug("~pe: {} contexts still running.", connected_contexts_.size());
         }
+
+        logger->debug("~pe: all contexts stopped.");
     }
 
     auto progress_engine::notification_handle() const -> doca_event_handle_t {

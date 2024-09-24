@@ -45,12 +45,12 @@ namespace doca {
         } else if(next_state == DOCA_CTX_STATE_IDLE ) {
             logger->debug("context stopped");
 
-            obj->parent_->signal_stopped_child(obj);
-
             if(obj->coro_stop_) {
                 logger->debug("continuing stop coroutine");
                 obj->coro_stop_.resume();
             }
+
+            obj->parent_->signal_stopped_child(obj);
         }
     }
 
@@ -79,6 +79,9 @@ namespace doca {
     }
 
     auto context_state_awaitable::await_ready() const noexcept -> bool {
+        // depending on the concrete context, doca_ctx_start will go either into DOCA_CTX_STATE_STARTING,
+        // in which case this awaitable has to suspend and wait for an async event to continue, or
+        // directly into DOCA_CTX_STATE_RUNNING, in which case suspension is unnecessary.
         return ctx_->get_state() == desired_state_;
     }
 

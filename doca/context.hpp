@@ -51,10 +51,10 @@ namespace doca {
 
         context(context_parent *parent);
 
-        virtual ~context() = default;
-
         context(context const &) = delete;
+        context(context&&) = delete;
         context &operator=(context const &) = delete;
+        context &operator=(context &&) = delete;
 
         [[nodiscard]]
         auto start() -> context_state_awaitable;

@@ -1,11 +1,13 @@
 #pragma once
 
+#include "error.hpp"
 #include "logger.hpp"
 
 #include <cassert>
 #include <concepts>
 #include <coroutine>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <type_traits>
@@ -27,20 +29,37 @@ namespace doca::coro {
     class task;
 
     namespace detail {
+        // for convenient std::variant visiting
         template<typename... Fs> struct overload : Fs... { using Fs::operator()...; };
         template<typename... Fs> overload(Fs...) -> overload<Fs...>;
 
+        /**
+         * base class for coroutine promise types. We will have to specialize for promise_types that
+         * return a value on the one hand and those that return void on the other, and this contains
+         * the common part.
+         *
+         * This common part concerns two main features of a task coroutine:
+         *
+         * 1. it is awaitable by other coroutines
+         * 2. return values and/or thrown exceptions are propagated to the waiter
+         */
         struct promise_base {
+            /**
+             * coroutine lifecycle management: when a task<...> coroutine returns, it'll suspend and keep
+             * the coroutine (and more importantly its promise) alive for us to extract the return value
+             * and/or stored exception.
+             *
+             * the final_awaitable facilitates this.
+             */
             struct final_awaitable {
                 auto await_ready() const noexcept {
-                    logger->trace(__PRETTY_FUNCTION__);
+                    logger->trace("{}", __PRETTY_FUNCTION__);
                     return false;
                 }
 
                 template<typename Promise>
                 auto await_suspend(std::coroutine_handle<Promise> coroutine) noexcept -> std::coroutine_handle<> {
-                    logger->trace(__PRETTY_FUNCTION__);
-
+                    logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, coroutine.address());
                     if(coroutine.promise().continuation) {
                         return coroutine.promise().continuation;
                     } else {
@@ -49,17 +68,17 @@ namespace doca::coro {
                 }
 
                 auto await_resume() noexcept -> void {
-                    logger->trace(__PRETTY_FUNCTION__);
+                    logger->trace("{}", __PRETTY_FUNCTION__);
                 }
             };
 
-            auto initial_suspend() noexcept { 
-                logger->trace(__PRETTY_FUNCTION__);
+            auto initial_suspend() noexcept {
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 return std::suspend_always{};
             }
 
             auto final_suspend() noexcept {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 return final_awaitable{};
             }
 
@@ -83,17 +102,17 @@ namespace doca::coro {
 
             template<std::convertible_to<Result> Value>
             auto return_value(Value &&val) {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 storage_.template emplace<stored_type>(std::move(val));
             }
 
             auto unhandled_exception() noexcept {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 storage_ = std::current_exception();
             }
 
             auto result() {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 auto visitor = overload {
                     [](stored_type &val) -> stored_type { return val; },
                     [](std::exception_ptr ex) -> stored_type { std::rethrow_exception(ex); },
@@ -116,16 +135,16 @@ namespace doca::coro {
             auto get_return_object() noexcept -> task<void>;
 
             auto return_void() noexcept {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
             }
 
             auto unhandled_exception() noexcept {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 ex_ = std::current_exception();
             }
 
             auto result() {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 if(ex_) {
                     std::rethrow_exception(ex_);
                 }
@@ -143,18 +162,18 @@ namespace doca::coro {
 
         struct awaitable {
             auto await_ready() const noexcept {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}, coro = {}, ready = {}", __PRETTY_FUNCTION__, coro.address(), !coro || coro.done());
                 return !coro || coro.done();
             }
 
             auto await_suspend(std::coroutine_handle<> caller) noexcept -> std::coroutine_handle<> {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}, caller = {}", __PRETTY_FUNCTION__, caller.address());
                 coro.promise().continuation = caller;
                 return coro;
             }
 
             auto await_resume() {
-                logger->trace(__PRETTY_FUNCTION__);
+                logger->trace("{}", __PRETTY_FUNCTION__);
                 return coro.promise().result();
             }
 
@@ -165,11 +184,11 @@ namespace doca::coro {
         explicit task(std::coroutine_handle<promise_type> handle):
             coroutine { handle }
         {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
         }
 
         ~task() {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, coroutine.address());
             destroy();
         }
 
@@ -177,12 +196,12 @@ namespace doca::coro {
         task(task &&other) noexcept:
             coroutine { std::exchange(other.coroutine, nullptr) }
         {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}", __PRETTY_FUNCTION__);
         }
 
         task &operator=(task const &) = delete;
         task &operator=(task &&other) {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}", __PRETTY_FUNCTION__);
             if(std::addressof(other) != this) {
                 destroy();
                 coroutine = std::exchange(other.coroutine, nullptr);
@@ -190,13 +209,13 @@ namespace doca::coro {
         }
 
         auto operator co_await() const noexcept {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}", __PRETTY_FUNCTION__);
             return awaitable { coroutine };
         }
 
     private:
         auto destroy() {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}", __PRETTY_FUNCTION__);
             if(coroutine) {
                 coroutine.destroy();
                 coroutine = nullptr;
@@ -211,46 +230,54 @@ namespace doca::coro {
     namespace detail {
         template<typename Result>
         inline auto promise<Result>::get_return_object() noexcept -> task<Result> {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}", __PRETTY_FUNCTION__);
             return task<Result> { std::coroutine_handle<promise>::from_promise(*this) };
         }
 
         inline auto promise<void>::get_return_object() noexcept -> task<void> {
-            logger->trace(__PRETTY_FUNCTION__);
+            logger->trace("{}", __PRETTY_FUNCTION__);
             return task<void> { std::coroutine_handle<promise>::from_promise(*this) };
         }
     }
 
     template<typename T, typename Promise = void>
     struct receptable {
-        T value;
+        std::optional<T> value;
         std::coroutine_handle<Promise> coro_handle;
-
-        ~receptable() {
-            logger->trace("{}", __PRETTY_FUNCTION__);
-        }
     };
 
     template<typename T, typename Promise = void>
     struct receptable_awaiter {
-        receptable<T, Promise> *dest;
+        std::unique_ptr<receptable<T, Promise>> dest;
 
-        ~receptable_awaiter() {
+        receptable_awaiter(std::unique_ptr<receptable<T, Promise>> &&dest):
+            dest { std::move(dest) }
+        {}
+
+        auto await_ready() const noexcept -> bool {
             logger->trace("{}", __PRETTY_FUNCTION__);
+            return dest->value.has_value();
         }
 
-        auto await_ready() const noexcept {
-            logger->trace(__PRETTY_FUNCTION__);
-            return false;
-        }
-        
-        auto await_suspend(std::coroutine_handle<Promise> handle) noexcept {
-            logger->trace("{}: coro = {}", __PRETTY_FUNCTION__, handle.address());
-            dest->coro_handle = handle;
+        auto await_suspend(std::coroutine_handle<Promise> handle) {
+            logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
+
+            if(dest == nullptr) {
+                throw doca_exception { DOCA_ERROR_UNEXPECTED };
+            }
+
+            if(dest->value.has_value()) {
+                return false;
+            } else {
+                dest->coro_handle = handle;
+                return true;
+            }
         }
 
         auto await_resume() const noexcept {
-            logger->trace(__PRETTY_FUNCTION__);        
+            assert(dest);
+
+            return std::move(*dest->value);
         }
     };
 }

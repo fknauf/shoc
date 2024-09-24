@@ -28,7 +28,14 @@ namespace doca {
     class buffer
     {
     public:
+        /**
+         * takes ownership of the supplied handle (unless it is nullptr), that is: the created
+         * buffer object will decrease the reference counter when it is destroyed.
+         * 
+         * @param handle pointer to a raw doca_buf instance
+         */
         buffer(doca_buf *handle = nullptr);
+
         ~buffer();
 
         buffer(buffer const &);

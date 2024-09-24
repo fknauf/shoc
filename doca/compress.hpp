@@ -103,7 +103,8 @@ namespace doca {
          * @param dest destination data buffer
          * @return a future that will be completed when the tasks completes
          */
-        auto compress(buffer const &src, buffer &dest) -> coro::task<compress_result> {
+        auto compress(buffer const &src, buffer &dest) {
+            logger->trace("{} start", __PRETTY_FUNCTION__);
             return submit_task<doca_compress_task_compress_deflate>(src, dest);
         }
 
@@ -115,7 +116,8 @@ namespace doca {
          * @param dest destination data buffer
          * @return a future that will be completed when the tasks completes
          */
-        auto decompress(buffer const &src, buffer &dest) -> coro::task<compress_result> {
+        auto decompress(buffer const &src, buffer &dest) {
+            logger->trace("{} start", __PRETTY_FUNCTION__);
             return submit_task<doca_compress_task_decompress_deflate>(src, dest);
         }
 
@@ -125,14 +127,14 @@ namespace doca {
 
     private:
         template<typename TaskType>
-        auto submit_task(buffer src, buffer dest) -> coro::task<compress_result> {
+        auto submit_task(buffer src, buffer dest) -> coro::receptable_awaiter<compress_result> {
             logger->trace(__PRETTY_FUNCTION__);
 
-            auto result = coro::receptable<compress_result> { };
+            auto result_space = std::make_unique<coro::receptable<compress_result>>();
 
             TaskType *compress_task;
             doca_data task_user_data = {
-                .ptr = std::addressof(result)
+                .ptr = result_space.get()
             };
 
             logger->trace("{} dest = {}", __PRETTY_FUNCTION__, task_user_data.ptr);
@@ -155,38 +157,22 @@ namespace doca {
                 doca_buf_inc_refcount(dest.handle(), nullptr);
             }
 
-            logger->trace("{} co_awaiting, coro = {}", __PRETTY_FUNCTION__, result.coro_handle.address());
-
-            co_await coro::receptable_awaiter<compress_result> { &result };
-
-            logger->trace("{} co_await done", __PRETTY_FUNCTION__);
-
-            co_return result.value;
+            return coro::receptable_awaiter<compress_result> { std::move(result_space) };
         }
 
-        static auto task_completion_compress_deflate_entry(
-            doca_compress_task_compress_deflate *compress_task,
+        template<typename TaskType>
+        static auto task_completion_entry(
+            TaskType *compress_task,
             doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
+            [[maybe_unused]] doca_data ctx_user_data
+        ) -> void {
+            auto dest = static_cast<coro::receptable<compress_result>*>(task_user_data.ptr);
 
-        static auto task_error_compress_deflate_entry(
-            doca_compress_task_compress_deflate *compress_task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
+            dest->value = compress_result { compress_task };
+            doca_task_free(compress_task_helpers<TaskType>::as_task(compress_task));
 
-        static auto task_completion_decompress_deflate_entry(
-            doca_compress_task_decompress_deflate *compress_task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
-
-        static auto task_error_decompress_deflate_entry(
-            doca_compress_task_decompress_deflate *compress_task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
+            dest->coro_handle.resume();
+        }
 
         unique_handle<doca_compress> handle_ { doca_compress_destroy };
     };
