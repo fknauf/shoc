@@ -153,6 +153,7 @@ namespace doca {
             new_context->connect();
 
             auto non_owning_ptr = new_context.get();
+            // make sure that registering the new context after starting cannot throw an exception (like bad_alloc)
             auto &slot = active_contexts_[non_owning_ptr];
             auto start_awaitable = new_context->start();
 

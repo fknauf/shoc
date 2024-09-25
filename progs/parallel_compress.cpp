@@ -1,5 +1,6 @@
 #include "doca/buffer_inventory.hpp"
 #include "doca/compress.hpp"
+#include "doca/coro/task.hpp"
 #include "doca/logger.hpp"
 #include "doca/memory_map.hpp"
 #include "doca/progress_engine.hpp"
@@ -14,10 +15,10 @@
 
 #include <doca_log.h>
 
-auto compress_file(std::istream &in, std::ostream &out) {
+auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream &out) -> doca::coro::eager_task<void> {
     std::uint32_t batches;
     std::uint32_t batchsize;
-    std::uint32_t const parallelism = 32;
+    std::uint32_t const parallelism = 4;
 
     in.read(reinterpret_cast<char *>(&batches), sizeof batches);
     in.read(reinterpret_cast<char *>(&batchsize), sizeof batchsize);
@@ -36,7 +37,6 @@ auto compress_file(std::istream &in, std::ostream &out) {
     auto dev = doca::compress_device{};
     auto mmap_src = doca::memory_map { dev, src_data };
     auto mmap_dst = doca::memory_map { dev, dst_data };
-    auto engine = doca::progress_engine {};
     auto buf_inv = doca::buffer_inventory { batches * 2 };
 
     auto src_buffers = std::vector<doca::buffer>{};
@@ -45,9 +45,6 @@ auto compress_file(std::istream &in, std::ostream &out) {
     src_buffers.reserve(batches);
     dst_buffers.reserve(batches);
 
-    std::chrono::time_point<std::chrono::steady_clock> start;
-    std::chrono::time_point<std::chrono::steady_clock> end;
-
     for(auto i : std::ranges::views::iota(0u, batches)) {
         auto offset = i * batchsize;
 
@@ -55,68 +52,39 @@ auto compress_file(std::istream &in, std::ostream &out) {
         dst_buffers.push_back(buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize));
     }
 
-    engine.create_context<doca::compress_context>(
-        dev,
-        (doca::compress_callbacks) {
-            .state_changed = [&](
-                doca::compress_context &self,
-                doca_ctx_states prev_state,
-                doca_ctx_states next_state
-            ) {
-                doca::logger->debug("compress changed state {} -> {}", prev_state, next_state);
+    auto compress = co_await engine->create_context<doca::compress_context>(dev, parallelism);
 
-                if(next_state == DOCA_CTX_STATE_RUNNING) {
-                    start = std::chrono::steady_clock::now();
+    try {
+        auto start = std::chrono::steady_clock::now();
 
-                    for(auto i : std::ranges::views::iota(0u, parallelism)) {
-                        self.compress(src_buffers[i], dst_buffers[i], { .u64 = i });
-                    }
-                }
-            },
-            .compress_completed = [&](
-                doca::compress_context &self,
-                doca::compress_task_compress_deflate &task
-            ) {
-                doca::logger->debug("compress chunk complete: {}, crc = {}, adler = {}",
-                    task.user_data().u64,
-                    task.crc_cs(),
-                    task.adler_cs()
-                );
+        std::array<doca::coro::receptable_awaiter<doca::compress_result>, parallelism> waiters;
 
-                auto next_chunk_no = task.user_data().u64 + parallelism;
+        for(auto i : std::ranges::views::iota(0u, batches)) {
+            auto waiter_index = i % parallelism;
+            auto &waiter = waiters[waiter_index];
 
-                if(next_chunk_no < batches) {
-                    self.compress(
-                        src_buffers[next_chunk_no],
-                        dst_buffers[next_chunk_no],
-                        { .u64 = next_chunk_no }
-                    );
-                } else if(self.inflight_tasks() == 0) {
-                    end = std::chrono::steady_clock::now();
-                    self.stop();
-                }
-            },
-            .compress_error = [&](
-                doca::compress_context &self,
-                doca::compress_task_compress_deflate &task
-            ) {
-                doca::logger->error("compression error on chunk {}: Code {}, {}", 
-                    task.user_data().u64,
-                    doca_error_get_name(task.status()),
-                    doca_error_get_descr(task.status())
-                );
-                end = std::chrono::steady_clock::now();
-                self.stop();
+            if(i >= parallelism) {
+                doca::logger->info("waiting for chunk {}", i - parallelism);
+                co_await waiter;
             }
-        },
-        parallelism * 2
-    );
 
-    engine.main_loop();
+            waiter = compress->compress(src_buffers[i], dst_buffers[i]);
+        }
 
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        for(auto &waiter: waiters) {
+            doca::logger->info("waiting for final chunks...");
+            co_await waiter;
+        }
 
-    doca::logger->info("elapsed time: {} us", elapsed.count());
+        auto end = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        doca::logger->info("elapsed time: {} us", elapsed.count());
+    } catch(std::exception &e) {
+        doca::logger->error("unexpected error: {}", e.what());
+    }
+
+    co_await compress->stop();
 
     for(auto &buf : dst_buffers) {
         auto data = buf.data();
@@ -132,9 +100,9 @@ auto main(int argc, char *argv[]) -> int try {
 
     doca_log_backend_create_standard();
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
+    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
 
-    doca::logger->set_level(spdlog::level::info);
+    doca::logger->set_level(spdlog::level::debug);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
@@ -144,7 +112,11 @@ auto main(int argc, char *argv[]) -> int try {
     auto in  = std::ifstream(argv[1], std::ios::binary);
     auto out = std::ofstream(argv[2], std::ios::binary);
 
-    compress_file(in, out);
+    auto engine = doca::progress_engine{};
+
+    auto compress_task = compress_file(&engine, in, out);
+
+    engine.main_loop();
 } catch(doca::doca_exception &ex) {
     doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

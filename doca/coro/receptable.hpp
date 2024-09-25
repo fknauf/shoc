@@ -19,6 +19,8 @@ namespace doca::coro {
     struct receptable_awaiter {
         std::unique_ptr<receptable<T, Promise>> dest;
 
+        receptable_awaiter() = default;
+
         receptable_awaiter(std::unique_ptr<receptable<T, Promise>> &&dest):
             dest { std::move(dest) }
         {}
@@ -26,7 +28,7 @@ namespace doca::coro {
         auto await_ready() const noexcept -> bool {
             logger->trace("{}", __PRETTY_FUNCTION__);
             // no need to wait if the value is already there.
-            return dest->value.has_value();
+            return dest && dest->value.has_value();
         }
 
         auto await_suspend(std::coroutine_handle<Promise> handle) {

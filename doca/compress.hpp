@@ -171,7 +171,9 @@ namespace doca {
             dest->value = compress_result { compress_task };
             doca_task_free(compress_task_helpers<TaskType>::as_task(compress_task));
 
-            dest->coro_handle.resume();
+            if(dest->coro_handle) {
+                dest->coro_handle.resume();
+            }
         }
 
         unique_handle<doca_compress> handle_ { doca_compress_destroy };
