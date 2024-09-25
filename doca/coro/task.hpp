@@ -1,17 +1,14 @@
 #pragma once
 
 #include "task_promise.hpp"
-#include <doca/logger.hpp>
 
 #include <coroutine>
-#include <variant>
-#include <type_traits>
 
 namespace doca::coro {
-    template<typename Result>
-    class [[nodiscard]] lazy_task {
+    template<typename Result, bool lazy>
+    class [[nodiscard]] task {
     public:
-        using promise_type = task_promise<Result, lazy_task, std::suspend_always>;
+        using promise_type = task_promise<Result, task, std::conditional_t<lazy, std::suspend_always, std::suspend_never>>;
 
         struct awaitable {
             auto await_ready() const noexcept {
@@ -19,10 +16,13 @@ namespace doca::coro {
                 return !coro || coro.done();
             }
 
-            auto await_suspend(std::coroutine_handle<> caller) noexcept -> std::coroutine_handle<> {
+            auto await_suspend(std::coroutine_handle<> caller) noexcept {
                 logger->trace("{}, caller = {}", __PRETTY_FUNCTION__, caller.address());
                 coro.promise().continuation = caller;
-                return coro;
+
+                if constexpr (lazy) {
+                    return coro;
+                }
             }
 
             auto await_resume() {
@@ -33,27 +33,27 @@ namespace doca::coro {
             std::coroutine_handle<promise_type> coro;
         };
 
-        lazy_task() noexcept = default;
-        explicit lazy_task(std::coroutine_handle<promise_type> handle):
+        task() noexcept = default;
+        explicit task(std::coroutine_handle<promise_type> handle):
             coroutine { handle }
         {
             logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
         }
 
-        ~lazy_task() {
+        ~task() {
             logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, coroutine.address());
             destroy();
         }
 
-        lazy_task(lazy_task const &) = delete;
-        lazy_task(lazy_task &&other) noexcept:
+        task(task const &) = delete;
+        task(task &&other) noexcept:
             coroutine { std::exchange(other.coroutine, nullptr) }
         {
             logger->trace("{}", __PRETTY_FUNCTION__);
         }
 
-        lazy_task &operator=(lazy_task const &) = delete;
-        lazy_task &operator=(lazy_task &&other) {
+        task &operator=(task const &) = delete;
+        task &operator=(task &&other) {
             logger->trace("{}", __PRETTY_FUNCTION__);
             if(std::addressof(other) != this) {
                 destroy();
@@ -79,4 +79,7 @@ namespace doca::coro {
 
         std::coroutine_handle<promise_type> coroutine;
     };
+
+    template<typename Result> using lazy_task = task<Result, true>;
+    template<typename Result> using eager_task = task<Result, false>;
 }

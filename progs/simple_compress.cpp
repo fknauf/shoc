@@ -1,6 +1,6 @@
 #include "doca/buffer_inventory.hpp"
 #include "doca/compress.hpp"
-#include "doca/coro/basic_coroutine.hpp"
+#include "doca/coro/task.hpp"
 #include "doca/logger.hpp"
 #include "doca/memory_map.hpp"
 #include "doca/progress_engine.hpp"
@@ -19,7 +19,7 @@ auto compress_file(
     doca::progress_engine *engine,
     std::istream &in,
     std::ostream &out
-) -> doca::coro::basic_coroutine
+) -> doca::coro::eager_task<void>
 {
     std::uint32_t batches;
     std::uint32_t batchsize;

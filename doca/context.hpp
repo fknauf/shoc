@@ -1,6 +1,6 @@
 #pragma once
 
-#include "coro/lazy_task.hpp"
+#include "coro/task.hpp"
 #include "error.hpp"
 #include "logger.hpp"
 
@@ -110,6 +110,24 @@ namespace doca {
         std::coroutine_handle<> coro_stop_;
     };
 
+    template<std::derived_from<context> ConcreteContext>
+    class create_context_awaitable {
+    public:
+        create_context_awaitable(ConcreteContext *ctx, context_state_awaitable start_awaitable):
+            ctx_ { ctx }, start_awaitable_ { std::move(start_awaitable) }
+        {}
+
+        auto await_ready() const noexcept { return start_awaitable_.await_ready(); }
+        auto await_resume() const noexcept { return ctx_; }
+        auto await_suspend(std::coroutine_handle<> handle) noexcept {
+            start_awaitable_.await_suspend(handle);
+        }
+
+    private:
+        ConcreteContext *ctx_;
+        context_state_awaitable start_awaitable_;
+    };
+
     template<std::derived_from<context> BaseContext = context>
     class dependent_contexts {
     public:
@@ -134,18 +152,13 @@ namespace doca {
             auto new_context = std::make_unique<ConcreteContext>(parent, std::forward<Args>(args)...);
             new_context->connect();
 
-            return create_context_coro(std::move(new_context));
-        }
-
-        template<std::derived_from<BaseContext> ConcreteContext>
-        auto create_context_coro(std::unique_ptr<ConcreteContext> new_context) -> coro::lazy_task<ConcreteContext*> {
             auto non_owning_ptr = new_context.get();
             auto &slot = active_contexts_[non_owning_ptr];
+            auto start_awaitable = new_context->start();
 
-            co_await new_context->start();
             slot = std::move(new_context);
 
-            co_return non_owning_ptr;
+            return create_context_awaitable { non_owning_ptr, std::move(start_awaitable) };
         }
 
         auto size() const noexcept {

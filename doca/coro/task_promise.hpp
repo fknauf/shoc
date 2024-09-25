@@ -4,6 +4,7 @@
 
 #include <coroutine>
 #include <stdexcept>
+#include <type_traits>
 #include <variant>
 
 namespace doca::coro {
