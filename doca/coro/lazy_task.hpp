@@ -1,32 +1,14 @@
 #pragma once
 
-#include "error.hpp"
-#include "logger.hpp"
+#include <doca/logger.hpp>
 
-#include <cassert>
-#include <concepts>
 #include <coroutine>
-#include <exception>
-#include <memory>
-#include <optional>
-#include <stdexcept>
-#include <type_traits>
-#include <utility>
 #include <variant>
+#include <type_traits>
 
 namespace doca::coro {
-    struct basic_coroutine {
-        struct promise_type {
-            auto get_return_object() const noexcept { return basic_coroutine{}; }
-            auto unhandled_exception() const noexcept {}
-            auto return_void() const noexcept {}
-            auto initial_suspend() const noexcept { return std::suspend_never{}; }
-            auto final_suspend() const noexcept { return std::suspend_never{}; }
-        };
-    };
-
     template<typename Result = void>
-    class task;
+    class lazy_task;
 
     namespace detail {
         // for convenient std::variant visiting
@@ -45,7 +27,7 @@ namespace doca::coro {
          */
         struct promise_base {
             /**
-             * coroutine lifecycle management: when a task<...> coroutine returns, it'll suspend and keep
+             * coroutine lifecycle management: when a lazy_task<...> coroutine returns, it'll suspend and keep
              * the coroutine (and more importantly its promise) alive for us to extract the return value
              * and/or stored exception.
              *
@@ -98,7 +80,7 @@ namespace doca::coro {
         {
             using stored_type = std::remove_const_t<Result>;
 
-            auto get_return_object() noexcept -> task<Result>;
+            auto get_return_object() noexcept -> lazy_task<Result>;
 
             template<std::convertible_to<Result> Value>
             auto return_value(Value &&val) {
@@ -132,7 +114,7 @@ namespace doca::coro {
         struct promise<void>:
             public promise_base
         {
-            auto get_return_object() noexcept -> task<void>;
+            auto get_return_object() noexcept -> lazy_task<void>;
 
             auto return_void() noexcept {
                 logger->trace("{}", __PRETTY_FUNCTION__);
@@ -156,7 +138,7 @@ namespace doca::coro {
     }
 
     template<typename Result>
-    class [[nodiscard]] task {
+    class [[nodiscard]] lazy_task {
     public:
         using promise_type = detail::promise<Result>;
 
@@ -180,27 +162,27 @@ namespace doca::coro {
             std::coroutine_handle<promise_type> coro;
         };
 
-        task() noexcept = default;
-        explicit task(std::coroutine_handle<promise_type> handle):
+        lazy_task() noexcept = default;
+        explicit lazy_task(std::coroutine_handle<promise_type> handle):
             coroutine { handle }
         {
             logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
         }
 
-        ~task() {
+        ~lazy_task() {
             logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, coroutine.address());
             destroy();
         }
 
-        task(task const &) = delete;
-        task(task &&other) noexcept:
+        lazy_task(lazy_task const &) = delete;
+        lazy_task(lazy_task &&other) noexcept:
             coroutine { std::exchange(other.coroutine, nullptr) }
         {
             logger->trace("{}", __PRETTY_FUNCTION__);
         }
 
-        task &operator=(task const &) = delete;
-        task &operator=(task &&other) {
+        lazy_task &operator=(lazy_task const &) = delete;
+        lazy_task &operator=(lazy_task &&other) {
             logger->trace("{}", __PRETTY_FUNCTION__);
             if(std::addressof(other) != this) {
                 destroy();
@@ -229,55 +211,14 @@ namespace doca::coro {
 
     namespace detail {
         template<typename Result>
-        inline auto promise<Result>::get_return_object() noexcept -> task<Result> {
+        inline auto promise<Result>::get_return_object() noexcept -> lazy_task<Result> {
             logger->trace("{}", __PRETTY_FUNCTION__);
-            return task<Result> { std::coroutine_handle<promise>::from_promise(*this) };
+            return lazy_task<Result> { std::coroutine_handle<promise>::from_promise(*this) };
         }
 
-        inline auto promise<void>::get_return_object() noexcept -> task<void> {
+        inline auto promise<void>::get_return_object() noexcept -> lazy_task<void> {
             logger->trace("{}", __PRETTY_FUNCTION__);
-            return task<void> { std::coroutine_handle<promise>::from_promise(*this) };
+            return lazy_task<void> { std::coroutine_handle<promise>::from_promise(*this) };
         }
     }
-
-    template<typename T, typename Promise = void>
-    struct receptable {
-        std::optional<T> value;
-        std::coroutine_handle<Promise> coro_handle;
-    };
-
-    template<typename T, typename Promise = void>
-    struct receptable_awaiter {
-        std::unique_ptr<receptable<T, Promise>> dest;
-
-        receptable_awaiter(std::unique_ptr<receptable<T, Promise>> &&dest):
-            dest { std::move(dest) }
-        {}
-
-        auto await_ready() const noexcept -> bool {
-            logger->trace("{}", __PRETTY_FUNCTION__);
-            return dest->value.has_value();
-        }
-
-        auto await_suspend(std::coroutine_handle<Promise> handle) {
-            logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
-
-            if(dest == nullptr) {
-                throw doca_exception { DOCA_ERROR_UNEXPECTED };
-            }
-
-            if(dest->value.has_value()) {
-                return false;
-            } else {
-                dest->coro_handle = handle;
-                return true;
-            }
-        }
-
-        auto await_resume() const noexcept {
-            assert(dest);
-
-            return std::move(*dest->value);
-        }
-    };
 }

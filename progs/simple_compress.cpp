@@ -1,5 +1,6 @@
 #include "doca/buffer_inventory.hpp"
 #include "doca/compress.hpp"
+#include "doca/coro/basic_coroutine.hpp"
 #include "doca/logger.hpp"
 #include "doca/memory_map.hpp"
 #include "doca/progress_engine.hpp"

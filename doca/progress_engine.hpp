@@ -1,7 +1,6 @@
 #pragma once
 
 #include "context.hpp"
-#include "coroutine.hpp"
 #include "epoll_handle.hpp"
 #include "error.hpp"
 #include "unique_handle.hpp"

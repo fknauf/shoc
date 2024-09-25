@@ -2,7 +2,7 @@
 
 #include "buffer.hpp"
 #include "context.hpp"
-#include "coroutine.hpp"
+#include "coro/receptable.hpp"
 #include "device.hpp"
 #include "logger.hpp"
 #include "progress_engine.hpp"

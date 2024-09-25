@@ -1,7 +1,8 @@
 #pragma once
 
-#include "coroutine.hpp"
+#include "coro/lazy_task.hpp"
 #include "error.hpp"
+#include "logger.hpp"
 
 #include <doca_ctx.h>
 
@@ -127,7 +128,7 @@ namespace doca {
         > auto create_context(
             Parent *parent,
             Args&&... args
-        ) -> coro::task<ConcreteContext*> {
+        ) {
             logger->trace("dependent_contexts::create_context, parent = {}", static_cast<void*>(parent));
 
             auto new_context = std::make_unique<ConcreteContext>(parent, std::forward<Args>(args)...);
@@ -137,7 +138,7 @@ namespace doca {
         }
 
         template<std::derived_from<BaseContext> ConcreteContext>
-        auto create_context_coro(std::unique_ptr<ConcreteContext> new_context) -> coro::task<ConcreteContext*> {
+        auto create_context_coro(std::unique_ptr<ConcreteContext> new_context) -> coro::lazy_task<ConcreteContext*> {
             auto non_owning_ptr = new_context.get();
             auto &slot = active_contexts_[non_owning_ptr];
 
