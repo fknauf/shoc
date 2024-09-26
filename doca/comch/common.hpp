@@ -1,4 +1,4 @@
-#include <doca/coro/receptable.hpp>
+#include <doca/coro/value_awaitable.hpp>
 
 #include <cstdint>
 #include <string>
@@ -8,6 +8,6 @@
 
 namespace doca::comch {
     using message = std::optional<std::string>;
-    using status_awaitable = coro::receptable_awaiter<doca_error_t>;
-    using message_awaitable = coro::receptable_awaiter<message>;
+    using status_awaitable = coro::value_awaitable<doca_error_t>;
+    using message_awaitable = coro::value_awaitable<message>;
 }

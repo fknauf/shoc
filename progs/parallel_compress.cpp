@@ -57,7 +57,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     try {
         auto start = std::chrono::steady_clock::now();
 
-        std::array<doca::coro::receptable_awaiter<doca::compress_result>, parallelism> waiters;
+        std::array<doca::coro::value_awaitable<doca::compress_result>, parallelism> waiters;
 
         for(auto i : std::ranges::views::iota(0u, batches)) {
             auto waiter_index = i % parallelism;

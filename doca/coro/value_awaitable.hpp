@@ -10,10 +10,10 @@
 #include <utility>
 
 namespace doca::coro {
-    template<typename T, typename Promise = void>
+    template<typename T>
     struct receptable {
         std::optional<T> value;
-        std::coroutine_handle<Promise> coro_handle;
+        std::coroutine_handle<> coro_handle;
 
         auto resume() {
             if(coro_handle) {
@@ -22,15 +22,15 @@ namespace doca::coro {
         }
     };
 
-    template<typename T, typename Promise = void>
-    struct [[nodiscard]] receptable_awaiter {
-        using payload_type = receptable<T, Promise>;
+    template<typename T>
+    struct [[nodiscard]] value_awaitable {
+        using payload_type = receptable<T>;
 
         std::unique_ptr<payload_type> dest;
 
-        receptable_awaiter() = default;
+        value_awaitable() = default;
 
-        receptable_awaiter(std::unique_ptr<payload_type> &&dest):
+        value_awaitable(std::unique_ptr<payload_type> &&dest):
             dest { std::move(dest) }
         {}
 
@@ -39,7 +39,7 @@ namespace doca::coro {
         }
 
         static auto from_value(T &&val) {
-            return receptable_awaiter(std::make_unique<payload_type>(std::move(val), nullptr));
+            return value_awaitable(std::make_unique<payload_type>(std::move(val), nullptr));
         }
 
         auto await_ready() const noexcept -> bool {
@@ -48,7 +48,7 @@ namespace doca::coro {
             return dest && dest->value.has_value();
         }
 
-        auto await_suspend(std::coroutine_handle<Promise> handle) {
+        auto await_suspend(std::coroutine_handle<> handle) {
             logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
 
             // this awaiter might be moved around a bit, but co_await should only ever be called

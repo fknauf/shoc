@@ -6,7 +6,7 @@
 //#include "producer.hpp"
 
 #include <doca/context.hpp>
-#include <doca/coro/receptable.hpp>
+#include <doca/coro/value_awaitable.hpp>
 #include <doca/unique_handle.hpp>
 
 #include <doca_comch.h>
@@ -62,7 +62,7 @@ namespace doca::comch {
         std::queue<message_awaitable::payload_type*> pending_receivers_;
     };
 
-    using server_connection_awaitable = coro::receptable_awaiter<server_connection>;
+    using server_connection_awaitable = coro::value_awaitable<server_connection>;
 
     class server:
         public context

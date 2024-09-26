@@ -2,7 +2,7 @@
 
 #include "buffer.hpp"
 #include "context.hpp"
-#include "coro/receptable.hpp"
+#include "coro/value_awaitable.hpp"
 #include "device.hpp"
 #include "logger.hpp"
 #include "progress_engine.hpp"
@@ -77,7 +77,7 @@ namespace doca {
         std::uint32_t adler_cs_ = 0;
     };
 
-    using compress_awaitable = coro::receptable_awaiter<compress_result>;
+    using compress_awaitable = coro::value_awaitable<compress_result>;
 
     /**
      * Context for compression tasks.
@@ -168,7 +168,7 @@ namespace doca {
             doca_data task_user_data,
             [[maybe_unused]] doca_data ctx_user_data
         ) -> void {
-            auto dest = static_cast<coro::receptable<compress_result>*>(task_user_data.ptr);
+            auto dest = static_cast<compress_awaitable::payload_type*>(task_user_data.ptr);
 
             dest->value = compress_result { compress_task };
             doca_task_free(compress_task_helpers<TaskType>::as_task(compress_task));
