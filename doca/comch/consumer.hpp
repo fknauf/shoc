@@ -1,106 +1,49 @@
 #pragma once
 
-#include "buffer.hpp"
-#include "context.hpp"
-#include "memory_map.hpp"
-#include "unique_handle.hpp"
+#include <doca/buffer.hpp>
+#include <doca/context.hpp>
+#include <doca/coro/value_awaitable.hpp>
+#include <doca/memory_map.hpp>
+#include <doca/unique_handle.hpp>
 
 #include <doca_comch_consumer.h>
 #include <doca_pe.h>
 
-#include <functional>
+#include <span>
 
-namespace doca {
-    class comch_consumer;
+namespace doca::comch {
+    class consumer;
 
-    class comch_consumer_task_post_recv {
-    public:
-        comch_consumer_task_post_recv(
-            doca_comch_consumer_task_post_recv *handle,
-            doca_data task_user_data
-        ):
-            handle_ { handle },
-            buf_ { doca_comch_consumer_task_post_recv_get_buf(handle) },
-            user_data_ { task_user_data }
-        { }
-
-        ~comch_consumer_task_post_recv() {
-            doca_task_free(as_task());
-        }
-
-        comch_consumer_task_post_recv(comch_consumer_task_post_recv const &) = delete;
-        comch_consumer_task_post_recv &operator=(comch_consumer_task_post_recv const &) = delete;
-
-        auto buf() const {
-            return buf_;
-        }
-
-        auto immediate_data() const -> std::span<std::uint8_t> {
-            return {
-                doca_comch_consumer_task_post_recv_get_imm_data(handle_),
-                doca_comch_consumer_task_post_recv_get_imm_data_len(handle_)
-            };
-        }
-
-        auto producer_id() const {
-            return doca_comch_consumer_task_post_recv_get_producer_id(handle_);
-        }
-
-        auto user_data() const {
-            return user_data_;
-        }
-
-        auto status() const {
-            return doca_task_get_status(as_task());
-        }
-
-    private:
-        auto as_task() const -> doca_task* {
-            return doca_comch_consumer_task_post_recv_as_task(handle_);
-        }
-
-        doca_comch_consumer_task_post_recv *handle_;
-        buffer buf_;
-        doca_data user_data_;
+    struct consumer_recv_result {
+        buffer buf;
+        std::span<std::uint8_t const> immediate;
+        std::uint32_t producer_id = -1;
+        std::uint32_t status = DOCA_ERROR_EMPTY;
     };
 
-    class base_comch_consumer:
+    using consumer_recv_awaitable = coro::value_awaitable<consumer_recv_result>;
+
+    class consumer:
         public context
     {
     public:
         using payload_type = std::span<char>;
 
-        base_comch_consumer(
+        consumer(
             context_parent *parent,
             doca_comch_connection *connection,
             memory_map &user_mmap,
             std::uint32_t max_tasks
         );
 
-        ~base_comch_consumer();
-
-        auto stop() -> void override;
+        ~consumer();
 
         [[nodiscard]]
         auto as_ctx() const -> doca_ctx* override {
             return doca_comch_consumer_as_ctx(handle_.handle());
         }
 
-        auto post_recv_msg(
-            buffer dest,
-            doca_data task_user_data = { .ptr = nullptr }
-        ) -> void;
-
-    protected:
-        virtual auto post_recv_task_completion(
-            [[maybe_unused]] comch_consumer_task_post_recv &task
-        ) -> void {
-        }
-
-        virtual auto post_recv_task_error(
-            [[maybe_unused]] comch_consumer_task_post_recv &task
-        ) -> void {
-        }
+        auto post_recv(buffer dest) -> consumer_recv_awaitable;
 
     private:
         static auto post_recv_task_completion_entry(
@@ -109,63 +52,6 @@ namespace doca {
             doca_data ctx_user_data
         ) -> void;
 
-        static auto post_recv_task_error_entry(
-            doca_comch_consumer_task_post_recv *task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
-
-        auto do_stop_if_able() -> void;
-
         unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
-
-        int currently_handling_tasks_ = 0;
-        bool stop_requested_ = false;
-    };
-
-    struct comch_consumer_callbacks {
-        using state_changed_callback = std::function<void (
-            comch_consumer &consumer,
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        )>;
-
-        using post_recv_completion_callback = std::function<void (
-            comch_consumer &consumer,
-            comch_consumer_task_post_recv &task
-        )>;
-
-        state_changed_callback state_changed = {};
-        post_recv_completion_callback post_recv_completion = {};
-        post_recv_completion_callback post_recv_error = {};
-    };
-
-    class comch_consumer:
-        public base_comch_consumer
-    {
-    public:
-        comch_consumer(
-            context_parent *parent,
-            doca_comch_connection *connection,
-            memory_map &user_mmap,
-            std::uint32_t max_tasks,
-            comch_consumer_callbacks callbacks
-        );
-
-    protected:
-        auto state_changed(
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void override;
-
-        auto post_recv_task_completion(
-            comch_consumer_task_post_recv &task
-        ) -> void override;
-
-        auto post_recv_task_error(
-            comch_consumer_task_post_recv &task
-        ) -> void override;
-
-        comch_consumer_callbacks callbacks_;
     };
 }
