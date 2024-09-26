@@ -17,7 +17,7 @@ common_srcs = [
     'doca/buffer.cpp',
     'doca/buffer_inventory.cpp',
     'doca/buffer_pool.cpp',
-#    'doca/comch/client.cpp',
+    'doca/comch/client.cpp',
 #    'doca/comch_consumer.cpp',
     'doca/comch/device.cpp',
 #    'doca/comch_producer.cpp',
@@ -39,11 +39,11 @@ libdocapp = static_library('doca-cpp-eventbased', common_srcs,
         include_directories: inc_dirs,
         install: false)
 
-# executable('comch_client', [ 'progs/comch_client.cpp' ],
-#         dependencies : deps,
-#         link_with: libdocapp,
-#         include_directories: inc_dirs,
-#         install: false)
+executable('comch_client', [ 'progs/comch_client.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
 
 executable('comch_server', [ 'progs/comch_server.cpp' ],
         dependencies : deps,

@@ -56,7 +56,7 @@ namespace doca {
 
     auto context::start() -> context_state_awaitable {
         logger->trace("requesting context start, this = {}, as_ctx() = {}", static_cast<void*>(this), static_cast<void*>(as_ctx()));
-        enforce_success(doca_ctx_start(as_ctx()));
+        enforce_success(doca_ctx_start(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
         logger->trace("context start requested");
 
         return { this, DOCA_CTX_STATE_RUNNING };

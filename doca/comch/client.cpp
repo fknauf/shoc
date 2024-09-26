@@ -1,33 +1,15 @@
-#include "comch_client.hpp"
-#include "logger.hpp"
+#include "client.hpp"
+
+#include <doca/logger.hpp>
 
 #include <doca_pe.h>
 
-namespace doca {
-    namespace {
-        auto get_comch_client_from_connection(doca_comch_connection *comch_connection) -> base_comch_client* {
-            auto client_handle = doca_comch_client_get_client_ctx(comch_connection);
-            auto client_ctx = doca_comch_client_as_ctx(client_handle);
-
-            doca_data user_data;
-            auto err = doca_ctx_get_user_data(client_ctx, &user_data);
-
-            if(err != DOCA_SUCCESS) {
-                auto errmsg = doca_error_get_name(err);
-                logger->error("comch_server new connection: could not get user data from ctx, errmsg = {}", errmsg);
-                return nullptr;
-            }
-
-            auto base_context = static_cast<context*>(user_data.ptr);
-            return static_cast<base_comch_client*>(base_context);
-        }
-    }
-
-    base_comch_client::base_comch_client(
+namespace doca::comch {
+    client::client(
         context_parent *parent,
         std::string const &server_name,
         comch_device &dev,
-        comch_client_limits const &limits
+        client_limits const &limits
     ):
         context { parent }
     {
@@ -39,35 +21,46 @@ namespace doca {
         context::init_state_changed_callback();
 
         enforce_success(doca_comch_client_task_send_set_conf(
-            handle(),
-            &base_comch_client::send_completion_entry,
-            &base_comch_client::send_error_entry,
+            handle_.handle(),
+            &client::send_completion_entry,
+            &client::send_completion_entry,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_client_event_msg_recv_register(
-            handle(),
-            &comch_client::msg_recv_entry
+            handle_.handle(),
+            &client::msg_recv_entry
         ));
-        enforce_success(doca_comch_client_event_consumer_register(
-            handle(),
-            &comch_client::new_consumer_entry,
-            &comch_client::expired_consumer_entry
-        ));
-        enforce_success(doca_comch_client_set_max_msg_size(handle(), limits.max_msg_size));
-        enforce_success(doca_comch_client_set_recv_queue_size(handle(), limits.recv_queue_size));
+        //enforce_success(doca_comch_client_event_consumer_register(
+        //    handle(),
+        //    &client::new_consumer_entry,
+        //    &client::expired_consumer_entry
+        //));
+        enforce_success(doca_comch_client_set_max_msg_size(handle_.handle(), limits.max_msg_size));
+        enforce_success(doca_comch_client_set_recv_queue_size(handle_.handle(), limits.recv_queue_size));
     }
 
-    base_comch_client::~base_comch_client() {
-        doca_ctx_stop(as_ctx());
+    client::~client() {
+        //assert(get_state() == DOCA_CTX_STATE_IDLE);
+
+        if(get_state() != DOCA_CTX_STATE_IDLE) {
+            logger->error("client not idle upon destruction, state = {}", get_state());
+        }
     }
 
-    auto base_comch_client::as_ctx() const -> doca_ctx* {
-        return doca_comch_client_as_ctx(handle());
+    auto client::as_ctx() const -> doca_ctx* {
+        return doca_comch_client_as_ctx(handle_.handle());
     }
 
-    auto base_comch_client::submit_message(std::string message, doca_data task_user_data) -> void {
+    auto client::send(std::string_view message) -> status_awaitable {
+        if(get_state() != DOCA_CTX_STATE_RUNNING) {
+            return status_awaitable::from_value(DOCA_ERROR_NOT_CONNECTED);
+        }
+
         doca_comch_connection *connection;
         doca_comch_task_send *task;
+
+        auto result_space = status_awaitable::create_space();
+        doca_data task_user_data = { .ptr = result_space.get() };
 
         enforce_success(doca_comch_client_get_connection(handle_.handle(), &connection));
         enforce_success(doca_comch_client_task_send_alloc_init(handle_.handle(), connection, message.data(), message.size(), &task));
@@ -78,191 +71,88 @@ namespace doca {
 
         if(err != DOCA_SUCCESS) {
             doca_task_free(base_task);
-            throw doca_exception(err);
+            return status_awaitable::from_value(std::move(err));
+        }
+
+        return status_awaitable { std::move(result_space) };
+    }
+
+    auto client::msg_recv() -> message_awaitable {
+        if(!pending_messages_.empty()) {
+            auto result = message_awaitable::from_value(std::move(pending_messages_.front()));
+            pending_messages_.pop();
+            return result;
+        } else if(get_state() != DOCA_CTX_STATE_RUNNING) {
+            return message_awaitable::from_value(std::nullopt);
+        } else {
+            auto result_space = message_awaitable::create_space();
+            pending_receivers_.push(result_space.get());
+            return message_awaitable { std::move(result_space) };
         }
     }
 
-    auto base_comch_client::send_completion_entry(
+    auto client::send_completion_entry(
         [[maybe_unused]] doca_comch_task_send *task,
         [[maybe_unused]] doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data
     ) -> void {
-        auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto client = static_cast<base_comch_client*>(base_context);
+        auto base_task = doca_comch_task_send_as_task(task);
+        auto status = doca_task_get_status(base_task);
 
-        if(client == nullptr) {
-            logger->error("got send completion event without comch_client");
-        } else {
-            try {
-                client->send_completion(task, task_user_data);
-            } catch(std::exception &e) {
-                logger->error("comch_client send completion handler failed: {}", e.what());
-            } catch(...) {
-                logger->error("comch_client send completion handler failed with unknown error");
-            }
-        }
+        doca_task_free(base_task);
 
-        doca_task_free(doca_comch_task_send_as_task(task));
+        auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
+        dest->value = status;
+        dest->resume();
     }
 
-    auto base_comch_client::send_error_entry(
-        [[maybe_unused]] doca_comch_task_send *task,
-        [[maybe_unused]] doca_data task_user_data,
-        [[maybe_unused]] doca_data ctx_user_data
-    ) -> void {
-        auto base_context = static_cast<context*>(ctx_user_data.ptr);
-        auto client = static_cast<base_comch_client*>(base_context);
-
-        if(client == nullptr) {
-            logger->error("got send error event without comch_client");
-        } else {
-            try {
-                client->send_error(task, task_user_data);
-            } catch(std::exception &e) {
-                logger->error("comch_client send error handler failed: {}", e.what());
-            } catch(...) {
-                logger->error("comch_client send error handler failed with unknown error");
-            }
-        }
-
-        doca_task_free(doca_comch_task_send_as_task(task));
-    }
-    
-    auto base_comch_client::msg_recv_entry(
+    auto client::msg_recv_entry(
         [[maybe_unused]] doca_comch_event_msg_recv *event,
         std::uint8_t *recv_buffer,
         std::uint32_t msg_len,
         doca_comch_connection *comch_connection
     ) -> void {
-        auto client = get_comch_client_from_connection(comch_connection);
+        auto self = client::resolve(comch_connection);
 
-        if(client == nullptr) {
-            logger->error("got msg recv event without comch_client instance");
+        if(self == nullptr) {
+            logger->error("received message to unknown client, bailing out");
             return;
         }
 
-        try {
-            auto msg = std::span { recv_buffer, static_cast<std::size_t>(msg_len) };
-            client->msg_recv(msg, comch_connection);
-        } catch(std::exception &e) {
-            logger->error("comch_client msg recv handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_client msg recv handler failed with unknown error");
-        }
-    }
-    
-    auto base_comch_client::new_consumer_entry(
-        [[maybe_unused]] doca_comch_event_consumer *event,
-        doca_comch_connection *comch_connection,
-        std::uint32_t id
-    ) -> void {
-        logger->debug("comch_client new consumer, id = {}", id);
+        auto msg = std::string_view { reinterpret_cast<char const *>(recv_buffer), msg_len };
 
-        auto client = get_comch_client_from_connection(comch_connection);
-
-        if(client == nullptr) {
-            logger->error("got new consumer event without comch_client instance");
-            return;
-        }
-
-        try {
-            client->new_consumer(comch_connection, id);
-        } catch(std::exception &e) {
-            logger->error("comch_client new consumer handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_client new consumer handler failed with unknown error");
-        }
-    }
-    
-    auto base_comch_client::expired_consumer_entry(
-        [[maybe_unused]] doca_comch_event_consumer *event,
-        doca_comch_connection *comch_connection,
-        std::uint32_t id
-    ) -> void 
-    {
-        logger->debug("comch_client new consumer, id = {}", id);
-
-        auto client = get_comch_client_from_connection(comch_connection);
-
-        if(client == nullptr) {
-            logger->error("got expired consumer event without comch_client instance");
-            return;
-        }
-
-        try {
-            client->expired_consumer(comch_connection, id);
-        } catch(std::exception &e) {
-            logger->error("comch_client expired consumer handler failed: {}", e.what());
-        } catch(...) {
-            logger->error("comch_client expired consumer handler failed with unknown error");
+        if(self->pending_receivers_.empty()) {
+            self->pending_messages_.emplace(msg);
+        } else {
+            auto receiver = self->pending_receivers_.front();
+            receiver->value = msg;
+            self->pending_receivers_.pop();
+            receiver->resume();
         }
     }
 
-    auto base_comch_client::stop() -> void {
-        stop_requested_ = true;
-        active_children_.stop_all();
-        do_stop_if_able();
+    auto client::resolve(doca_comch_connection *handle) -> client* {
+        auto server_handle = doca_comch_client_get_client_ctx(handle);
+        return resolve(server_handle);
     }
 
-    auto base_comch_client::signal_stopped_child(context *stopped_child) -> void {
-        active_children_.remove_stopped_context(stopped_child);
-        if(stop_requested_) {
-            do_stop_if_able();
+    auto client::resolve(doca_comch_client *handle) -> client* {
+        if(handle == nullptr) {
+            return nullptr;
         }
-    }
 
-    auto base_comch_client::do_stop_if_able() -> void {
-        if(active_children_.empty()) {
-            context::stop();
-        }
-    }
+        auto ctx = doca_comch_client_as_ctx(handle);
 
-    comch_client::comch_client(
-        context_parent *parent,
-        std::string const &server_name,
-        comch_device &dev,
-        comch_client_callbacks callbacks,
-        comch_client_limits const &limits
-    ):
-        base_comch_client { parent, server_name, dev, limits },
-        callbacks_ { std::move(callbacks) }
-    { }
+        doca_data user_data;
+        auto err = doca_ctx_get_user_data(ctx, &user_data);
 
-    auto comch_client::state_changed(
-        doca_ctx_states prev_state,
-        doca_ctx_states next_state
-    ) -> void {
-        logger->debug("comch_client: state change {} -> {}", prev_state, next_state);
+        if(err != DOCA_SUCCESS) {
+            auto errmsg = doca_error_get_name(err);
+            logger->error("comch::server::resolve: could not get user data from ctx, errmsg = {}", errmsg);
+            return nullptr;
+        }
 
-        if(callbacks_.state_changed) {
-            callbacks_.state_changed(*this, prev_state, next_state);
-        }
-    }
-
-    auto comch_client::send_completion(
-        doca_comch_task_send *task,
-        doca_data task_user_data
-    ) -> void {
-        if(callbacks_.send_completion) {
-            callbacks_.send_completion(*this, task, task_user_data);
-        }
-    }
-        
-    auto comch_client::send_error(
-        doca_comch_task_send *task,
-        doca_data task_user_data
-    ) -> void {
-        if(callbacks_.send_error) {
-            callbacks_.send_error(*this, task, task_user_data);
-        }
-    }
-        
-    auto comch_client::msg_recv(
-        std::span<std::uint8_t> recv_buffer,
-        doca_comch_connection *comch_connection
-    ) -> void {
-        if(callbacks_.message_received) {
-            callbacks_.message_received(*this, recv_buffer, comch_connection);
-        }
+        auto base_context = static_cast<context*>(user_data.ptr);
+        return static_cast<client*>(base_context);
     }
 }

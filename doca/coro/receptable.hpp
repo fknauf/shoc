@@ -23,7 +23,7 @@ namespace doca::coro {
     };
 
     template<typename T, typename Promise = void>
-    struct receptable_awaiter {
+    struct [[nodiscard]] receptable_awaiter {
         using payload_type = receptable<T, Promise>;
 
         std::unique_ptr<payload_type> dest;
