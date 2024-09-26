@@ -1,6 +1,6 @@
 #include "doca/buffer_inventory.hpp"
 #include "doca/compress.hpp"
-#include "doca/coro/task.hpp"
+#include "doca/coro/fiber.hpp"
 #include "doca/logger.hpp"
 #include "doca/memory_map.hpp"
 #include "doca/progress_engine.hpp"
@@ -19,7 +19,7 @@ auto compress_file(
     doca::progress_engine *engine,
     std::istream &in,
     std::ostream &out
-) -> doca::coro::eager_task<void>
+) -> doca::coro::fiber
 {
     std::uint32_t batches;
     std::uint32_t batchsize;
@@ -98,7 +98,7 @@ auto main(int argc, char *argv[]) -> int try {
 
     doca::logger->debug("starting compress_file");
 
-    [[maybe_unused]] auto compress_task = compress_file(&engine, in, out);
+    compress_file(&engine, in, out);
 
     doca::logger->debug("spawned coroutine, starting main loop");
 

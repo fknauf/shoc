@@ -256,10 +256,7 @@ namespace doca::comch {
 
         auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
         dest->value = status;
-
-        if(dest->coro_handle) {
-            dest->coro_handle.resume();
-        }
+        dest->resume();
     }
 
     auto server::msg_recv_entry(
