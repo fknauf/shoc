@@ -1,9 +1,8 @@
-#include "comch_device.hpp"
-#include "logger.hpp"
+#include "device.hpp"
 
-#include <string_view>
+#include <doca/logger.hpp>
 
-namespace doca {
+namespace doca::comch {
     comch_device::comch_device(std::string const &pci_addr):
         device(device::find_by_pci_addr(pci_addr))
     {

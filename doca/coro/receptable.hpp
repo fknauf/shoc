@@ -1,5 +1,6 @@
 #pragma once
 
+#include <doca/error.hpp>
 #include <doca/logger.hpp>
 
 #include <cassert>
@@ -13,17 +14,33 @@ namespace doca::coro {
     struct receptable {
         std::optional<T> value;
         std::coroutine_handle<Promise> coro_handle;
+
+        auto resume() {
+            if(coro_handle) {
+                coro_handle.resume();
+            }
+        }
     };
 
     template<typename T, typename Promise = void>
     struct receptable_awaiter {
-        std::unique_ptr<receptable<T, Promise>> dest;
+        using payload_type = receptable<T, Promise>;
+
+        std::unique_ptr<payload_type> dest;
 
         receptable_awaiter() = default;
 
-        receptable_awaiter(std::unique_ptr<receptable<T, Promise>> &&dest):
+        receptable_awaiter(std::unique_ptr<payload_type> &&dest):
             dest { std::move(dest) }
         {}
+
+        static auto create_space() {
+            return std::make_unique<payload_type>();
+        }
+
+        static auto from_value(T &&val) {
+            return receptable_awaiter(std::make_unique<payload_type>(std::move(val), nullptr));
+        }
 
         auto await_ready() const noexcept -> bool {
             logger->trace("{}", __PRETTY_FUNCTION__);

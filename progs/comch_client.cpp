@@ -1,9 +1,24 @@
-#include "doca/comch_client.hpp"
+#include "doca/comch/client.hpp"
+#include "doca/coro/task.hpp"
 #include "doca/logger.hpp"
 #include "doca/progress_engine.hpp"
 
 #include <latch>
 #include <iostream>
+
+auto ping_pong(doca::progress_engine *engine) -> doca::coro::eager_task<void> {
+    auto dev = doca::comch::comch_device { "81:00.0" };
+
+    auto client = co_await engine->create_context<doca::comch::client("vss-test", dev);
+
+    client->send_message("ping");
+
+    auto [ msg, con ] = co_await client->recv_msg();
+
+    std::cout << msg << std::endl;
+
+    co_await client->stop();
+}
 
 int main() {
     doca_log_backend *sdk_log;
@@ -14,38 +29,9 @@ int main() {
 
     doca::logger->set_level(spdlog::level::debug);    
     
-    auto dev = doca::comch_device { "81:00.0" };
     auto engine = doca::progress_engine {};
 
-    engine.create_context<doca::comch_client>(
-        "vss-test",
-        dev, 
-        (doca::comch_client_callbacks) {
-            .state_changed = [&](
-                doca::comch_client &client,
-                [[maybe_unused]] doca_ctx_states prev_state,
-                doca_ctx_states next_state
-            ) {
-                if(next_state == DOCA_CTX_STATE_RUNNING) {
-                    client.submit_message("Hello, world.");
-                }
-            },
-            .message_received = [&](
-                doca::comch_client &client,
-                std::span<std::uint8_t> msgbuf,
-                [[maybe_unused]] doca_comch_connection *con
-            ) {
-                auto msg = std::string_view{ reinterpret_cast<char const*>(msgbuf.data()), msgbuf.size() };
-                std::cout << msg << std::endl;
-
-                client.stop();
-            }
-        }
-    );
-
-    doca::logger->info("sent message");
+    auto client_task = ping_pong(&engine);
 
     engine.main_loop();
-
-    doca::logger->info("done");
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "device.hpp"
+#include <doca/device.hpp>
 
-namespace doca {
+namespace doca::comch {
     class comch_device:
         public device
     {

@@ -77,6 +77,8 @@ namespace doca {
         std::uint32_t adler_cs_ = 0;
     };
 
+    using compress_awaitable = coro::receptable_awaiter<compress_result>;
+
     /**
      * Context for compression tasks.
      */
@@ -127,10 +129,10 @@ namespace doca {
 
     private:
         template<typename TaskType>
-        auto submit_task(buffer src, buffer dest) -> coro::receptable_awaiter<compress_result> {
+        auto submit_task(buffer src, buffer dest) -> compress_awaitable {
             logger->trace(__PRETTY_FUNCTION__);
 
-            auto result_space = std::make_unique<coro::receptable<compress_result>>();
+            auto result_space = compress_awaitable::create_space();
 
             TaskType *compress_task;
             doca_data task_user_data = {
@@ -157,7 +159,7 @@ namespace doca {
                 doca_buf_inc_refcount(dest.handle(), nullptr);
             }
 
-            return coro::receptable_awaiter<compress_result> { std::move(result_space) };
+            return compress_awaitable { std::move(result_space) };
         }
 
         template<typename TaskType>
