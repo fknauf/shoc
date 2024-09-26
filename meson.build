@@ -20,7 +20,7 @@ common_srcs = [
     'doca/comch/client.cpp',
     'doca/comch/consumer.cpp',
     'doca/comch/device.cpp',
-#    'doca/comch/producer.cpp',
+    'doca/comch/producer.cpp',
     'doca/comch/server.cpp',
     'doca/compress.cpp',
     'doca/context.cpp',
