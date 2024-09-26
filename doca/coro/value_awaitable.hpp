@@ -35,7 +35,7 @@ namespace doca::coro {
         {}
 
         static auto create_space() {
-            return std::make_unique<payload_type>();
+            return value_awaitable { std::make_unique<payload_type>() } ;
         }
 
         static auto from_value(T &&val) {

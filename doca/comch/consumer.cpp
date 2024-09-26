@@ -35,8 +35,8 @@ namespace doca::comch {
     auto consumer::post_recv(buffer dest) -> consumer_recv_awaitable {
         doca_comch_consumer_task_post_recv *task;
 
-        auto result_space = consumer_recv_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result_space.get() };
+        auto result = consumer_recv_awaitable::create_space();
+        doca_data task_user_data = { .ptr = result.dest.get() };
 
         enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle_.handle(), dest.handle(), &task));
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
@@ -52,7 +52,7 @@ namespace doca::comch {
 
         doca_buf_inc_refcount(dest.handle(), nullptr);
 
-        return consumer_recv_awaitable { std::move(result_space) };
+        return result;
     }
 
     auto consumer::post_recv_task_completion_entry(

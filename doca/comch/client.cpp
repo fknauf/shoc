@@ -59,8 +59,8 @@ namespace doca::comch {
         doca_comch_connection *connection;
         doca_comch_task_send *task;
 
-        auto result_space = status_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result_space.get() };
+        auto result = status_awaitable::create_space();
+        doca_data task_user_data = { .ptr = result.dest.get() };
 
         enforce_success(doca_comch_client_get_connection(handle_.handle(), &connection));
         enforce_success(doca_comch_client_task_send_alloc_init(handle_.handle(), connection, message.data(), message.size(), &task));
@@ -74,7 +74,7 @@ namespace doca::comch {
             return status_awaitable::from_value(std::move(err));
         }
 
-        return status_awaitable { std::move(result_space) };
+        return result;
     }
 
     auto client::msg_recv() -> message_awaitable {
@@ -85,9 +85,9 @@ namespace doca::comch {
         } else if(get_state() != DOCA_CTX_STATE_RUNNING) {
             return message_awaitable::from_value(std::nullopt);
         } else {
-            auto result_space = message_awaitable::create_space();
-            pending_receivers_.push(result_space.get());
-            return message_awaitable { std::move(result_space) };
+            auto result = message_awaitable::create_space();
+            pending_receivers_.push(result.dest.get());
+            return result;
         }
     }
 

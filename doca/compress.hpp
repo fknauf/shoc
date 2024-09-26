@@ -132,11 +132,11 @@ namespace doca {
         auto submit_task(buffer src, buffer dest) -> compress_awaitable {
             logger->trace(__PRETTY_FUNCTION__);
 
-            auto result_space = compress_awaitable::create_space();
+            auto result = compress_awaitable::create_space();
 
             TaskType *compress_task;
             doca_data task_user_data = {
-                .ptr = result_space.get()
+                .ptr = result.dest.get()
             };
 
             logger->trace("{} dest = {}", __PRETTY_FUNCTION__, task_user_data.ptr);
@@ -159,7 +159,7 @@ namespace doca {
                 doca_buf_inc_refcount(dest.handle(), nullptr);
             }
 
-            return compress_awaitable { std::move(result_space) };
+            return result;
         }
 
         template<typename TaskType>

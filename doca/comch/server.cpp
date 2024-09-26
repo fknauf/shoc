@@ -82,7 +82,7 @@ namespace doca::comch {
         doca_comch_task_send *send_task;
 
         auto result = status_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result.get() };
+        doca_data task_user_data = { .ptr = result.dest.get() };
 
         enforce_success(doca_comch_server_task_send_alloc_init(
             ctx_->handle(),
@@ -102,7 +102,7 @@ namespace doca::comch {
             throw doca_exception(err);
         }
 
-        return status_awaitable { std::move(result) };        
+        return result;
     }
 
     auto server_connection::msg_recv() -> message_awaitable {
@@ -119,9 +119,9 @@ namespace doca::comch {
             return message_awaitable::from_value(std::nullopt);
         } else {
             logger->debug("registering receiver for waiting");
-            auto result_space = message_awaitable::create_space();
-            pending_receivers_.push(result_space.get());
-            return message_awaitable { std::move(result_space) };
+            auto result = message_awaitable::create_space();
+            pending_receivers_.push(result.dest.get());
+            return result;
         }
     }
 
@@ -192,9 +192,9 @@ namespace doca::comch {
 
     auto server::accept() -> server_connection_awaitable {
         if(pending_connections_.empty()) {
-            auto result_space = server_connection_awaitable::create_space();
-            pending_accepters_.push(result_space.get());
-            return server_connection_awaitable { std::move(result_space) };
+            auto result = server_connection_awaitable::create_space();
+            pending_accepters_.push(result.dest.get());
+            return result;
         } else {
             auto result = server_connection_awaitable::from_value(std::move(pending_connections_.front()));
             pending_connections_.pop();
@@ -285,7 +285,7 @@ namespace doca::comch {
         }
 
         auto ctx = doca_comch_server_as_ctx(handle);
-        
+
         doca_data user_data;
         auto err = doca_ctx_get_user_data(ctx, &user_data);
 
