@@ -111,6 +111,54 @@ namespace doca {
     };
 
     template<std::derived_from<context> ConcreteContext>
+    class context_handle {
+    public:
+        ~context_handle() {
+            clear();
+        }
+
+        context_handle() = default;
+        context_handle(ConcreteContext *ctx):
+            ctx_ { ctx }
+        {}
+
+        context_handle(context_handle const &) = delete;
+        context_handle(context_handle &&other):
+            ctx_ { std::exchange(other.ctx_, nullptr) }
+        { }
+
+        context_handle &operator=(context_handle const &) = delete;
+        context_handle &operator=(context_handle &&other) {
+            clear();
+            other.ctx_ = std::exchange(other.ctx_, nullptr);
+            return *this;
+        }
+
+        auto get() const noexcept {
+            return ctx_;
+        }
+
+        auto operator->() const noexcept {
+            return ctx_;
+        }
+
+        auto &operator*() const noexcept {
+            return *ctx_;
+        }
+
+    private:
+        auto clear() -> void {
+            if(ctx_) {
+                logger->trace("auto-stopping ctx {}", static_cast<void*>(ctx_));
+                static_cast<void>(ctx_->stop());
+                ctx_ = nullptr;
+            }
+        }
+
+        ConcreteContext *ctx_ = nullptr;
+    };
+
+    template<std::derived_from<context> ConcreteContext>
     class create_context_awaitable {
     public:
         create_context_awaitable(ConcreteContext *ctx, context_state_awaitable start_awaitable):
@@ -118,7 +166,7 @@ namespace doca {
         {}
 
         auto await_ready() const noexcept { return start_awaitable_.await_ready(); }
-        auto await_resume() const noexcept { return ctx_; }
+        auto await_resume() const noexcept { return context_handle { ctx_ }; }
         auto await_suspend(std::coroutine_handle<> handle) noexcept {
             start_awaitable_.await_suspend(handle);
         }
