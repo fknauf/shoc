@@ -1,12 +1,42 @@
-#include "doca/buffer.hpp"
-#include "doca/buffer_inventory.hpp"
-#include "doca/comch_client.hpp"
-#include "doca/logger.hpp"
-#include "doca/memory_map.hpp"
-#include "doca/progress_engine.hpp"
+#include <doca/buffer.hpp>
+#include <doca/buffer_inventory.hpp>
+#include <doca/comch/client.hpp>
+#include <doca/comch/consumer.hpp>
+#include <doca/coro/fiber.hpp>
+#include <doca/logger.hpp>
+#include <doca/memory_map.hpp>
+#include <doca/progress_engine.hpp>
 
 #include <iostream>
 #include <string_view>
+
+auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
+    auto dev = doca::comch_device { "81:00.0" };
+
+    auto client = co_await engine->create_context<doca::comch::client>("vss-data-test", dev);
+    
+    if(
+        DOCA_SUCCESS == co_await client->send("give x") &&
+        "ok" == co_await(client->recv())
+    ) {
+        auto memory = std::vector<char>(1024);
+        auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+        auto bufinv = doca::buffer_inventory { 1 };
+        auto buffer = bufinv.buf_get_by_addr(mmap, memory);
+
+        auto consumer = co_await client->create_consumer(mmap, 16);
+        auto result = co_await client->post_recv(buffer);
+
+        if(result.status == DOCA_SUCCESS) {
+            auto data = result.buf.data();
+            std::cout << std::string_view { begin(data), end(data) } << std::endl;
+        } else {
+            doca::logger->error("post_recv failed with error: {}", doca_error_get_descr(result.status));
+        }
+    }
+
+    client->stop();
+}
 
 int main() {
     doca_log_backend *sdk_log;
@@ -17,73 +47,7 @@ int main() {
 
     doca::logger->set_level(spdlog::level::debug);    
     
-    auto dev = doca::comch_device { "81:00.0" };
-    auto engine = doca::progress_engine {};
-
-    auto memory = std::vector<char>(1024);
-    auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
-    auto bufinv = doca::buffer_inventory { 1 };
-    auto buffer = bufinv.buf_get_by_addr(mmap, memory);
-    doca::comch_client *client;
-
-    doca::comch_consumer_callbacks consumer_callbacks = {
-        .state_changed = [&] (
-            doca::comch_consumer &self,
-            [[maybe_unused]] doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) {
-            if(next_state == DOCA_CTX_STATE_RUNNING) {
-                self.post_recv_msg(buffer);
-            }
-        },
-        .post_recv_completion = [&] (
-            [[maybe_unused]] doca::comch_consumer &self,
-            doca::comch_consumer_task_post_recv &task
-        ) {
-            auto data = task.buf().data();
-            std::cout << std::string_view { begin(data), end(data) } << std::endl;
-            client->stop();
-        },
-        .post_recv_error = [&] (
-            [[maybe_unused]] doca::comch_consumer &self,
-            doca::comch_consumer_task_post_recv &task
-        ) {
-            auto status = task.status();
-            auto name = doca_error_get_name(status);
-            auto description = doca_error_get_descr(status);
-
-            doca::logger->error("post_recv error {}: {}", name, description);
-            client->stop();
-        }
-    };
-
-    doca::comch_client_callbacks client_callbacks = {
-        .state_changed = [&](
-            doca::comch_client &self,
-            [[maybe_unused]] doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) {
-            if(next_state == DOCA_CTX_STATE_RUNNING) {
-                self.submit_message("start");
-            }
-        },
-        .message_received = [&](
-            doca::comch_client &self,
-            std::span<std::uint8_t> msgbuf,
-            [[maybe_unused]] doca_comch_connection *con
-        ) {
-            auto msg = std::string_view{ reinterpret_cast<char const*>(msgbuf.data()), msgbuf.size() };
-            std::cout << msg << std::endl;
-
-            if(msg == "ready") {
-                self.create_consumer<doca::comch_consumer>(mmap, 32, consumer_callbacks);
-            }
-        }
-    };
-
-    client = engine.create_context<doca::comch_client>("vss-data-test", dev, client_callbacks);
-
-    doca::logger->info("sent message");
+    ask_for_x(&engine);
 
     engine.main_loop();
 

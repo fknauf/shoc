@@ -38,16 +38,16 @@ namespace doca {
         if(next_state == DOCA_CTX_STATE_RUNNING) {
             logger->debug("context started");
 
-            if(obj->coro_start_) {
-                logger->debug("continuing start coroutine");
-                obj->coro_start_.resume();
+            auto coro = std::exchange(obj->coro_start_, nullptr);
+            if(coro) {
+                coro.resume();
             }
         } else if(next_state == DOCA_CTX_STATE_IDLE ) {
             logger->debug("context stopped");
 
-            if(obj->coro_stop_) {
-                logger->debug("continuing stop coroutine");
-                obj->coro_stop_.resume();
+            auto coro = std::exchange(obj->coro_stop_, nullptr);
+            if(coro) {
+                coro.resume();
             }
 
             obj->parent_->signal_stopped_child(obj);
@@ -59,13 +59,13 @@ namespace doca {
         enforce_success(doca_ctx_start(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
         logger->trace("context start requested");
 
-        return { this, DOCA_CTX_STATE_RUNNING };
+        return { shared_from_this(), DOCA_CTX_STATE_RUNNING };
     }
 
     auto context::stop() -> context_state_awaitable {
         enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
 
-        return { this, DOCA_CTX_STATE_IDLE };
+        return { shared_from_this(), DOCA_CTX_STATE_IDLE };
     }
 
     auto context::connect() -> void {

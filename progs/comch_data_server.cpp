@@ -1,25 +1,51 @@
-#include "doca/buffer.hpp"
-#include "doca/buffer_inventory.hpp"
-#include "doca/comch_producer.hpp"
-#include "doca/comch_server.hpp"
-#include "doca/logger.hpp"
-#include "doca/memory_map.hpp"
-#include "doca/progress_engine.hpp"
+#include <doca/buffer.hpp>
+#include <doca/buffer_inventory.hpp>
+#include <doca/comch/producer.hpp>
+#include <doca/comch/server.hpp>
+#include <doca/coro/fiber.hpp>
+#include <doca/logger.hpp>
+#include <doca/memory_map.hpp>
+#include <doca/progress_engine.hpp>
 
 #include <iostream>
 #include <string_view>
 #include <vector>
 
-int main() {
+auto dance(doca::comch::server_connection con) -> doca::coro::fiber {
+    auto msg = co_await con.recv();
+
+    if(
+        msg == "give x" &&
+        co_await con.send("ok") == DOCA_SUCCESS
+    ) {
+        auto prod = co_await con.create_producer(16);
+        auto consumer_id = co_await con.accept_consumer();
+
+        auto memory = std::vector<char>(1024, 'x');
+        auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+        auto bufinv = doca::buffer_inventory { 1 };
+        auto buffer = bufinv.buf_get_by_data(mmap, memory);
+
+        auto status = co_await prod->send(buffer, {}, consumer_id);
+    }
+
+    co_await con.disconnect();
+}
+
+auto serve(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::comch_device { "03:00.0" };
     auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
-    auto engine = doca::progress_engine{};
+    auto server = co_await engine->create_context<doca::comch::server>("vss-data-test", dev, rep);
 
-    auto memory = std::vector<char>(1024, 'x');
-    auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
-    auto bufinv = doca::buffer_inventory { 1 };
-    auto buffer = bufinv.buf_get_by_data(mmap, memory);
+    for(;;) {
+        auto con = co_await server->accept();
+        dance(std::move(con));
+    }
+}
+
+int main() {
+    auto engine = doca::progress_engine{};
 
     doca::comch_server_callbacks server_callbacks = {
         .message_received = [&](
@@ -38,7 +64,7 @@ int main() {
             std::uint32_t remote_consumer_id
         ) {
             doca::comch_producer_callbacks producer_callbacks {
-                .state_changed = [&, remote_consumer_id]( 
+                .state_changed = [&, remote_consumer_id](
                     doca::comch_producer &self,
                     [[maybe_unused]] doca_ctx_states prev_state,
                     doca_ctx_states next_state

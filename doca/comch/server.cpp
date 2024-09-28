@@ -11,71 +11,19 @@ namespace doca::comch {
         server *ctx
     ):
         handle_ { con },
-        ctx_ { ctx }
-    {
-        update_user_data();
-    }
+        ctx_ { ctx },
+        state_ { state::CONNECTED }
+    { }
 
     server_connection::~server_connection() {
-        if(handle_ != nullptr) {
-            auto err = disconnect();
-
-            if(err != DOCA_SUCCESS) {
-                logger->warn("disconnection failed in server_connection destructor");
-            }
+        if(state_ == state::CONNECTED) {
+            logger->error("server_connection destructed before it is disconnected");
+            static_cast<void>(disconnect());
         }
-    }
-
-    server_connection::server_connection(server_connection &&other) {
-        swap(other);
-    }
-
-    server_connection &server_connection::operator=(server_connection &&other) {
-        auto copy = server_connection(std::move(other));
-        swap(copy);
-        return *this;
-    }
-
-    auto server_connection::swap(server_connection &other) noexcept -> void {
-        std::swap(handle_, other.handle_);
-        std::swap(ctx_, other.ctx_);
-        std::swap(pending_messages_, other.pending_messages_);
-        std::swap(pending_receivers_, other.pending_receivers_);
-
-        update_user_data();
-        other.update_user_data();
-    }
-
-    auto server_connection::update_user_data() noexcept -> void {
-        if(handle_ != nullptr) {
-            doca_comch_connection_set_user_data(handle_, (doca_data) { .ptr = this });
-        }
-    }
-
-    auto server_connection::resolve(doca_comch_connection *handle) -> server_connection* {
-        auto user_data = doca_comch_connection_get_user_data(handle);
-        return static_cast<server_connection*>(user_data.ptr);
-    }
-
-    auto server_connection::disconnect() -> doca_error_t {
-        logger->debug("disconnecting");
-
-        if(handle_ == nullptr) {
-            return DOCA_ERROR_INVALID_VALUE;
-        }
-
-        auto err = doca_comch_server_disconnect(ctx_->handle(), handle_);
-
-        if(err == DOCA_SUCCESS) {
-            // just signalling ourselves to avoid code duplication
-            signal_disconnect();
-        }
-
-        return err;
     }
 
     auto server_connection::send(std::string_view message) -> status_awaitable {
-        if(handle_ == nullptr) {
+        if(state_ != state::CONNECTED) {
             return status_awaitable::from_value(DOCA_ERROR_NOT_CONNECTED);
         }
 
@@ -114,7 +62,7 @@ namespace doca::comch {
             auto result = message_awaitable::from_value(std::move(pending_messages_.front()));
             pending_messages_.pop();
             return result;
-        } else if(handle_ == nullptr) {
+        } else if(state_ != state::CONNECTED) {
             logger->debug("disconnected, sending nullopt");
             return message_awaitable::from_value(std::nullopt);
         } else {
@@ -136,8 +84,66 @@ namespace doca::comch {
         }
     }
 
+    auto server_connection::disconnect() -> server_disconnect_awaitable {
+        if(state_ == state::CONNECTED) {
+            state_ = state::DISCONNECTING;
+        }
+
+        active_children_.stop_all();
+        disconnect_if_able();
+
+        return server_disconnect_awaitable { this };
+    }
+
+    auto server_connection::disconnect_if_able() -> void {
+        assert(handle_ != nullptr);
+
+        if(!active_children_.empty()) {
+            return;
+        }
+
+        logger->debug("disconnecting");
+
+        auto err = doca_comch_server_disconnect(ctx_->handle(), handle_);
+
+        if(err == DOCA_SUCCESS) {
+            while(!pending_receivers_.empty()) {
+                auto &receiver = pending_receivers_.front();
+                receiver->value.emplace(std::nullopt);
+                pending_receivers_.pop();
+                receiver->resume();
+            }
+
+            // just signalling ourselves to avoid code duplication
+            signal_disconnect();
+        } else {
+            logger->error("could not disconnect server connection {}: {}", static_cast<void*>(handle_), doca_error_get_descr(err));
+        }
+    }
+
     auto server_connection::signal_disconnect() -> void {
-        handle_ = nullptr;
+        if(state_ != state::DISCONNECTED) {
+            logger->warn("server_connection marked disconnected twice");
+        }
+
+        state_ = state::DISCONNECTED;
+
+        auto waiting_coro = coro_disconnect_;
+        if(waiting_coro) {
+            coro_disconnect_ = nullptr;
+            waiting_coro.resume();
+        }
+    }
+
+    auto server_connection::signal_stopped_child(context *stopped_child) -> void {
+        active_children_.remove_stopped_context(stopped_child);
+        if(state_ == state::DISCONNECTING) {
+            disconnect_if_able();
+        }
+    }
+
+    auto server_connection::engine() -> progress_engine* {
+        return ctx_->engine();
     }
 
     server::server(
@@ -149,6 +155,8 @@ namespace doca::comch {
     ):
         context { parent }
     {
+        open_connections_.max_load_factor(0.75);
+
         doca_comch_server *doca_server;
 
         enforce_success(doca_comch_server_create(dev.handle(), rep.handle(), server_name.c_str(), &doca_server));
@@ -190,6 +198,35 @@ namespace doca::comch {
         assert(get_state() == DOCA_CTX_STATE_IDLE);
     }
 
+    auto server::stop() -> context_state_awaitable {
+        stop_requested_ = true;
+        do_stop_if_able();
+        return context_state_awaitable { shared_from_this(), DOCA_CTX_STATE_IDLE };
+    }
+
+    auto server::do_stop_if_able() -> void {
+        if(open_connections_.empty()) {
+            auto err = doca_ctx_stop(as_ctx());
+
+            if(err != DOCA_SUCCESS) {
+                logger->error("unable to stop comch server {}", static_cast<void*>(handle_.handle()));
+            }
+        }
+    }
+
+    auto server::signal_disconnect(doca_comch_connection *con) -> void {
+        auto count_erased = open_connections_.erase(con);
+
+        if(count_erased == 0) {
+            logger->error("comch server {} got disconnect signal for unknown connection {}",
+                static_cast<void*>(handle_.handle()), static_cast<void*>(con));
+        }
+
+        if(stop_requested_) {
+            do_stop_if_able();
+        }
+    }
+
     auto server::accept() -> server_connection_awaitable {
         if(pending_connections_.empty()) {
             auto result = server_connection_awaitable::create_space();
@@ -212,18 +249,23 @@ namespace doca::comch {
             return;
         }
 
-        auto self = server::resolve(comch_connection);
+        auto self = server::resolve_server(comch_connection);
         if(self == nullptr) {
             logger->error("received connection to unknown server, bailing out");
             return;
         }
 
+        auto new_connection = std::make_shared<server_connection>(comch_connection, self);
+        auto &slot = self->open_connections_[comch_connection];
+
         if(self->pending_accepters_.empty()) {
-            self->pending_connections_.emplace(comch_connection, self);
+            self->pending_connections_.emplace(new_connection);
+            slot = std::move(new_connection);
         } else {
             auto accepter = self->pending_accepters_.front();
-            accepter->value = server_connection(comch_connection, self);
+            accepter->value = scoped_server_connection { new_connection };
             self->pending_accepters_.pop();
+            slot = std::move(new_connection);
             accepter->resume();
         }
     }
@@ -233,12 +275,14 @@ namespace doca::comch {
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint8_t change_successful
     ) -> void {
+        logger->trace("comch server disconnect, con = {}", static_cast<void*>(comch_connection));
+
         if(!change_successful) {
             logger->warn("comch::server: unsuccessful disconnection attempt");
             return;
         }
 
-        auto server_con = server_connection::resolve(comch_connection);
+        auto server_con = server::resolve_connection(comch_connection);
         assert(server_con != nullptr);
 
         server_con->signal_disconnect();
@@ -267,19 +311,19 @@ namespace doca::comch {
     ) -> void {
         logger->debug("got message for connection {}", static_cast<void*>(comch_connection));
 
-        auto server_con = server_connection::resolve(comch_connection);
+        auto server_con = server::resolve_connection(comch_connection);
         assert(server_con != nullptr);
 
         auto msg = std::string_view {reinterpret_cast<char const *>(recv_buffer), msg_len };
         server_con->signal_message(msg);
     }
 
-    auto server::resolve(doca_comch_connection *handle) -> server* {
+    auto server::resolve_server(doca_comch_connection *handle) -> server* {
         auto server_handle = doca_comch_server_get_server_ctx(handle);
-        return resolve(server_handle);
+        return resolve_server(server_handle);
     }
 
-    auto server::resolve(doca_comch_server *handle) -> server* {
+    auto server::resolve_server(doca_comch_server *handle) -> server* {
         if(handle == nullptr) {
             return nullptr;
         }
@@ -297,5 +341,27 @@ namespace doca::comch {
 
         auto base_context = static_cast<context*>(user_data.ptr);
         return static_cast<server*>(base_context);
+    }
+
+    auto server::resolve_connection(doca_comch_connection *handle) -> server_connection* {
+        auto server = resolve_server(handle);
+
+        assert(server != nullptr);
+
+        auto it = server->open_connections_.find(handle);
+
+        if(it == server->open_connections_.end()) {
+            return nullptr;
+        }
+
+        return it->second.get();
+    }
+
+    auto server_disconnect_awaitable::await_ready() const noexcept -> bool {
+        return con_->state_ == server_connection::state::DISCONNECTED;
+    }
+
+    auto server_disconnect_awaitable::await_suspend(std::coroutine_handle<> handle) const noexcept -> void {
+        con_->coro_disconnect_ = handle;
     }
 }

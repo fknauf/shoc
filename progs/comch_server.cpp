@@ -7,26 +7,22 @@
 #include <iostream>
 #include <string_view>
 
-auto ping_pong(doca::comch::server_connection con) -> doca::coro::fiber {
+auto ping_pong(doca::comch::scoped_server_connection con) -> doca::coro::fiber {
     doca::logger->debug("waiting for message");
 
-    auto msg = co_await con.msg_recv();
+    auto msg = co_await con->msg_recv();
 
     doca::logger->debug("message received");
 
     if(msg) {
         std::cout << *msg << std::endl;
-        auto status = co_await con.send("pong");
+        auto status = co_await con->send("pong");
         doca::logger->info("sent response, status = {}", status);
     } else {
         doca::logger->warn("null message received, i.e. connection broke off");
     }
 
-    auto err = con.disconnect();
-
-    if(err != DOCA_SUCCESS) {
-        doca::logger->warn("disconnect failed, err = {}", err);
-    }
+    co_await con->disconnect();
 }
 
 auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {

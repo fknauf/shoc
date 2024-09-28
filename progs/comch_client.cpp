@@ -34,9 +34,9 @@ int main() {
 
     doca_log_backend_create_standard();
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
+    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
 
-    doca::logger->set_level(spdlog::level::info);
+    doca::logger->set_level(spdlog::level::trace);
 
     auto engine = doca::progress_engine {};
 

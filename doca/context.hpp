@@ -28,10 +28,10 @@ namespace doca {
 
     class [[nodiscard]] context_state_awaitable {
     public:
-        context_state_awaitable(context *ctx, doca_ctx_states desired_state):
-            ctx_(ctx), desired_state_(desired_state)
+        context_state_awaitable(std::shared_ptr<context> ctx, doca_ctx_states desired_state):
+            ctx_(std::move(ctx)), desired_state_(desired_state)
         {
-            logger->trace("context_state_awaitable ctx = {}, desired_state = {}", static_cast<void*>(ctx_), desired_state_);
+            logger->trace("context_state_awaitable ctx = {}, desired_state = {}", static_cast<void*>(ctx_.get()), desired_state_);
         }
 
         auto await_ready() const noexcept -> bool;
@@ -40,12 +40,13 @@ namespace doca {
         auto await_suspend(std::coroutine_handle<> caller) noexcept -> void;
 
     private:
-        context *ctx_;
+        std::shared_ptr<context> ctx_;
         doca_ctx_states desired_state_;
     };
 
     class context:
-        public context_parent
+        public context_parent,
+        public std::enable_shared_from_this<context>
     {
     public:
         friend class context_state_awaitable;
@@ -111,68 +112,68 @@ namespace doca {
     };
 
     template<std::derived_from<context> ConcreteContext>
-    class context_handle {
+    class scoped_context {
     public:
-        ~context_handle() {
+        ~scoped_context() {
             clear();
         }
 
-        context_handle() = default;
-        context_handle(ConcreteContext *ctx):
+        scoped_context() = default;
+        scoped_context(std::shared_ptr<ConcreteContext> ctx):
             ctx_ { ctx }
         {}
 
-        context_handle(context_handle const &) = delete;
-        context_handle(context_handle &&other):
+        scoped_context(scoped_context const &) = delete;
+        scoped_context(scoped_context &&other):
             ctx_ { std::exchange(other.ctx_, nullptr) }
         { }
 
-        context_handle &operator=(context_handle const &) = delete;
-        context_handle &operator=(context_handle &&other) {
+        scoped_context &operator=(scoped_context const &) = delete;
+        scoped_context &operator=(scoped_context &&other) {
             clear();
             other.ctx_ = std::exchange(other.ctx_, nullptr);
             return *this;
         }
 
         auto get() const noexcept {
-            return ctx_;
+            return ctx_.get();
         }
 
         auto operator->() const noexcept {
-            return ctx_;
+            return get();
         }
 
         auto &operator*() const noexcept {
-            return *ctx_;
+            return *get();
         }
 
     private:
         auto clear() -> void {
-            if(ctx_) {
-                logger->trace("auto-stopping ctx {}", static_cast<void*>(ctx_));
+            if(ctx_ != nullptr) {
+                logger->trace("auto-stopping ctx {}", static_cast<void*>(get()));
                 static_cast<void>(ctx_->stop());
                 ctx_ = nullptr;
             }
         }
 
-        ConcreteContext *ctx_ = nullptr;
+        std::shared_ptr<ConcreteContext> ctx_ = nullptr;
     };
 
     template<std::derived_from<context> ConcreteContext>
     class create_context_awaitable {
     public:
-        create_context_awaitable(ConcreteContext *ctx, context_state_awaitable start_awaitable):
-            ctx_ { ctx }, start_awaitable_ { std::move(start_awaitable) }
+        create_context_awaitable(std::shared_ptr<ConcreteContext> ctx, context_state_awaitable start_awaitable):
+            ctx_ { std::move(ctx) }, start_awaitable_ { std::move(start_awaitable) }
         {}
 
         auto await_ready() const noexcept { return start_awaitable_.await_ready(); }
-        auto await_resume() const noexcept { return context_handle { ctx_ }; }
+        auto await_resume() const noexcept { return scoped_context { ctx_ }; }
         auto await_suspend(std::coroutine_handle<> handle) noexcept {
             start_awaitable_.await_suspend(handle);
         }
 
     private:
-        ConcreteContext *ctx_;
+        std::shared_ptr<ConcreteContext> ctx_;
         context_state_awaitable start_awaitable_;
     };
 
@@ -197,17 +198,15 @@ namespace doca {
         ) {
             logger->trace("dependent_contexts::create_context, parent = {}", static_cast<void*>(parent));
 
-            auto new_context = std::make_unique<ConcreteContext>(parent, std::forward<Args>(args)...);
+            auto new_context = std::make_shared<ConcreteContext>(parent, std::forward<Args>(args)...);
             new_context->connect();
 
-            auto non_owning_ptr = new_context.get();
             // make sure that registering the new context after starting cannot throw an exception (like bad_alloc)
-            auto &slot = active_contexts_[non_owning_ptr];
+            auto &slot = active_contexts_[new_context.get()];
             auto start_awaitable = new_context->start();
+            slot = new_context;
 
-            slot = std::move(new_context);
-
-            return create_context_awaitable { non_owning_ptr, std::move(start_awaitable) };
+            return create_context_awaitable { std::move(new_context), std::move(start_awaitable) };
         }
 
         auto size() const noexcept {
@@ -225,7 +224,6 @@ namespace doca {
         }
 
     private:
-        //std::vector<std::unique_ptr<BaseContext>> active_contexts_;
-        std::unordered_map<BaseContext*, std::unique_ptr<BaseContext>> active_contexts_;
+        std::unordered_map<BaseContext*, std::shared_ptr<BaseContext>> active_contexts_;
     };
 }
