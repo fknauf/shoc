@@ -34,8 +34,6 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
             doca::logger->error("post_recv failed with error: {}", doca_error_get_descr(result.status));
         }
     }
-
-    client->stop();
 }
 
 int main() {

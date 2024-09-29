@@ -30,11 +30,11 @@ namespace doca::comch {
             handle_.handle(),
             &client::msg_recv_entry
         ));
-        //enforce_success(doca_comch_client_event_consumer_register(
-        //    handle(),
-        //    &client::new_consumer_entry,
-        //    &client::expired_consumer_entry
-        //));
+        enforce_success(doca_comch_client_event_consumer_register(
+            handle_.handle(),
+            &client::new_consumer_entry,
+            &client::expired_consumer_entry
+        ));
         enforce_success(doca_comch_client_set_max_msg_size(handle_.handle(), limits.max_msg_size));
         enforce_success(doca_comch_client_set_recv_queue_size(handle_.handle(), limits.recv_queue_size));
     }
@@ -49,6 +49,12 @@ namespace doca::comch {
 
     auto client::as_ctx() const -> doca_ctx* {
         return doca_comch_client_as_ctx(handle_.handle());
+    }
+
+    auto client::connection_handle() const -> doca_comch_connection* {
+        doca_comch_connection *result;
+        enforce_success(doca_comch_client_get_connection(handle_.handle(), &result));
+        return result;
     }
 
     auto client::send(std::string_view message) -> status_awaitable {
@@ -144,6 +150,29 @@ namespace doca::comch {
     ) -> void {
         if(next_state == DOCA_CTX_STATE_IDLE) {
             message_queues_.disconnect();
+            remote_consumer_queues_.disconnect();
         }
+    }
+
+    auto client::new_consumer_entry(
+        [[maybe_unused]] doca_comch_event_consumer *event,
+        doca_comch_connection *comch_connection,
+        std::uint32_t remote_consumer_id
+    ) -> void {
+        auto client = client::resolve(comch_connection);
+
+        if(client != nullptr) {
+            client->remote_consumer_queues_.supply(remote_consumer_id);
+        } else {
+            logger->error("comch client got new consumer on unknown/expired connection");
+        }
+    }
+
+    auto client::expired_consumer_entry(
+        [[maybe_unused]] doca_comch_event_consumer *event,
+        [[maybe_unused]] doca_comch_connection *comch_connection,
+        [[maybe_unused]] std::uint32_t remote_consumer_id
+    ) -> void {
+        // TODO: design and implement logic for consumer expiry
     }
 }
