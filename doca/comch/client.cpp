@@ -78,17 +78,7 @@ namespace doca::comch {
     }
 
     auto client::msg_recv() -> message_awaitable {
-        if(!pending_messages_.empty()) {
-            auto result = message_awaitable::from_value(std::move(pending_messages_.front()));
-            pending_messages_.pop();
-            return result;
-        } else if(get_state() != DOCA_CTX_STATE_RUNNING) {
-            return message_awaitable::from_value(std::nullopt);
-        } else {
-            auto result = message_awaitable::create_space();
-            pending_receivers_.push(result.dest.get());
-            return result;
-        }
+        return message_queues_.accept();
     }
 
     auto client::send_completion_entry(
@@ -102,7 +92,7 @@ namespace doca::comch {
         doca_task_free(base_task);
 
         auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
-        dest->value = status;
+        dest->emplace_value(status);
         dest->resume();
     }
 
@@ -120,15 +110,7 @@ namespace doca::comch {
         }
 
         auto msg = std::string_view { reinterpret_cast<char const *>(recv_buffer), msg_len };
-
-        if(self->pending_receivers_.empty()) {
-            self->pending_messages_.emplace(msg);
-        } else {
-            auto receiver = self->pending_receivers_.front();
-            receiver->value = msg;
-            self->pending_receivers_.pop();
-            receiver->resume();
-        }
+        self->message_queues_.supply(message { msg });
     }
 
     auto client::resolve(doca_comch_connection *handle) -> client* {
@@ -154,5 +136,14 @@ namespace doca::comch {
 
         auto base_context = static_cast<context*>(user_data.ptr);
         return static_cast<client*>(base_context);
+    }
+
+    auto client::state_changed(
+        [[maybe_unused]] doca_ctx_states prev_state,
+        doca_ctx_states next_state
+    ) -> void {
+        if(next_state == DOCA_CTX_STATE_IDLE) {
+            message_queues_.disconnect();
+        }
     }
 }

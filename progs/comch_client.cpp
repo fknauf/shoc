@@ -19,23 +19,18 @@ auto ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
         co_return;
     }
 
-    auto msg = co_await client->msg_recv();
+    try {
+        auto msg = co_await client->msg_recv();
 
-    if(msg) {
-        std::cout << *msg << std::endl;
+        std::cout << msg << std::endl;
         co_await client->stop();
-    } else {
-        doca::logger->warn("no message received before disconnection");
+    } catch(doca::doca_exception &ex) {
+        doca::logger->warn("no message received before disconnection: {}", ex.what());
     }
 }
 
 int main() {
-    doca_log_backend *sdk_log;
-
-    doca_log_backend_create_standard();
-    doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
-
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     doca::logger->set_level(spdlog::level::trace);
 
     auto engine = doca::progress_engine {};

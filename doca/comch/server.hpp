@@ -1,9 +1,9 @@
 #pragma once
 
 #include "common.hpp"
-//#include "consumer.hpp"
+#include "consumer.hpp"
 #include "device.hpp"
-//#include "producer.hpp"
+#include "producer.hpp"
 
 #include <doca/context.hpp>
 #include <doca/coro/value_awaitable.hpp>
@@ -68,19 +68,30 @@ namespace doca::comch {
         auto send(std::string_view message) -> status_awaitable;
         auto msg_recv() -> message_awaitable;
 
+        auto create_consumer(memory_map &user_mmap, std::uint32_t max_tasks) {
+            return active_children_.create_context<consumer>(this, handle_, user_mmap, max_tasks);
+        }
+
+        auto create_producer(std::uint32_t max_tasks) {
+            return active_children_.create_context<producer>(this, handle_, max_tasks);
+        }
+
+        auto accept_consumer() -> id_awaitable;
+
         auto signal_stopped_child(context *stopped_child) -> void override;
         auto engine() -> progress_engine* override;
 
     private:
         auto signal_message(std::string_view msg) -> void;
         auto signal_disconnect() -> void;
+        auto signal_new_consumer(std::uint32_t remote_consumer_id) -> void;
         auto disconnect_if_able() -> void;
 
         doca_comch_connection *handle_ = nullptr;
         server *ctx_ = nullptr;
 
-        std::queue<message> pending_messages_;
-        std::queue<message_awaitable::payload_type*> pending_receivers_;
+        accepter_queues<message> message_queues_;
+        accepter_queues<std::uint32_t> remote_consumer_queues_;
 
         dependent_contexts<> active_children_;
         state state_ = state::CONNECTED;
@@ -157,6 +168,12 @@ namespace doca::comch {
         auto stop() -> context_state_awaitable override;
         auto accept() -> server_connection_awaitable;
 
+    protected:
+        auto state_changed(
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void override;
+
     private:
         auto do_stop_if_able() -> void;
         auto signal_disconnect(doca_comch_connection *con) -> void;
@@ -186,17 +203,17 @@ namespace doca::comch {
             std::uint8_t change_successful
         ) -> void;
 
-        //static auto new_consumer_entry(
-        //    doca_comch_event_consumer *event,
-        //    doca_comch_connection *comch_connection,
-        //    std::uint32_t remote_consumer_id
-        //) -> void;
+        static auto new_consumer_entry(
+            doca_comch_event_consumer *event,
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
+        ) -> void;
 
-        //static auto expired_consumer_entry(
-        //    doca_comch_event_consumer *event,
-        //    doca_comch_connection *comch_connection,
-        //    std::uint32_t remote_consumer_id
-        //) -> void;
+        static auto expired_consumer_entry(
+            doca_comch_event_consumer *event,
+            doca_comch_connection *comch_connection,
+            std::uint32_t remote_consumer_id
+        ) -> void;
 
         static auto resolve_server(doca_comch_connection *handle) -> server*;
         static auto resolve_server(doca_comch_server *handle) -> server*;
@@ -204,8 +221,10 @@ namespace doca::comch {
 
         unique_handle<doca_comch_server> handle_ { doca_comch_server_destroy };
 
-        std::queue<std::shared_ptr<server_connection>> pending_connections_;
-        std::queue<server_connection_awaitable::payload_type*> pending_accepters_;
+        accepter_queues<
+            std::shared_ptr<server_connection>,
+            scoped_server_connection
+        > connection_queues_;
 
         bool stop_requested_ = false;
         std::unordered_map<doca_comch_connection*, std::shared_ptr<server_connection>> open_connections_;

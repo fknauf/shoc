@@ -10,19 +10,17 @@
 auto ping_pong(doca::comch::scoped_server_connection con) -> doca::coro::fiber {
     doca::logger->debug("waiting for message");
 
-    auto msg = co_await con->msg_recv();
+    try {
+        auto msg = co_await con->msg_recv();
 
-    doca::logger->debug("message received");
+        doca::logger->debug("message received");
 
-    if(msg) {
-        std::cout << *msg << std::endl;
+        std::cout << msg << std::endl;
         auto status = co_await con->send("pong");
         doca::logger->info("sent response, status = {}", status);
-    } else {
-        doca::logger->warn("null message received, i.e. connection broke off");
+    } catch(doca::doca_exception &ex) {
+        doca::logger->warn("no message received: {}", ex.what());
     }
-
-    co_await con->disconnect();
 }
 
 auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
@@ -42,12 +40,7 @@ auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
 }
 
 int main() {
-    doca_log_backend *sdk_log;
-
-    doca_log_backend_create_standard();
-    doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
-
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     doca::logger->set_level(spdlog::level::trace);
 
     auto engine = doca::progress_engine{};

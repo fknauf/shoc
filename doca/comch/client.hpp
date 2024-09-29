@@ -37,6 +37,12 @@ namespace doca::comch {
         auto send(std::string_view message) -> status_awaitable;
         auto msg_recv() -> message_awaitable;
 
+    protected:
+        auto state_changed(
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void override;
+
     private:
         static auto send_completion_entry(
             doca_comch_task_send *task,
@@ -56,7 +62,6 @@ namespace doca::comch {
 
         unique_handle<doca_comch_client> handle_ { doca_comch_client_destroy };
 
-        std::queue<message> pending_messages_;
-        std::queue<message_awaitable::payload_type*> pending_receivers_;
+        accepter_queues<message> message_queues_;
     };
 }

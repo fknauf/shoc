@@ -22,6 +22,14 @@ namespace doca::comch {
         }
     }
 
+    auto server_connection::accept_consumer() -> id_awaitable {
+        return remote_consumer_queues_.accept();
+    }
+
+    auto server_connection::signal_new_consumer(std::uint32_t consumer_id) -> void {
+        remote_consumer_queues_.supply(consumer_id);
+    }
+
     auto server_connection::send(std::string_view message) -> status_awaitable {
         if(state_ != state::CONNECTED) {
             return status_awaitable::from_value(DOCA_ERROR_NOT_CONNECTED);
@@ -54,34 +62,11 @@ namespace doca::comch {
     }
 
     auto server_connection::msg_recv() -> message_awaitable {
-        logger->debug("server connection msg_recv");
-
-        if(!pending_messages_.empty()) {
-            logger->debug("using pending message");
-
-            auto result = message_awaitable::from_value(std::move(pending_messages_.front()));
-            pending_messages_.pop();
-            return result;
-        } else if(state_ != state::CONNECTED) {
-            logger->debug("disconnected, sending nullopt");
-            return message_awaitable::from_value(std::nullopt);
-        } else {
-            logger->debug("registering receiver for waiting");
-            auto result = message_awaitable::create_space();
-            pending_receivers_.push(result.dest.get());
-            return result;
-        }
+        return message_queues_.accept();
     }
 
     auto server_connection::signal_message(std::string_view msg) -> void {
-        if(pending_receivers_.empty()) {
-            pending_messages_.emplace(msg);
-        } else {
-            auto receiver = pending_receivers_.front();
-            receiver->value = msg;
-            pending_receivers_.pop();
-            receiver->resume();
-        }
+        message_queues_.supply(message { msg });
     }
 
     auto server_connection::disconnect() -> server_disconnect_awaitable {
@@ -107,13 +92,6 @@ namespace doca::comch {
         auto err = doca_comch_server_disconnect(ctx_->handle(), handle_);
 
         if(err == DOCA_SUCCESS) {
-            while(!pending_receivers_.empty()) {
-                auto &receiver = pending_receivers_.front();
-                receiver->value.emplace(std::nullopt);
-                pending_receivers_.pop();
-                receiver->resume();
-            }
-
             // just signalling ourselves to avoid code duplication
             signal_disconnect();
         } else {
@@ -127,6 +105,8 @@ namespace doca::comch {
         }
 
         state_ = state::DISCONNECTED;
+        message_queues_.disconnect();
+        remote_consumer_queues_.disconnect();
 
         auto waiting_coro = coro_disconnect_;
         if(waiting_coro) {
@@ -179,11 +159,11 @@ namespace doca::comch {
             &server::connection_entry,
             &server::disconnection_entry
         ));
-        //enforce_success(doca_comch_server_event_consumer_register(
-        //    handle_.handle(),
-        //    &server::new_consumer_entry,
-        //    &server::expired_consumer_entry
-        //));
+        enforce_success(doca_comch_server_event_consumer_register(
+            handle_.handle(),
+            &server::new_consumer_entry,
+            &server::expired_consumer_entry
+        ));
         enforce_success(doca_comch_server_set_max_msg_size(
             handle_.handle(),
             limits.max_msg_size
@@ -228,14 +208,15 @@ namespace doca::comch {
     }
 
     auto server::accept() -> server_connection_awaitable {
-        if(pending_connections_.empty()) {
-            auto result = server_connection_awaitable::create_space();
-            pending_accepters_.push(result.dest.get());
-            return result;
-        } else {
-            auto result = server_connection_awaitable::from_value(std::move(pending_connections_.front()));
-            pending_connections_.pop();
-            return result;
+        return connection_queues_.accept();
+    }
+
+    auto server::state_changed(
+        [[maybe_unused]] doca_ctx_states prev_state,
+        doca_ctx_states next_state
+    ) -> void {
+        if(next_state == DOCA_CTX_STATE_IDLE) {
+            connection_queues_.disconnect();
         }
     }
 
@@ -256,18 +237,8 @@ namespace doca::comch {
         }
 
         auto new_connection = std::make_shared<server_connection>(comch_connection, self);
-        auto &slot = self->open_connections_[comch_connection];
-
-        if(self->pending_accepters_.empty()) {
-            self->pending_connections_.emplace(new_connection);
-            slot = std::move(new_connection);
-        } else {
-            auto accepter = self->pending_accepters_.front();
-            accepter->value = scoped_server_connection { new_connection };
-            self->pending_accepters_.pop();
-            slot = std::move(new_connection);
-            accepter->resume();
-        }
+        self->open_connections_[comch_connection] = new_connection;
+        self->connection_queues_.supply(new_connection);
     }
 
     auto server::disconnection_entry(
@@ -299,7 +270,7 @@ namespace doca::comch {
         doca_task_free(base_task);
 
         auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
-        dest->value = status;
+        dest->emplace_value(status);
         dest->resume();
     }
 
@@ -312,10 +283,35 @@ namespace doca::comch {
         logger->debug("got message for connection {}", static_cast<void*>(comch_connection));
 
         auto server_con = server::resolve_connection(comch_connection);
-        assert(server_con != nullptr);
 
-        auto msg = std::string_view {reinterpret_cast<char const *>(recv_buffer), msg_len };
-        server_con->signal_message(msg);
+        if(server_con != nullptr) {
+            auto msg = std::string_view {reinterpret_cast<char const *>(recv_buffer), msg_len };
+            server_con->signal_message(msg);
+        } else {
+            logger->error("comch server got message on unknown/expired connection");
+        }
+    }
+
+    auto server::new_consumer_entry(
+        [[maybe_unused]] doca_comch_event_consumer *event,
+        doca_comch_connection *comch_connection,
+        std::uint32_t remote_consumer_id
+    ) -> void {
+        auto con = server::resolve_connection(comch_connection);
+
+        if(con != nullptr) {
+            con->signal_new_consumer(remote_consumer_id);
+        } else {
+            logger->error("comch server got new consumer on unknown/expired connection");
+        }
+    }
+
+    auto server::expired_consumer_entry(
+        [[maybe_unused]] doca_comch_event_consumer *event,
+        [[maybe_unused]] doca_comch_connection *comch_connection,
+        [[maybe_unused]] std::uint32_t remote_consumer_id
+    ) -> void {
+        // TODO: design and implement logic for consumer expiry
     }
 
     auto server::resolve_server(doca_comch_connection *handle) -> server* {

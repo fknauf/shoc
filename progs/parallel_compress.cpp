@@ -96,12 +96,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
 }
 
 auto main(int argc, char *argv[]) -> int try {
-    doca_log_backend *sdk_log;
-
-    doca_log_backend_create_standard();
-    doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
-
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     doca::logger->set_level(spdlog::level::debug);
 
     if(argc < 3) {

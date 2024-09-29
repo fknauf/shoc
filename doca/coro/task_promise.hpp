@@ -1,5 +1,7 @@
 #pragma once
 
+#include "overload.hpp"
+
 #include <doca/logger.hpp>
 
 #include <coroutine>
@@ -9,10 +11,6 @@
 
 namespace doca::coro {
     namespace detail {
-        // for convenient std::variant visiting
-        template<typename... Fs> struct overload : Fs... { using Fs::operator()...; };
-        template<typename... Fs> overload(Fs...) -> overload<Fs...>;
-
         /**
          * base class for coroutine promise types. We will have to specialize for promise_types that
          * return a value on the one hand and those that return void on the other, and this contains
@@ -101,7 +99,7 @@ namespace doca::coro {
 
         auto result() {
             logger->trace("{}", __PRETTY_FUNCTION__);
-            auto visitor = detail::overload {
+            auto visitor = overload {
                 [](stored_type &val) -> stored_type { return val; },
                 [](std::exception_ptr ex) -> stored_type { std::rethrow_exception(ex); },
                 [](std::monostate)  -> stored_type {

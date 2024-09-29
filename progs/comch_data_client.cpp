@@ -14,7 +14,7 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::comch_device { "81:00.0" };
 
     auto client = co_await engine->create_context<doca::comch::client>("vss-data-test", dev);
-    
+
     if(
         DOCA_SUCCESS == co_await client->send("give x") &&
         "ok" == co_await(client->recv())
@@ -39,14 +39,9 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
 }
 
 int main() {
-    doca_log_backend *sdk_log;
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    doca::logger->set_level(spdlog::level::debug);
 
-    doca_log_backend_create_standard();
-    doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
-
-    doca::logger->set_level(spdlog::level::debug);    
-    
     ask_for_x(&engine);
 
     engine.main_loop();
