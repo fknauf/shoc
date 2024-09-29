@@ -18,7 +18,7 @@ namespace doca::comch {
         buffer buf;
         std::span<std::uint8_t const> immediate;
         std::uint32_t producer_id = -1;
-        std::uint32_t status = DOCA_ERROR_EMPTY;
+        doca_error_t status = DOCA_ERROR_EMPTY;
     };
 
     using consumer_recv_awaitable = coro::value_awaitable<consumer_recv_result>;

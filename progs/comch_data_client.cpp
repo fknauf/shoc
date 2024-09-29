@@ -11,13 +11,13 @@
 #include <string_view>
 
 auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::comch_device { "81:00.0" };
+    auto dev = doca::comch::comch_device { "81:00.0" };
 
     auto client = co_await engine->create_context<doca::comch::client>("vss-data-test", dev);
 
     if(
         DOCA_SUCCESS == co_await client->send("give x") &&
-        "ok" == co_await(client->recv())
+        "ok" == co_await(client->msg_recv())
     ) {
         auto memory = std::vector<char>(1024);
         auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
@@ -25,7 +25,7 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
         auto buffer = bufinv.buf_get_by_addr(mmap, memory);
 
         auto consumer = co_await client->create_consumer(mmap, 16);
-        auto result = co_await client->post_recv(buffer);
+        auto result = co_await consumer->post_recv(buffer);
 
         if(result.status == DOCA_SUCCESS) {
             auto data = result.buf.data();
@@ -39,6 +39,8 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
 int main() {
     doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     doca::logger->set_level(spdlog::level::debug);
+
+    auto engine = doca::progress_engine{};
 
     ask_for_x(&engine);
 
