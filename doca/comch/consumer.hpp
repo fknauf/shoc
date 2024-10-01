@@ -23,6 +23,11 @@ namespace doca::comch {
 
     using consumer_recv_awaitable = coro::value_awaitable<consumer_recv_result>;
 
+    /**
+     * Consumer side of a producer/consumer fast data path pair.
+     *
+     * This class is made to receive data buffers from a producer on the other side of a connection.
+     */
     class consumer:
         public context
     {
@@ -43,6 +48,11 @@ namespace doca::comch {
             return doca_comch_consumer_as_ctx(handle_.handle());
         }
 
+        /**
+         * Receive/wait for a data buffer
+         *
+         * @return awaitable to co_await a buffer
+         */
         auto post_recv(buffer dest) -> consumer_recv_awaitable;
 
     private:

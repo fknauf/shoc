@@ -13,6 +13,11 @@
 #include <functional>
 
 namespace doca::comch {
+    /**
+     * Producer side of a consumer/producer fast data path
+     *
+     * Used to send buffers to a consumer on the other side of a connection
+     */
     class producer:
         public context
     {
@@ -30,6 +35,14 @@ namespace doca::comch {
             return doca_comch_producer_as_ctx(handle_.handle());
         }
 
+        /**
+         * Send a data buffer to a specific consumer
+         *
+         * @param buf buffer to send
+         * @param immediate_data some immediate data to send in addition to the buffer
+         * @param consumer_id ID of the consumer that'll receive this buffer
+         * @return awaitable to co_await the status of the send operation
+         */
         auto send(
             buffer buf,
             std::span<std::uint8_t> immediate_data,

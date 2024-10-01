@@ -21,6 +21,13 @@ namespace doca::comch {
         std::uint32_t recv_queue_size = 16;
     };
 
+    /**
+     * comch client. This is conceptually almost the same as a server_connection, except that we're the ones
+     * asking for it.
+     *
+     * When the client is started, it is associated with a connection, and all messages, child consumers and producers
+     * are likewise associated with that connection.
+     */
     class client:
         public context
     {
@@ -36,17 +43,44 @@ namespace doca::comch {
 
         [[nodiscard]] auto as_ctx() const -> doca_ctx* override;
 
+        /**
+         * Send message to the server we're connected to
+         *
+         * @return awaitable for the send status
+         */
         auto send(std::string_view message) -> status_awaitable;
+
+        /**
+         * Receive/wait for a message from the server
+         *
+         * @return awaitable for a message from the server
+         */
         auto msg_recv() -> message_awaitable;
 
+        /**
+         * Create a consumer to receive data buffers from a producer on the server side
+         *
+         * @param user_mmap memory map for the buffers where we receive data
+         * @param max_tasks maximum number of tasks that can be in flight on the same time on this consumer
+         */
         auto create_consumer(memory_map &user_mmap, std::uint32_t max_tasks){
             return active_children_.create_context<consumer>(this, connection_handle(), user_mmap, max_tasks);
         }
 
+        /**
+         * Create a producer to send data buffers to a consumer on the server side
+         *
+         * @param max_tasks maximum number of parallel in-flight tasks
+         */
         auto create_producer(std::uint32_t max_tasks){
             return active_children_.create_context<producer>(this, connection_handle(), max_tasks);
         }
 
+        /**
+         * Accept a server-side consumer and retrieve its ID, or wait for one to appear
+         *
+         * @return awaitable to co_await a remote consumer id
+         */
         auto accept_consumer() -> id_awaitable {
             return remote_consumer_queues_.accept();
         }
