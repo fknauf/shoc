@@ -12,13 +12,15 @@ namespace doca::comch {
     ):
         handle_ { con },
         ctx_ { ctx },
-        state_ { state::CONNECTED }
+        state_ { connection_state::CONNECTED }
     { }
 
     server_connection::~server_connection() {
-        if(state_ == state::CONNECTED) {
+        // Either client code disconnected us, or server does when it is stopped -- at the very
+        // latest when the progress engine is destroyed. So by the time we get here, the connection
+        // should no longer be active.
+        if(state_ != connection_state::DISCONNECTED) {
             logger->error("server_connection destructed before it is disconnected");
-            static_cast<void>(disconnect());
         }
     }
 
@@ -31,7 +33,7 @@ namespace doca::comch {
     }
 
     auto server_connection::send(std::string_view message) -> status_awaitable {
-        if(state_ != state::CONNECTED) {
+        if(state_ != connection_state::CONNECTED) {
             return status_awaitable::from_value(DOCA_ERROR_NOT_CONNECTED);
         }
 
@@ -70,8 +72,16 @@ namespace doca::comch {
     }
 
     auto server_connection::disconnect() -> server_disconnect_awaitable {
-        if(state_ == state::CONNECTED) {
-            state_ = state::DISCONNECTING;
+        // We may have child consumers/producers that keep us from disconnecting immediately.
+        // So here we mark ourselves disconnecting, ask all children to stop, then disconnect
+        // if all children are already stopped.
+        //
+        // If all children are not stopped yet, disconnect_if_able will not do anything, and
+        // instead we rely on all our children to alert us that they've stopped, then when the
+        // last one stopped we'll disconnect. See signal_stopped_child
+
+        if(state_ == connection_state::CONNECTED) {
+            state_ = connection_state::DISCONNECTING;
         }
 
         active_children_.stop_all();
@@ -83,11 +93,12 @@ namespace doca::comch {
     auto server_connection::disconnect_if_able() -> void {
         assert(handle_ != nullptr);
 
+        // if we still have active children, we can't disconnect yet.
         if(!active_children_.empty()) {
             return;
         }
 
-        logger->debug("disconnecting");
+        logger->debug("disconnecting server_connection {}", static_cast<void*>(handle_));
 
         auto err = doca_comch_server_disconnect(ctx_->handle(), handle_);
 
@@ -99,26 +110,36 @@ namespace doca::comch {
         }
     }
 
+    auto server_connection::signal_stopped_child(context *stopped_child) -> void {
+        active_children_.remove_stopped_context(stopped_child);
+        if(state_ == connection_state::DISCONNECTING) {
+            disconnect_if_able();
+        }
+    }
+
     auto server_connection::signal_disconnect() -> void {
-        if(state_ != state::DISCONNECTED) {
+        // stuff to do when we're disconnected
+
+        if(state_ == connection_state::DISCONNECTED) {
             logger->warn("server_connection marked disconnected twice");
         }
 
-        state_ = state::DISCONNECTED;
+        // mark ourselves disconnected
+        state_ = connection_state::DISCONNECTED;
+
+        // mark queues disconnected. This will cause all waiting accepters to throw
+        // an error.
         message_queues_.disconnect();
         remote_consumer_queues_.disconnect();
 
+        // tell our server we're disconnected so it'll remove us from its connection registry.
+        ctx_->signal_disconnect(handle_);
+
+        // if someone is co_awaiting disconnect, resume.
         auto waiting_coro = coro_disconnect_;
         if(waiting_coro) {
             coro_disconnect_ = nullptr;
             waiting_coro.resume();
-        }
-    }
-
-    auto server_connection::signal_stopped_child(context *stopped_child) -> void {
-        active_children_.remove_stopped_context(stopped_child);
-        if(state_ == state::DISCONNECTING) {
-            disconnect_if_able();
         }
     }
 
@@ -179,7 +200,22 @@ namespace doca::comch {
     }
 
     auto server::stop() -> context_state_awaitable {
+        // Server has child contexts, so mark as stopping, tell all open connections to
+        // disconnect (which will also stop their child consumers/producers), then stop
+        // if able, otherwise wait for children to stop before stopping ourselves.
         stop_requested_ = true;
+
+        auto next = open_connections_.begin();
+
+        while(next != open_connections_.end()) {
+            // disconnect may remove *it from open_connections_ and invalidate it,
+            // but this way next remains valid in that case.
+            auto it = next;
+            ++next;
+
+            static_cast<void>(it->second->disconnect());
+        }
+
         do_stop_if_able();
         return context_state_awaitable { shared_from_this(), DOCA_CTX_STATE_IDLE };
     }
@@ -195,6 +231,8 @@ namespace doca::comch {
     }
 
     auto server::signal_disconnect(doca_comch_connection *con) -> void {
+        // child connection disconnected -> remove from registry. If we've been asked to stop, try
+        // to stop afterwards.
         auto count_erased = open_connections_.erase(con);
 
         if(count_erased == 0) {
@@ -216,6 +254,8 @@ namespace doca::comch {
         doca_ctx_states next_state
     ) -> void {
         if(next_state == DOCA_CTX_STATE_IDLE) {
+            // server stopped -> tell all waiting accepters that no more connections will
+            // be forthcoming. Anyone co_awaiting one of them will get an exception.
             connection_queues_.disconnect();
         }
     }
@@ -254,9 +294,13 @@ namespace doca::comch {
         }
 
         auto server_con = server::resolve_connection(comch_connection);
-        assert(server_con != nullptr);
 
-        server_con->signal_disconnect();
+        if(server_con != nullptr) {
+            // client has disconnected from us, so the connection is already disconnected. Signal that to the server_connection.
+            server_con->signal_disconnect();
+        } else {
+            logger->warn("comch server received disconnection event for unknown server_connection {}", static_cast<void*>(comch_connection));
+        }
     }
 
     auto server::send_completion_entry(
@@ -354,7 +398,7 @@ namespace doca::comch {
     }
 
     auto server_disconnect_awaitable::await_ready() const noexcept -> bool {
-        return con_->state_ == server_connection::state::DISCONNECTED;
+        return con_->state_ == connection_state::DISCONNECTED;
     }
 
     auto server_disconnect_awaitable::await_suspend(std::coroutine_handle<> handle) const noexcept -> void {

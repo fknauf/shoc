@@ -40,7 +40,7 @@ namespace doca {
      * Awaitable for context state changes (to started or stopped). Jointly owns the waited-upon context
      * with its parent to keep it alive long enough for the awaitable to use in all circumstances (particularly
      * when co_await is delayed or the context destroyed synchronously) so as to avoid use-after-free.
-     * 
+     *
      * See C++20 coroutine docs for the meaning of the member functions.
      */
     class [[nodiscard]] context_state_awaitable {
@@ -64,7 +64,7 @@ namespace doca {
     /**
      * Base class for DOCA contexts. Modelled as a context_parent for ease of implementation, even
      * though not all contexts can have child contexts.
-     * 
+     *
      * Always constructed in a std::shared_ptr so context_state_awaitable can own it.
      */
     class context:
@@ -92,7 +92,7 @@ namespace doca {
 
         /**
          * stop this context (asynchronously)
-         * 
+         *
          * @return awaitable to co_await upon until the context is actually stopped
          */
         [[nodiscard]]
@@ -100,7 +100,7 @@ namespace doca {
 
         /**
          * For internal use.
-         * 
+         *
          * @return this context's DOCA handle as doca_ctx*, for use in some SDK functions.
          */
         [[nodiscard]]
@@ -136,7 +136,7 @@ namespace doca {
     protected:
         /**
          * Called by child classes in the constructor to set the state-change callback and context user data
-         * 
+         *
          * This is necessary because each of them has a different way of creating the DOCA SDK context handle.
          */
         auto init_state_changed_callback() -> void;
@@ -182,7 +182,7 @@ namespace doca {
     /**
      * Scoped context wrapper for automatic cleanup. Modelled after std::unique_ptr
      * with more limited functionality.
-     * 
+     *
      * Note that the referenced context object will survive the destructor of scoped_context
      * unless it has been stopped before. The purpose of this wrapper is not to prevent a
      * memory leak on the context but to prevent it from never being stopped.
@@ -318,11 +318,18 @@ namespace doca {
          * for all of them once they've been stopped.
          */
         auto stop_all() -> void {
-            for(auto &child : active_contexts_) {
+            // We need this iterator dance because it->second->stop() may remove the context from active_children,
+            // and the iterator pointing to it will be invalidated. This way, next remains valid in that case.
+            auto next = active_contexts_.begin();
+
+            while(next != active_contexts_.end()) {
+                auto it = next;
+                ++next;
+
                 try {
-                    static_cast<void>(child.second->stop());
+                    static_cast<void>(it->second->stop());
                 } catch(doca_exception &e) {
-                    logger->error("unable to stop child context {}", static_cast<void*>(child.second.get()));
+                    logger->error("unable to stop child context {}", static_cast<void*>(it->second.get()));
                 }
             }
         }

@@ -22,6 +22,13 @@ namespace doca::comch {
         DISCONNECTED
     };
 
+    /**
+     * Accepter queues for messages, connections, and consumers.
+     *
+     * When there are no waiting coroutines, messages need to be queued. When there are no
+     * queued messages, accepters need to be queued. When the context is stopped, waiting
+     * consumers need to be fed an error message. This does that.
+     */
     template<typename Payload, typename ScopeWrapper = Payload>
     class accepter_queues {
     public:
@@ -34,6 +41,12 @@ namespace doca::comch {
         accepter_queues &operator=(accepter_queues const &) = delete;
         accepter_queues &operator=(accepter_queues &&) = default;
 
+        /**
+         * Accept queued thing or queue an accepter. If the queues are disconnected
+         * and empty, the returned awaitable will throw doca_exception upon co_await.
+         *
+         * @return awaitable to wait for whatever's in this queue.
+         */
         auto accept() -> awaitable {
             if(!pending_data_.empty()) {
                 auto result = awaitable::from_value(std::move(pending_data_.front()));
@@ -48,6 +61,9 @@ namespace doca::comch {
             }
         }
 
+        /**
+         * Feed a thing to a waiting accepter or queue the thing for future accepters.
+         */
         auto supply(Payload new_payload) -> void {
             if(pending_accepters_.empty()) {
                 pending_data_.emplace(std::move(new_payload));
@@ -59,6 +75,9 @@ namespace doca::comch {
             }
         }
 
+        /**
+         * Mark the queues as disconnected and feed an error to all waiting accepters.
+         */
         auto disconnect() -> void {
             disconnected_ = true;
 
