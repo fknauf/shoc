@@ -57,8 +57,38 @@ namespace doca::comch {
         return result;
     }
 
+    auto client::stop() -> context_state_awaitable {
+        if(state_ == connection_state::CONNECTED) {
+            state_ = connection_state::DISCONNECTING;
+        }
+
+        active_children_.stop_all();
+        disconnect_if_able();
+
+        return context_state_awaitable { shared_from_this(), DOCA_CTX_STATE_IDLE };
+    }
+
+    auto client::signal_stopped_child(context *stopped_child) -> void {
+        active_children_.remove_stopped_context(stopped_child);
+        if(state_ == connection_state::DISCONNECTING) {
+            disconnect_if_able();
+        }
+    }
+
+    auto client::disconnect_if_able() -> void {
+        if(!active_children_.empty()) {
+            return;
+        }
+
+        auto err = doca_ctx_stop(as_ctx());
+
+        if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
+            logger->error("could not stop comch client even though it has no active consumers/producers: {}", doca_error_get_descr(err));
+        }
+    }
+
     auto client::send(std::string_view message) -> status_awaitable {
-        if(get_state() != DOCA_CTX_STATE_RUNNING) {
+        if(state_ != connection_state::CONNECTED) {
             return status_awaitable::from_value(DOCA_ERROR_NOT_CONNECTED);
         }
 
@@ -148,9 +178,15 @@ namespace doca::comch {
         [[maybe_unused]] doca_ctx_states prev_state,
         doca_ctx_states next_state
     ) -> void {
-        if(next_state == DOCA_CTX_STATE_IDLE) {
+        if(next_state == DOCA_CTX_STATE_RUNNING) {
+            state_ = connection_state::CONNECTED;
+        } else if(next_state == DOCA_CTX_STATE_STOPPING) {
+            state_ = connection_state::DISCONNECTING;
+        } else if(next_state == DOCA_CTX_STATE_IDLE) {
             message_queues_.disconnect();
             remote_consumer_queues_.disconnect();
+
+            state_ = connection_state::DISCONNECTED;
         }
     }
 

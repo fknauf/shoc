@@ -16,6 +16,12 @@ namespace doca::comch {
     using message_awaitable = coro::value_awaitable<message>;
     using id_awaitable = coro::value_awaitable<std::uint32_t>;
 
+    enum class connection_state {
+        CONNECTED,
+        DISCONNECTING,
+        DISCONNECTED
+    };
+
     template<typename Payload, typename ScopeWrapper = Payload>
     class accepter_queues {
     public:

@@ -51,6 +51,8 @@ namespace doca::comch {
             return remote_consumer_queues_.accept();
         }
 
+        auto stop() -> context_state_awaitable override;
+
     protected:
         auto state_changed(
             doca_ctx_states prev_state,
@@ -86,8 +88,11 @@ namespace doca::comch {
         static auto resolve(doca_comch_connection*) -> client*;
         static auto resolve(doca_comch_client*) -> client*;
         auto connection_handle() const -> doca_comch_connection*;
+        auto signal_stopped_child(context *child) -> void override;
+        auto disconnect_if_able() -> void;
 
         unique_handle<doca_comch_client> handle_ { doca_comch_client_destroy };
+        connection_state state_ = connection_state::DISCONNECTED;
 
         accepter_queues<message> message_queues_;
         accepter_queues<std::uint32_t> remote_consumer_queues_;
