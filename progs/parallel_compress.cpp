@@ -96,8 +96,8 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
 }
 
 auto main(int argc, char *argv[]) -> int try {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    doca::logger->set_level(spdlog::level::debug);
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    doca::logger->set_level(spdlog::level::info);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";

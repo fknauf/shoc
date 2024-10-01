@@ -12,6 +12,15 @@
 #include <variant>
 
 namespace doca::coro {
+    /**
+     * Meeting point for waiting coroutines and result-providing event callbacks.
+     * 
+     * Callbacks can supply their results here before resuming the stored coroutine.
+     * When a coroutine is suspended waiting for this result, a handle to it will be
+     * stored here.
+     * 
+     * used by value_awaitable.
+     */
     template<typename T>
     struct receptable {
         std::variant<std::monostate, std::exception_ptr, T> value;
@@ -37,6 +46,9 @@ namespace doca::coro {
         }
     };
 
+    /**
+     * Awaitable that allows a single coroutine to wait for a single value.
+     */
     template<typename T>
     struct [[nodiscard]] value_awaitable {
         using payload_type = receptable<T>;
@@ -49,18 +61,30 @@ namespace doca::coro {
             dest { std::move(dest) }
         {}
 
+        /**
+         * Create a value_awaitable referencing an empty receptable.
+         */
         static auto create_space() {
             return value_awaitable { std::make_unique<payload_type>() } ;
         }
 
+        /**
+         * create a value_awaitable from an existing value (so that coroutines will not have to wait)
+         */
         static auto from_value(T &&val) {
             return value_awaitable(std::make_unique<payload_type>(std::move(val), nullptr));
         }
 
+        /**
+         * Create a value_awaitable that will throw an exception upon value retrieval
+         */
         static auto from_exception(std::exception_ptr ex) {
             return value_awaitable(std::make_unique<payload_type>(ex, nullptr));
         }
 
+        /**
+         * Create a value_awaitable that will throw a doca_exception with the supplied error code
+         */
         static auto from_error(doca_error_t err) {
             return from_exception(std::make_exception_ptr(doca_exception { err }));
         }

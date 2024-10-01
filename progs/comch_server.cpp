@@ -8,18 +8,12 @@
 #include <string_view>
 
 auto ping_pong(doca::comch::scoped_server_connection con) -> doca::coro::fiber {
-    doca::logger->debug("waiting for message");
+    auto msg = co_await con->msg_recv();
+    std::cout << msg << std::endl;
+    auto status = co_await con->send("pong");
 
-    try {
-        auto msg = co_await con->msg_recv();
-
-        doca::logger->debug("message received");
-
-        std::cout << msg << std::endl;
-        auto status = co_await con->send("pong");
-        doca::logger->info("sent response, status = {}", status);
-    } catch(doca::doca_exception &ex) {
-        doca::logger->warn("no message received: {}", ex.what());
+    if(status != DOCA_SUCCESS) {
+        doca::logger->error("failed to send response:", doca_error_get_descr(status));
     }
 }
 
@@ -27,21 +21,21 @@ auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::comch::comch_device { "03:00.0" };
     auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
-    doca::logger->info("server starting");
-
     auto server = co_await engine->create_context<doca::comch::server>("vss-test", dev, rep);
 
-    doca::logger->info("server started");
-
     for(;;) {
+        // wait for and accept client connection
         auto con = co_await server->accept();
+        // spawn new coroutine (fiber) to handle it. Again this will run up to the first co_await
+        // and suspend, returning control here. It will be resumed when events concerning that
+        // connection are processed by the engine.
         ping_pong(std::move(con));
     }
 }
 
 int main() {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    doca::logger->set_level(spdlog::level::trace);
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    doca::logger->set_level(spdlog::level::info);
 
     auto engine = doca::progress_engine{};
     serve_ping_pong(&engine);

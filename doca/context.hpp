@@ -18,14 +18,31 @@ namespace doca {
     class context;
     class progress_engine;
 
+    /**
+     * Interface for classes that have dependent context (e.g. the progress engine or other contexts)
+     */
     class context_parent {
     public:
         virtual ~context_parent() = default;
 
+        /**
+         * Called by the stopping child when a child is stopped
+         */
         virtual auto signal_stopped_child(context *stopped_child) -> void = 0;
+
+        /**
+         * handle to the common progress engine, so parent and child run on the same engine.
+         */
         virtual auto engine() -> progress_engine* = 0;
     };
 
+    /**
+     * Awaitable for context state changes (to started or stopped). Jointly owns the waited-upon context
+     * with its parent to keep it alive long enough for the awaitable to use in all circumstances (particularly
+     * when co_await is delayed or the context destroyed synchronously) so as to avoid use-after-free.
+     * 
+     * See C++20 coroutine docs for the meaning of the member functions.
+     */
     class [[nodiscard]] context_state_awaitable {
     public:
         context_state_awaitable(std::shared_ptr<context> ctx, doca_ctx_states desired_state):
@@ -44,6 +61,12 @@ namespace doca {
         doca_ctx_states desired_state_;
     };
 
+    /**
+     * Base class for DOCA contexts. Modelled as a context_parent for ease of implementation, even
+     * though not all contexts can have child contexts.
+     * 
+     * Always constructed in a std::shared_ptr so context_state_awaitable can own it.
+     */
     class context:
         public context_parent,
         public std::enable_shared_from_this<context>
@@ -51,6 +74,9 @@ namespace doca {
     public:
         friend class context_state_awaitable;
 
+        /**
+         * @param parent parent to signal when this context is stopped
+         */
         context(context_parent *parent);
 
         context(context const &) = delete;
@@ -58,33 +84,68 @@ namespace doca {
         context &operator=(context const &) = delete;
         context &operator=(context &&) = delete;
 
+        /**
+         * For internal use.
+         */
         [[nodiscard]]
         auto start() -> context_state_awaitable;
 
+        /**
+         * stop this context (asynchronously)
+         * 
+         * @return awaitable to co_await upon until the context is actually stopped
+         */
         [[nodiscard]]
         virtual auto stop() -> context_state_awaitable;
 
+        /**
+         * For internal use.
+         * 
+         * @return this context's DOCA handle as doca_ctx*, for use in some SDK functions.
+         */
         [[nodiscard]]
         virtual auto as_ctx() const -> doca_ctx* = 0;
 
+        /**
+         * Get current context state (idle, starting, running, stopping)
+         */
         [[nodiscard]]
         auto get_state() const -> doca_ctx_states {
             return current_state_;
         }
 
+        /**
+         * Called by child contexts to signal that they have been stopped.
+         */
         auto signal_stopped_child([[maybe_unused]] context *stopped_child) -> void override {}
 
+        /**
+         * @return the progress engine that handles the events for this context
+         */
         [[nodiscard]]
         auto engine() -> progress_engine* override {
             return parent_->engine();
         }
 
+        /**
+         * @return the number of tasks that are in flight for this context
+         */
         [[nodiscard]]
         auto inflight_tasks() const -> std::size_t;
 
     protected:
+        /**
+         * Called by child classes in the constructor to set the state-change callback and context user data
+         * 
+         * This is necessary because each of them has a different way of creating the DOCA SDK context handle.
+         */
         auto init_state_changed_callback() -> void;
 
+        /**
+         * Overridable state-changed handler. This is called from the state-change callback after the current state
+         * is updated but before waiting coroutines are resumed and allows child contexts to update their state
+         * in the way those waiting coroutines expect.
+         */
         virtual auto state_changed(
             [[maybe_unused]] doca_ctx_states prev_state,
             [[maybe_unused]] doca_ctx_states next_state
@@ -95,6 +156,9 @@ namespace doca {
         template<std::derived_from<context> BaseContext>
         friend class dependent_contexts;
 
+        /**
+         * state-change callback for the SDK
+         */
         static auto state_changed_entry(
             doca_data user_data,
             doca_ctx *ctx,
@@ -102,15 +166,27 @@ namespace doca {
             doca_ctx_states next_state
         ) -> void;
 
+        /**
+         * Connects this context to engine()
+         */
         auto connect() -> void;
 
         context_parent *parent_ = nullptr;
         doca_ctx_states current_state_ = DOCA_CTX_STATE_IDLE;
 
+        // coroutines waiting for start/stop state changes
         std::coroutine_handle<> coro_start_;
         std::coroutine_handle<> coro_stop_;
     };
 
+    /**
+     * Scoped context wrapper for automatic cleanup. Modelled after std::unique_ptr
+     * with more limited functionality.
+     * 
+     * Note that the referenced context object will survive the destructor of scoped_context
+     * unless it has been stopped before. The purpose of this wrapper is not to prevent a
+     * memory leak on the context but to prevent it from never being stopped.
+     */
     template<std::derived_from<context> ConcreteContext>
     class scoped_context {
     public:
@@ -159,6 +235,10 @@ namespace doca {
         std::shared_ptr<ConcreteContext> ctx_ = nullptr;
     };
 
+    /**
+     * Awaitable for context creation. Generally fulfils the same purpose as context_state_awaitable
+     * but will return a scoped wrapper around the new context.
+     */
     template<std::derived_from<context> ConcreteContext>
     class create_context_awaitable {
     public:
@@ -177,6 +257,9 @@ namespace doca {
         context_state_awaitable start_awaitable_;
     };
 
+    /**
+     * active-children registry for context parents.
+     */
     template<std::derived_from<context> BaseContext = context>
     class dependent_contexts {
     public:
@@ -184,10 +267,17 @@ namespace doca {
             active_contexts_.max_load_factor(0.75);
         }
 
+        /**
+         * called when a child context has been stopped to remove it from the registry
+         */
         auto remove_stopped_context(BaseContext *stopped_ctx) -> void {
             active_contexts_.erase(stopped_ctx);
         }
 
+        /**
+         * Create a new context, start it, put it in the registry, and return an awaitable with which
+         * a scoped wrapper around the new context can be co_awaited.
+         */
         template<
             std::derived_from<BaseContext> ConcreteContext,
             std::derived_from<context_parent> Parent,
@@ -209,17 +299,31 @@ namespace doca {
             return create_context_awaitable { std::move(new_context), std::move(start_awaitable) };
         }
 
+        /**
+         * @return number of active children
+         */
         auto size() const noexcept {
             return active_contexts_.size();
         }
 
+        /**
+         * @return true if there are no active children left
+         */
         auto empty() const noexcept -> bool {
             return active_contexts_.empty();
         }
 
+        /**
+         * Request to stop all child contexts. After this we expect remove_stopped_context to be called
+         * for all of them once they've been stopped.
+         */
         auto stop_all() -> void {
             for(auto &child : active_contexts_) {
-                doca_ctx_stop(child.second->as_ctx());
+                try {
+                    static_cast<void>(child.second->stop());
+                } catch(doca_exception &e) {
+                    logger->error("unable to stop child context {}", static_cast<void*>(child.second.get()));
+                }
             }
         }
 

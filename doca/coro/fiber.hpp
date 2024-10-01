@@ -5,6 +5,13 @@
 #include <coroutine>
 
 namespace doca::coro {
+    /**
+     * Coroutine wrapper class for a fiber, i.e. a top-level eager coroutine that
+     * no-one will wait on.
+     * 
+     * These are supposed to be fire-and-forget, similar to spawning a new thread
+     * of execution.
+     */
     struct fiber {
         struct promise_type {
             auto get_return_object() const noexcept { return fiber{}; }

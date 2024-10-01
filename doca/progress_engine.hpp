@@ -21,14 +21,14 @@ namespace doca {
      * RAII wrapper around a doca_pe (progress engine) handle. Manages its lifetime, can wait for
      * events with epoll.
      *
-     * This class is mainly intended to be used inside the event_thread class for background handling
-     * completion events (because we assume that the completion events will mainly trigger the completion
-     * of promise/future pairs), but synchronous polling is also possible.
-     *
      * IMPORTANT: According to the DOCA documentation, doca_pe (which this class wraps) is not threadsafe.
      * In particular, as I understand it, tasks need to be submitted in the same thread that handles the
      * completion events (or at least when the program is certain no concurrent completion events are
      * possible, e.g. when offloading tasks sequentially).
+     * 
+     * The progress engine acts as a parent for all contexts that are created through it and handles all
+     * their events and their children's events. Upon destruction, the progress engine will stop all
+     * dependent contexts and wait for their stoppage before winding down.
      */
     class progress_engine:
         public context_parent
@@ -62,7 +62,15 @@ namespace doca {
             return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
         }
 
+        /**
+         * Main event-handling loop: Wait for events and process them until there are no more
+         * active dependent contexts.
+         */
         auto main_loop() -> void;
+
+        /**
+         * Main event-handling loop with a custom loop condition.
+         */
         auto main_loop_while(std::function<bool()> condition) -> void;
 
         auto connect(context *ctx) -> void;

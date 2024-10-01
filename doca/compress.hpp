@@ -6,7 +6,6 @@
 #include "device.hpp"
 #include "logger.hpp"
 #include "progress_engine.hpp"
-#include "scoped_counter.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_compress.h>
@@ -30,6 +29,7 @@ namespace doca {
         unique_handle<doca_dev> handle_ { doca_dev_close };
     };
 
+    // compile-time lookup table for task-specific helper functions
     template<typename TaskType>
     struct compress_task_helpers {};
 
@@ -51,6 +51,9 @@ namespace doca {
         static auto constexpr get_dst      = doca_compress_task_decompress_deflate_get_dst;
     };
 
+    /**
+     * Result of a compression operation: compressed data, checksums, status
+     */
     class compress_result {
     public:
         compress_result() = default;
@@ -98,7 +101,7 @@ namespace doca {
         ~compress_context();
 
         /**
-         * Compress the data in src, write the results to dest. Returns immediately; the result of the call is a future that'll be completed
+         * Compress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
          * when the task finishes. At this point, the compressed data will be in dest.
          *
          * @param src source data buffer
@@ -111,7 +114,7 @@ namespace doca {
         }
 
         /**
-         * Decompress the data in src, write the results to dest. Returns immediately; the result of the call is a future that'll be completed
+         * Decompress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
          * when the task finishes. At this point, the decompressed data will be in dest.
          *
          * @param src source data buffer

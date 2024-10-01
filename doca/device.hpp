@@ -10,6 +10,9 @@
 #include <string_view>
 
 namespace doca {
+    /**
+     * Base class for DOCA devices.
+     */
     class device
     {
     public:
