@@ -82,10 +82,10 @@ namespace doca::comch {
 
         if(state_ == connection_state::CONNECTED) {
             state_ = connection_state::DISCONNECTING;
-        }
 
-        active_children_.stop_all();
-        disconnect_if_able();
+            active_children_.stop_all();
+            disconnect_if_able();
+        }
 
         return server_disconnect_awaitable { this };
     }
