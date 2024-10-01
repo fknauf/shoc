@@ -77,3 +77,9 @@ executable('parallel_compress', [ 'progs/parallel_compress.cpp' ],
 
 executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)
+
+executable('test-docapp', [ 'tests/coro/group_value_awaitable.cpp' ],
+        dependencies : deps + [ dependency('gtest', main: true) ],
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)

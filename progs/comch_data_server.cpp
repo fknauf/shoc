@@ -36,8 +36,6 @@ auto dance(
             doca::logger->warn("producer failed to send buffer: {}", doca_error_get_descr(status));
         }
     }
-
-    co_await con->disconnect();
 }
 
 auto serve(doca::progress_engine *engine) -> doca::coro::fiber {

@@ -14,11 +14,11 @@
 namespace doca::coro {
     /**
      * Meeting point for waiting coroutines and result-providing event callbacks.
-     * 
+     *
      * Callbacks can supply their results here before resuming the stored coroutine.
      * When a coroutine is suspended waiting for this result, a handle to it will be
      * stored here.
-     * 
+     *
      * used by value_awaitable.
      */
     template<typename T>
@@ -115,7 +115,8 @@ namespace doca::coro {
             }
         }
 
-        auto await_resume() const noexcept {
+        [[nodiscard]]
+        auto await_resume() const {
             return std::visit(
                 overload{
                     [](T &&val) -> T&& {
