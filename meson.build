@@ -25,6 +25,7 @@ common_srcs = [
     'doca/compress.cpp',
     'doca/context.cpp',
     'doca/device.cpp',
+    'doca/dma.cpp',
     'doca/epoll_handle.cpp',
     'doca/logger.cpp',
     'doca/memory_map.cpp',
