@@ -8,11 +8,13 @@ namespace doca::comch {
     client::client(
         context_parent *parent,
         std::string const &server_name,
-        comch_device &dev,
+        device const &dev,
         client_limits const &limits
     ):
         context { parent }
     {
+        enforce(dev.has_capability(device_capability::comch_client), DOCA_ERROR_NOT_SUPPORTED);
+
         doca_comch_client *doca_client;
 
         enforce_success(doca_comch_client_create(dev.handle(), server_name.c_str(), &doca_client));

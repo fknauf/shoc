@@ -13,22 +13,6 @@
 #include <functional>
 
 namespace doca {
-    /**
-     * DOCA device descriptor for compression tasks.
-     */
-    class compress_device:
-        public device
-    {
-    public:
-        compress_device(std::string pci_addr);
-        compress_device();
-
-        [[nodiscard]] auto max_buf_size() const -> std::uint64_t;
-
-    private:
-        unique_handle<doca_dev> handle_ { doca_dev_close };
-    };
-
     // compile-time lookup table for task-specific helper functions
     template<typename TaskType>
     struct compress_task_helpers {};
@@ -95,7 +79,7 @@ namespace doca {
          */
         compress_context(
             progress_engine *parent,
-            compress_device const &dev,
+            device const &dev,
             std::uint32_t max_tasks = 1
         );
         ~compress_context();

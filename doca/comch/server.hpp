@@ -2,17 +2,19 @@
 
 #include "common.hpp"
 #include "consumer.hpp"
-#include "device.hpp"
 #include "producer.hpp"
 
+#include <doca/common/status.hpp>
 #include <doca/context.hpp>
 #include <doca/coro/value_awaitable.hpp>
+#include <doca/device.hpp>
 #include <doca/unique_handle.hpp>
 
 #include <doca_comch.h>
 
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <queue>
 
@@ -89,7 +91,8 @@ namespace doca::comch {
          * Send message to the connected client. Returns an awaitable with with the result
          * of the operation (success or reason for failure) can be co_awaited.
          *
-         * @param message Message to send
+         * @param msg message base address
+         * @param len message length
          * @return awaitable for the send operation status result
          */
         auto send(std::string_view message) -> status_awaitable;
@@ -214,7 +217,7 @@ namespace doca::comch {
         server(
             context_parent *parent,
             std::string const &server_name,
-            comch_device &dev,
+            device const &dev,
             device_representor &rep,
             server_limits const &limits = {}
         );

@@ -6,23 +6,15 @@
 #include <cassert>
 
 namespace doca {
-    dma_device::dma_device(std::string const &pci_addr):
-        device(device::find_by_pci_addr(pci_addr, doca_dma_cap_task_memcpy_is_supported))
-    {
-    }
-
-    dma_device::dma_device():
-        device(device::find_by_capabilities(doca_dma_cap_task_memcpy_is_supported))
-    {
-    }
-
     dma_context::dma_context(
         context_parent *parent,
-        dma_device &dev,
+        device const &dev,
         std::uint32_t max_tasks
     ):
         context { parent }
     {
+        enforce(dev.has_capability(device_capability::dma), DOCA_ERROR_NOT_SUPPORTED);
+
         doca_dma *raw_handle;
         enforce_success(doca_dma_create(dev.handle(), &raw_handle));
         handle_.reset(raw_handle);

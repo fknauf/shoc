@@ -11,7 +11,7 @@
 #include <string_view>
 
 auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::comch::comch_device { "81:00.0" };
+    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_client);
 
     auto client = co_await engine->create_context<doca::comch::client>("vss-data-test", dev);
 

@@ -34,7 +34,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
     out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
 
-    auto dev = doca::compress_device{};
+    auto dev = doca::device::find_by_capabilities(doca::device_capability::compress_deflate);
     auto mmap_src = doca::memory_map { dev, src_data };
     auto mmap_dst = doca::memory_map { dev, dst_data };
     auto buf_inv = doca::buffer_inventory { batches * 2 };

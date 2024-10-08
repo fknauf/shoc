@@ -2,10 +2,10 @@
 
 #include "common.hpp"
 #include "consumer.hpp"
-#include "device.hpp"
 #include "producer.hpp"
 
 #include <doca/context.hpp>
+#include <doca/device.hpp>
 #include <doca/unique_handle.hpp>
 
 #include <doca_comch.h>
@@ -35,7 +35,7 @@ namespace doca::comch {
         client(
             context_parent *parent,
             std::string const &server_name,
-            comch_device &dev,
+            device const &dev,
             client_limits const &limits = {}
         );
 

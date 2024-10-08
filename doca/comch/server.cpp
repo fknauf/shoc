@@ -150,12 +150,14 @@ namespace doca::comch {
     server::server(
         context_parent *parent,
         std::string const &server_name,
-        comch_device &dev,
+        device const &dev,
         device_representor &rep,
         server_limits const &limits
     ):
         context { parent }
     {
+        enforce(dev.has_capability(device_capability::comch_server), DOCA_ERROR_NOT_SUPPORTED);
+
         open_connections_.max_load_factor(0.75);
 
         doca_comch_server *doca_server;

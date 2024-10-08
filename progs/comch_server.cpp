@@ -18,7 +18,7 @@ auto ping_pong(doca::comch::scoped_server_connection con) -> doca::coro::fiber {
 }
 
 auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::comch::comch_device { "03:00.0" };
+    auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
     auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
     auto server = co_await engine->create_context<doca::comch::server>("vss-test", dev, rep);

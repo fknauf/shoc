@@ -13,7 +13,7 @@
 
 auto dance(
     doca::comch::scoped_server_connection con,
-    doca::comch::comch_device &dev
+    doca::device const &dev
 ) -> doca::coro::fiber {
     auto msg = co_await con->msg_recv();
 
@@ -39,8 +39,8 @@ auto dance(
 }
 
 auto serve(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::comch::comch_device { "03:00.0" };
-    auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
+    auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
+    auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0");
 
     auto server = co_await engine->create_context<doca::comch::server>("vss-data-test", dev, rep);
 

@@ -1,7 +1,12 @@
 #include "device.hpp"
 
 #include <doca_compress.h>
+#include <doca_comch.h>
+#include <doca_comch_consumer.h>
+#include <doca_comch_producer.h>
+#include <doca_dma.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -54,7 +59,39 @@ namespace doca {
         private:
             doca_devinfo_rep **rep_list = nullptr;
             std::uint32_t nb_devs = 0;
-        };    
+        };
+
+        auto devinfo_has_capability(
+            doca_devinfo *dev,
+            device_capability required_cap
+        ) -> bool {
+            switch(required_cap) {
+                case device_capability::compress_deflate:
+                    return doca_compress_cap_task_compress_deflate_is_supported(dev) == DOCA_SUCCESS
+                        && doca_compress_cap_task_decompress_deflate_is_supported(dev) == DOCA_SUCCESS;
+                case device_capability::comch_client:
+                    return doca_comch_cap_client_is_supported(dev) == DOCA_SUCCESS
+                        && doca_comch_consumer_cap_is_supported(dev) == DOCA_SUCCESS
+                        && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS;
+                case device_capability::comch_server:
+                    return doca_comch_cap_server_is_supported(dev) == DOCA_SUCCESS
+                        && doca_comch_consumer_cap_is_supported(dev) == DOCA_SUCCESS
+                        && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS;
+                case device_capability::dma:
+                    return doca_dma_cap_task_memcpy_is_supported(dev) == DOCA_SUCCESS;
+                default:
+                    return false;
+            }
+        }
+
+        auto devinfo_has_capabilities(doca_devinfo *dev, std::initializer_list<device_capability> required_caps) -> bool {
+            return std::ranges::all_of(
+                required_caps,
+                [dev](device_capability cap) {
+                    return devinfo_has_capability(dev, cap);
+                }
+            );
+        }
     }
 
     device::device(doca_dev *doca_handle)
@@ -70,18 +107,26 @@ namespace doca {
         return doca_dev_as_devinfo(handle());
     }
 
-    auto device::find_by_pci_addr(std::string const &pci_addr, tasks_check *check_fun) -> device {
+    auto device::has_capability(device_capability required_cap) const noexcept -> bool {
+        return devinfo_has_capability(as_devinfo(), required_cap);
+    }
+
+    auto device::has_capabilities(std::initializer_list<device_capability> required_caps) const noexcept -> bool {
+        return devinfo_has_capabilities(as_devinfo(), required_caps);
+    }
+
+    auto device::find_by_pci_addr(std::string const &pci_addr, std::initializer_list<device_capability> required_caps) -> device {
         for(auto dev : device_list()) {
             std::uint8_t is_addr_equal = 0;
             auto err = doca_devinfo_is_equal_pci_addr(dev, pci_addr.c_str(), &is_addr_equal);
 
-            if(err == DOCA_SUCCESS && is_addr_equal) {
-                if(check_fun != nullptr && DOCA_SUCCESS != check_fun(dev)) {
-                    continue;
-                }
-
+            if(
+                err == DOCA_SUCCESS &&
+                is_addr_equal &&
+                devinfo_has_capabilities(dev, required_caps)
+            ) {
                 doca_dev *dev_handle = nullptr;
-                
+
                 if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
                     return device { dev_handle };
                 }
@@ -91,14 +136,14 @@ namespace doca {
         throw doca_exception(DOCA_ERROR_NOT_FOUND);
     }
 
-    auto device::find_by_capabilities(tasks_check *check_fun) -> device {
+    auto device::find_by_capabilities(std::initializer_list<device_capability> required_caps) -> device {
         for(auto dev : device_list()) {
-            if(DOCA_SUCCESS != check_fun(dev)) {
+            if(!devinfo_has_capabilities(dev, required_caps)) {
                 continue;
             }
-            
+
             doca_dev *dev_handle = nullptr;
-                
+
             if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
                 return device { dev_handle };
             }
@@ -115,7 +160,7 @@ namespace doca {
         device const &dev,
         std::string const &pci_addr,
         doca_devinfo_rep_filter filter
-    ) -> device_representor 
+    ) -> device_representor
     {
         std::uint8_t is_addr_equal;
         doca_dev_rep *result;
@@ -136,7 +181,7 @@ namespace doca {
         device const &dev,
         std::string_view vuid,
         doca_devinfo_rep_filter filter
-    ) -> device_representor 
+    ) -> device_representor
     {
         char vuid_buf[DOCA_DEVINFO_VUID_SIZE + 1] = "";
         doca_dev_rep *result;

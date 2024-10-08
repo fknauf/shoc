@@ -40,4 +40,30 @@ namespace doca {
         enforce_success(doca_mmap_set_permissions(handle_.handle(), permissions));
         enforce_success(doca_mmap_start(handle_.handle()));
     }
+
+    memory_map::memory_map(
+        device const &dev,
+        export_descriptor export_desc
+    ) {
+        doca_mmap *map = nullptr;
+        enforce_success(doca_mmap_create_from_export(nullptr, export_desc.base_ptr, export_desc.length, dev.handle(), &map));
+        handle_.reset(map);
+
+        void *range_base = nullptr;
+        std::size_t range_length = 0;
+        enforce_success(doca_mmap_get_memrange(handle_.handle(), &range_base, &range_length));
+        range_ = std::span { reinterpret_cast<std::uint8_t*>(range_base), range_length };
+    }
+
+    auto memory_map::export_pci(device const &dev) const -> export_descriptor {
+        void const *export_desc = nullptr;
+        std::size_t export_len = 0;
+
+        enforce_success(doca_mmap_export_pci(handle_.handle(), dev.handle(), &export_desc, &export_len));
+
+        return {
+            .base_ptr = export_desc,
+            .length = export_len
+        };
+    }
 }

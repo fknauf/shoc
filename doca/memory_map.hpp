@@ -21,6 +21,11 @@ namespace doca {
     class memory_map
     {
     public:
+        struct export_descriptor {
+            void const *base_ptr;
+            std::size_t length;
+        };
+
         /**
          * @param dev the device that'll have access to this memory
          * @param size size of the memory to allocate and map
@@ -44,6 +49,11 @@ namespace doca {
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         );
 
+        memory_map(
+            device const &dev,
+            export_descriptor export_desc
+        );
+
         /**
          * @return the managed doca_mmap handle
          */
@@ -54,6 +64,8 @@ namespace doca {
          */
         [[nodiscard]] auto span() const -> std::span<std::uint8_t const> { return range_; }
         [[nodiscard]] auto span() -> std::span<std::uint8_t> { return range_; }
+
+        [[nodiscard]] auto export_pci(device const &dev) const -> export_descriptor;
 
     private:
         unique_handle<doca_mmap> handle_ { doca_mmap_destroy };

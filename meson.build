@@ -11,7 +11,13 @@ add_project_arguments('-D DOCA_ALLOW_EXPERIMENTAL_API', language: ['c', 'cpp'])
 add_project_arguments('-fcoroutines', language: ['cpp'])
 
 
-deps = [ dependency('doca-common'), dependency('doca-compress'), dependency('doca-comch'), dependency('spdlog') ]
+deps = [
+        dependency('doca-common'),
+        dependency('doca-compress'),
+        dependency('doca-comch'),
+        dependency('doca-dma'),
+        dependency('spdlog')
+]
 
 common_srcs = [
     'doca/buffer.cpp',
@@ -19,7 +25,6 @@ common_srcs = [
     'doca/buffer_pool.cpp',
     'doca/comch/client.cpp',
     'doca/comch/consumer.cpp',
-    'doca/comch/device.cpp',
     'doca/comch/producer.cpp',
     'doca/comch/server.cpp',
     'doca/compress.cpp',

@@ -7,7 +7,7 @@
 
 auto ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
     // get device from PCIe address
-    auto dev = doca::comch::comch_device { "81:00.0" };
+    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_client);
 
     // wait for connection to server, that is: create the context and ask the SDK to start
     // it, then suspend. The coroutine will be resumed by the state-changed handler when
