@@ -97,7 +97,11 @@ executable('dma_server', [ 'progs/dma_server.cpp' ],
 executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)
 
-executable('test-docapp', [ 'tests/coro/group_value_awaitable.cpp' ],
+executable('test-docapp',
+        [
+                'tests/coro/group_value_awaitable.cpp',
+                'tests/group_event_sources.cpp'
+        ],
         dependencies : deps + [ dependency('gtest', main: true) ],
         link_with: libdocapp,
         include_directories: inc_dirs,
