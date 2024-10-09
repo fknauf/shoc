@@ -32,6 +32,7 @@ common_srcs = [
     'doca/device.cpp',
     'doca/dma.cpp',
     'doca/epoll_handle.cpp',
+    'doca/event_sources.cpp',
     'doca/logger.cpp',
     'doca/memory_map.cpp',
     'doca/progress_engine.cpp'
