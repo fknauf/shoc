@@ -104,7 +104,7 @@ namespace doca {
          * @return this context's DOCA handle as doca_ctx*, for use in some SDK functions.
          */
         [[nodiscard]]
-        virtual auto as_ctx() const -> doca_ctx* = 0;
+        virtual auto as_ctx() const noexcept -> doca_ctx* = 0;
 
         /**
          * Get current context state (idle, starting, running, stopping)

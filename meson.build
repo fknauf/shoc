@@ -81,6 +81,18 @@ executable('parallel_compress', [ 'progs/parallel_compress.cpp' ],
         include_directories: inc_dirs,
         install: false)
 
+executable('dma_client', [ 'progs/dma_client.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
+executable('dma_server', [ 'progs/dma_server.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
 executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)
 

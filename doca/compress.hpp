@@ -110,7 +110,7 @@ namespace doca {
             return submit_task<doca_compress_task_decompress_deflate>(src, dest);
         }
 
-        [[nodiscard]] auto as_ctx() const -> doca_ctx * override;
+        [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx * override;
 
         // auto stop() -> void override;
 

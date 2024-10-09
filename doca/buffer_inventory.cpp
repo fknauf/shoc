@@ -18,21 +18,26 @@ namespace doca {
         enforce_success(doca_buf_inventory_start(handle_.handle()));
     }
 
-    auto buffer_inventory::buf_get_by_args(memory_map &mmap, void *addr, std::size_t len, void *data, std::size_t data_len) -> buffer {
+    auto buffer_inventory::buf_get_by_args(memory_map &mmap, void const *addr, std::size_t len, void const *data, std::size_t data_len) -> buffer {
         doca_buf *dest;
-        enforce_success(doca_buf_inventory_buf_get_by_args(handle_.handle(), mmap.handle(), addr, len, data, data_len, &dest));
+        enforce_success(doca_buf_inventory_buf_get_by_args(
+            handle_.handle(),
+            mmap.handle(),
+            const_cast<void*>(addr), len,
+            const_cast<void*>(data), data_len,
+            &dest));
         return dest;
     }
 
-    auto buffer_inventory::buf_get_by_addr(memory_map &mmap, void *addr, std::size_t len) -> buffer {
+    auto buffer_inventory::buf_get_by_addr(memory_map &mmap, void const *addr, std::size_t len) -> buffer {
         doca_buf *dest;
-        enforce_success(doca_buf_inventory_buf_get_by_addr(handle_.handle(), mmap.handle(), addr, len, &dest));
+        enforce_success(doca_buf_inventory_buf_get_by_addr(handle_.handle(), mmap.handle(), const_cast<void*>(addr), len, &dest));
         return dest;
     }
 
-    auto buffer_inventory::buf_get_by_data(memory_map &mmap, void *data, std::size_t data_len) -> buffer {
+    auto buffer_inventory::buf_get_by_data(memory_map &mmap, void const *data, std::size_t data_len) -> buffer {
         doca_buf *dest;
-        enforce_success(doca_buf_inventory_buf_get_by_data(handle_.handle(), mmap.handle(), data, data_len, &dest));
+        enforce_success(doca_buf_inventory_buf_get_by_data(handle_.handle(), mmap.handle(), const_cast<void*>(data), data_len, &dest));
         return dest;
     }
 

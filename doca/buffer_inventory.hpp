@@ -14,7 +14,7 @@
 namespace doca {
     /**
      * buffer inventory that references existing memory maps.
-     * 
+     *
      * referenced memory maps need to live longer than the buffer inventory, while the
      * buffer inventory needs to live longer than the buffers it creates.
      */
@@ -23,20 +23,21 @@ namespace doca {
     public:
         buffer_inventory(std::uint32_t max_buf);
 
-        [[nodiscard]] auto buf_get_by_args(memory_map &mmap, void *addr, std::size_t len, void *data, std::size_t data_len) -> buffer;
-        [[nodiscard]] auto buf_get_by_addr(memory_map &mmap, void *addr, std::size_t len) -> buffer;
-        [[nodiscard]] auto buf_get_by_data(memory_map &mmap, void *data, std::size_t data_len) -> buffer;
+        [[nodiscard]] auto buf_get_by_args(memory_map &mmap, void const *addr, std::size_t len, void const *data, std::size_t data_len) -> buffer;
+        [[nodiscard]] auto buf_get_by_addr(memory_map &mmap, void const *addr, std::size_t len) -> buffer;
+        [[nodiscard]] auto buf_get_by_data(memory_map &mmap, void const *data, std::size_t data_len) -> buffer;
+
         [[nodiscard]] auto buf_dup(buffer const &src) -> buffer;
 
-        [[nodiscard]] auto buf_get_by_args(memory_map &mmap, std::span<char> mem, std::span<char> data) -> buffer {
+        [[nodiscard]] auto buf_get_by_args(memory_map &mmap, std::span<char const> mem, std::span<char const> data) -> buffer {
             return buf_get_by_args(mmap, mem.data(), mem.size(), data.data(), data.size());
         }
 
-        [[nodiscard]] auto buf_get_by_addr(memory_map &mmap, std::span<char> mem) -> buffer {
+        [[nodiscard]] auto buf_get_by_addr(memory_map &mmap, std::span<char const> mem) -> buffer {
             return buf_get_by_addr(mmap, mem.data(), mem.size());
         }
 
-        [[nodiscard]] auto buf_get_by_data(memory_map &mmap, std::span<char> data) -> buffer {
+        [[nodiscard]] auto buf_get_by_data(memory_map &mmap, std::span<char const> data) -> buffer {
             return buf_get_by_data(mmap, data.data(), data.size());
         }
 

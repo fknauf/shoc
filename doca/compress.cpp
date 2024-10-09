@@ -37,7 +37,7 @@ namespace doca {
     compress_context::~compress_context() {
     }
 
-    auto compress_context::as_ctx() const -> doca_ctx * {
+    auto compress_context::as_ctx() const noexcept -> doca_ctx * {
         return doca_compress_as_ctx(handle_.handle());
     }
 }

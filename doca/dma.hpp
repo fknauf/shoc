@@ -27,6 +27,10 @@ namespace doca {
             buffer &dest
         ) const -> status_awaitable;
 
+        auto as_ctx() const noexcept -> doca_ctx* override {
+            return doca_dma_as_ctx(handle_.handle());
+        }
+
     private:
         unique_handle<doca_dma> handle_ { doca_dma_destroy };
     };

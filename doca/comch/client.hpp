@@ -41,7 +41,7 @@ namespace doca::comch {
 
         ~client();
 
-        [[nodiscard]] auto as_ctx() const -> doca_ctx* override;
+        [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx* override;
 
         /**
          * Send message to the server we're connected to

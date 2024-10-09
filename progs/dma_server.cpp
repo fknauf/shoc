@@ -1,3 +1,5 @@
+#include "dma_common.hpp"
+
 #include <doca/buffer.hpp>
 #include <doca/buffer_inventory.hpp>
 #include <doca/comch/server.hpp>
@@ -6,36 +8,12 @@
 #include <doca/memory_map.hpp>
 #include <doca/progress_engine.hpp>
 
+#include <iostream>
 #include <span>
+#include <string_view>
 #include <vector>
 
-struct remote_buffer_descriptor {
-    std::span<char> src_buffer_range;
-    doca::memory_map::export_descriptor export_desc;
-};
-
-auto parse_remote_buffer_descr(std::string const &msg) {
-    auto src_buffer_addr = std::uint64_t{};
-    auto src_buffer_len = std::uint64_t{};
-
-    std::copy(msg.data()    , msg.data() +  8, &src_buffer_addr);
-    std::copy(msg.data() + 8, msg.data() + 16, &src_buffer_len );
-
-    auto export_desc = doca::memory_map::export_descriptor {
-        .base_ptr = msg.data() + 16,
-        .length = msg.size() - 16
-    };
-
-    return remote_buffer_descriptor {
-        .src_buffer_range = {
-            reinterpret_cast<char*>(src_buffer_addr),
-            src_buffer_len
-        },
-        .export_desc = export_desc
-    };
-}
-
-auto dma_serve(doca::progress_engine *engine) {
+auto dma_serve(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr("03:00.0", { doca::device_capability::dma, doca::device_capability::comch_server });
     auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
@@ -44,15 +22,31 @@ auto dma_serve(doca::progress_engine *engine) {
 
     auto conn = co_await server->accept();
     auto msg = co_await conn->msg_recv();
-    auto remote_buffer_desc = parse_remote_buffer_descr(msg);
+    auto remote_buffer_desc = remote_buffer_descriptor { msg };
 
     auto remote_mmap = doca::memory_map { dev, remote_buffer_desc.export_desc };
-    auto inv = doca::buffer_inventory { 1 };
-    auto buf = inv.buf_get_by_addr(remote_mmap, remote_buffer_desc.src_buffer_range);
+    auto inv = doca::buffer_inventory { 2 };
+    auto remote_buf = inv.buf_get_by_addr(remote_mmap, remote_buffer_desc.src_range);
 
-    auto local_mmap = doca::memory_map { }
+    auto local_space = std::vector<char>(remote_buf.memory().size());
+    auto local_mmap = doca::memory_map { dev, local_space };
+    auto local_buf = inv.buf_get_by_addr(local_mmap, local_space);
 
-    auto ok_status = co_await conn->send("ok");
+    auto status = co_await dma->memcpy(remote_buf, local_buf);
+
+    if(status == DOCA_SUCCESS) {
+        doca::logger->info("dma memcpy succeeded");
+
+        auto copied_data = std::string_view {
+            local_buf.data().data(),
+            local_buf.data().size()
+        };
+        std::cout << "copied data: " << copied_data << std::endl;
+    } else {
+        doca::logger->error("dma memcpy failed");
+    }
+
+    [[maybe_unused]] auto ok_status = co_await conn->send("ok");
 }
 
 auto main() -> int {

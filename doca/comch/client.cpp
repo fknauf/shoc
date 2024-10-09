@@ -49,7 +49,7 @@ namespace doca::comch {
         }
     }
 
-    auto client::as_ctx() const -> doca_ctx* {
+    auto client::as_ctx() const noexcept -> doca_ctx* {
         return doca_comch_client_as_ctx(handle_.handle());
     }
 
