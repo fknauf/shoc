@@ -50,7 +50,7 @@ namespace doca::comch {
         ) -> status_awaitable;
 
     private:
-        static auto send_completion_entry(
+        static auto send_completion_callback(
             doca_comch_producer_task_send *task,
             doca_data task_user_data,
             doca_data ctx_user_data

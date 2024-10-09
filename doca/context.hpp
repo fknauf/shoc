@@ -110,7 +110,7 @@ namespace doca {
          * Get current context state (idle, starting, running, stopping)
          */
         [[nodiscard]]
-        auto get_state() const -> doca_ctx_states {
+        auto get_state() const noexcept -> doca_ctx_states {
             return current_state_;
         }
 
@@ -159,7 +159,7 @@ namespace doca {
         /**
          * state-change callback for the SDK
          */
-        static auto state_changed_entry(
+        static auto state_changed_callback(
             doca_data user_data,
             doca_ctx *ctx,
             doca_ctx_states prev_state,

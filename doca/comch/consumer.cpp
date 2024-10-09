@@ -22,8 +22,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_consumer_task_post_recv_set_conf(
             handle_.handle(),
-            &consumer::post_recv_task_completion_entry,
-            &consumer::post_recv_task_completion_entry,
+            &consumer::post_recv_task_completion_callback,
+            &consumer::post_recv_task_completion_callback,
             max_tasks
         ));
     }
@@ -50,12 +50,10 @@ namespace doca::comch {
             throw doca_exception(err);
         }
 
-        doca_buf_inc_refcount(dest.handle(), nullptr);
-
         return result;
     }
 
-    auto consumer::post_recv_task_completion_entry(
+    auto consumer::post_recv_task_completion_callback(
         doca_comch_consumer_task_post_recv *task,
         doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data
@@ -64,7 +62,6 @@ namespace doca::comch {
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
 
         auto result = consumer_recv_result {
-            .buf = buffer { doca_comch_consumer_task_post_recv_get_buf(task) },
             .immediate = std::span {
                 doca_comch_consumer_task_post_recv_get_imm_data(task),
                 doca_comch_consumer_task_post_recv_get_imm_data_len(task)

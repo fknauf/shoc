@@ -59,7 +59,7 @@ auto compress_file(
         auto result = co_await compress->compress(src, dst);
         doca::logger->debug("compress_chunk complete: {}, crc = {}, adler = {}", i, result.crc_cs(), result.adler_cs());
 
-        dst_ranges[i] = result.dst().data();
+        dst_ranges[i] = dst.data();
     }
 
     auto end = std::chrono::steady_clock::now();

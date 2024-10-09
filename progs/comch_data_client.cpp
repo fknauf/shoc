@@ -28,7 +28,7 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
         auto result = co_await consumer->post_recv(buffer);
 
         if(result.status == DOCA_SUCCESS) {
-            auto data = result.buf.data();
+            auto data = buffer.data();
             std::cout << std::string_view { begin(data), end(data) } << std::endl;
         } else {
             doca::logger->error("post_recv failed with error: {}", doca_error_get_descr(result.status));

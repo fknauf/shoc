@@ -169,23 +169,23 @@ namespace doca::comch {
 
         enforce_success(doca_comch_server_task_send_set_conf(
             handle_.handle(),
-            &server::send_completion_entry,
-            &server::send_completion_entry,
+            &server::send_completion_callback,
+            &server::send_completion_callback,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_server_event_msg_recv_register(
             handle_.handle(),
-            &server::msg_recv_entry
+            &server::msg_recv_callback
         ));
         enforce_success(doca_comch_server_event_connection_status_changed_register(
             handle_.handle(),
-            &server::connection_entry,
-            &server::disconnection_entry
+            &server::connection_callback,
+            &server::disconnection_callback
         ));
         enforce_success(doca_comch_server_event_consumer_register(
             handle_.handle(),
-            &server::new_consumer_entry,
-            &server::expired_consumer_entry
+            &server::new_consumer_callback,
+            &server::expired_consumer_callback
         ));
         enforce_success(doca_comch_server_set_max_msg_size(
             handle_.handle(),
@@ -262,7 +262,7 @@ namespace doca::comch {
         }
     }
 
-    auto server::connection_entry(
+    auto server::connection_callback(
         [[maybe_unused]] doca_comch_event_connection_status_changed *event,
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint8_t change_successful
@@ -283,7 +283,7 @@ namespace doca::comch {
         self->connection_queues_.supply(new_connection);
     }
 
-    auto server::disconnection_entry(
+    auto server::disconnection_callback(
         [[maybe_unused]] doca_comch_event_connection_status_changed *event,
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint8_t change_successful
@@ -305,7 +305,7 @@ namespace doca::comch {
         }
     }
 
-    auto server::send_completion_entry(
+    auto server::send_completion_callback(
         doca_comch_task_send *task,
         [[maybe_unused]] doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data
@@ -320,7 +320,7 @@ namespace doca::comch {
         dest->resume();
     }
 
-    auto server::msg_recv_entry(
+    auto server::msg_recv_callback(
         [[maybe_unused]] doca_comch_event_msg_recv *event,
         std::uint8_t *recv_buffer,
         std::uint32_t msg_len,
@@ -338,7 +338,7 @@ namespace doca::comch {
         }
     }
 
-    auto server::new_consumer_entry(
+    auto server::new_consumer_callback(
         [[maybe_unused]] doca_comch_event_consumer *event,
         doca_comch_connection *comch_connection,
         std::uint32_t remote_consumer_id
@@ -352,7 +352,7 @@ namespace doca::comch {
         }
     }
 
-    auto server::expired_consumer_entry(
+    auto server::expired_consumer_callback(
         [[maybe_unused]] doca_comch_event_consumer *event,
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint32_t remote_consumer_id

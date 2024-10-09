@@ -24,18 +24,18 @@ namespace doca::comch {
 
         enforce_success(doca_comch_client_task_send_set_conf(
             handle_.handle(),
-            &client::send_completion_entry,
-            &client::send_completion_entry,
+            &client::send_completion_callback,
+            &client::send_completion_callback,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_client_event_msg_recv_register(
             handle_.handle(),
-            &client::msg_recv_entry
+            &client::msg_recv_callback
         ));
         enforce_success(doca_comch_client_event_consumer_register(
             handle_.handle(),
-            &client::new_consumer_entry,
-            &client::expired_consumer_entry
+            &client::new_consumer_callback,
+            &client::expired_consumer_callback
         ));
         enforce_success(doca_comch_client_set_max_msg_size(handle_.handle(), limits.max_msg_size));
         enforce_success(doca_comch_client_set_recv_queue_size(handle_.handle(), limits.recv_queue_size));
@@ -119,7 +119,7 @@ namespace doca::comch {
         return message_queues_.accept();
     }
 
-    auto client::send_completion_entry(
+    auto client::send_completion_callback(
         [[maybe_unused]] doca_comch_task_send *task,
         [[maybe_unused]] doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data
@@ -134,7 +134,7 @@ namespace doca::comch {
         dest->resume();
     }
 
-    auto client::msg_recv_entry(
+    auto client::msg_recv_callback(
         [[maybe_unused]] doca_comch_event_msg_recv *event,
         std::uint8_t *recv_buffer,
         std::uint32_t msg_len,
@@ -192,7 +192,7 @@ namespace doca::comch {
         }
     }
 
-    auto client::new_consumer_entry(
+    auto client::new_consumer_callback(
         [[maybe_unused]] doca_comch_event_consumer *event,
         doca_comch_connection *comch_connection,
         std::uint32_t remote_consumer_id
@@ -206,7 +206,7 @@ namespace doca::comch {
         }
     }
 
-    auto client::expired_consumer_entry(
+    auto client::expired_consumer_callback(
         [[maybe_unused]] doca_comch_event_consumer *event,
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint32_t remote_consumer_id

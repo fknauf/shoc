@@ -44,21 +44,17 @@ namespace doca {
 
         template<typename TaskType>
         compress_result(TaskType *task):
-            dst_ { compress_task_helpers<TaskType>::get_dst(task) },
             status_ { doca_task_get_status(compress_task_helpers<TaskType>::as_task(task)) },
             crc_cs_ { compress_task_helpers<TaskType>::get_crc_cs(task) },
             adler_cs_ { compress_task_helpers<TaskType>::get_adler_cs(task) }
         {
         }
 
-        auto &dst() { return dst_; }
-        auto const &dst() const { return dst_; }
         auto status() const { return status_; }
         auto crc_cs() const { return crc_cs_; }
         auto adler_cs() const { return adler_cs_; }
 
     private:
-        buffer dst_;
         std::uint32_t status_ = DOCA_ERROR_EMPTY;
         std::uint32_t crc_cs_ = 0;
         std::uint32_t adler_cs_ = 0;
@@ -150,7 +146,7 @@ namespace doca {
         }
 
         template<typename TaskType>
-        static auto task_completion_entry(
+        static auto task_completion_callback(
             TaskType *compress_task,
             doca_data task_user_data,
             [[maybe_unused]] doca_data ctx_user_data

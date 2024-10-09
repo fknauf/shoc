@@ -19,10 +19,10 @@ namespace doca {
 
         doca_data ctx_user_data = { .ptr = this };
         enforce_success(doca_ctx_set_user_data(ctx, ctx_user_data));
-        enforce_success(doca_ctx_set_state_changed_cb(ctx, &context::state_changed_entry));
+        enforce_success(doca_ctx_set_state_changed_cb(ctx, &context::state_changed_callback));
     }
 
-    auto context::state_changed_entry(
+    auto context::state_changed_callback(
         doca_data user_data,
         [[maybe_unused]] doca_ctx *ctx,
         doca_ctx_states prev_state,
@@ -33,7 +33,14 @@ namespace doca {
         assert(obj != nullptr);
 
         obj->current_state_ = next_state;
-        obj->state_changed(prev_state, next_state);
+
+        try {
+            obj->state_changed(prev_state, next_state);
+        } catch(std::exception &e) {
+            logger->error("state change event handler finished with error: {}", e.what());
+        } catch(...) {
+            logger->error("state change event handler finished with unknown error");
+        }
 
         if(next_state == DOCA_CTX_STATE_RUNNING) {
             logger->debug("context started");

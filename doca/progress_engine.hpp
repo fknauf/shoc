@@ -25,7 +25,7 @@ namespace doca {
      * In particular, as I understand it, tasks need to be submitted in the same thread that handles the
      * completion events (or at least when the program is certain no concurrent completion events are
      * possible, e.g. when offloading tasks sequentially).
-     * 
+     *
      * The progress engine acts as a parent for all contexts that are created through it and handles all
      * their events and their children's events. Upon destruction, the progress engine will stop all
      * dependent contexts and wait for their stoppage before winding down.
@@ -51,10 +51,8 @@ namespace doca {
          * @return number of completed tasks that were handled
          */
         [[nodiscard]]
-        auto progress() -> std::uint8_t;
-        auto wait(int timeout_ms = -1) -> void;
-
-        auto submit_task(doca_task *) -> void;
+        auto progress() const -> std::uint8_t;
+        auto wait(int timeout_ms = -1) const -> void;
 
         template<std::derived_from<context> Context, typename... Args>
         auto create_context(Args&&... args) {
@@ -66,12 +64,12 @@ namespace doca {
          * Main event-handling loop: Wait for events and process them until there are no more
          * active dependent contexts.
          */
-        auto main_loop() -> void;
+        auto main_loop() const -> void;
 
         /**
          * Main event-handling loop with a custom loop condition.
          */
-        auto main_loop_while(std::function<bool()> condition) -> void;
+        auto main_loop_while(std::function<bool()> condition) const -> void;
 
         auto connect(context *ctx) -> void;
         auto signal_stopped_child(context *ctx) -> void override;
@@ -81,8 +79,8 @@ namespace doca {
 
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
-        auto request_notification() -> void;
-        auto clear_notification() -> void;
+        auto request_notification() const -> void;
+        auto clear_notification() const -> void;
 
         unique_handle<doca_pe> handle_ { doca_pe_destroy };
         epoll_handle epoll_;

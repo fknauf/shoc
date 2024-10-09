@@ -94,26 +94,26 @@ namespace doca::comch {
         ) -> void override;
 
     private:
-        static auto send_completion_entry(
+        static auto send_completion_callback(
             doca_comch_task_send *task,
             doca_data task_user_data,
             doca_data ctx_user_data
         ) -> void;
 
-        static auto msg_recv_entry(
+        static auto msg_recv_callback(
             doca_comch_event_msg_recv *event,
             std::uint8_t *recv_buffer,
             std::uint32_t msg_len,
             doca_comch_connection *comch_connection
         ) -> void;
 
-        static auto new_consumer_entry(
+        static auto new_consumer_callback(
             doca_comch_event_consumer *event,
             doca_comch_connection *comch_connection,
             std::uint32_t remote_consumer_id
         ) -> void;
 
-        static auto expired_consumer_entry(
+        static auto expired_consumer_callback(
             doca_comch_event_consumer *event,
             doca_comch_connection *comch_connection,
             std::uint32_t remote_consumer_id

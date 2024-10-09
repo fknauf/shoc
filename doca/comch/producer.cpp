@@ -20,8 +20,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_producer_task_send_set_conf(
             handle_.handle(),
-            &producer::send_completion_entry,
-            &producer::send_completion_entry,
+            &producer::send_completion_callback,
+            &producer::send_completion_callback,
             max_tasks
         ));
     }
@@ -63,7 +63,7 @@ namespace doca::comch {
         return result;
     }
 
-    auto producer::send_completion_entry(
+    auto producer::send_completion_callback(
         doca_comch_producer_task_send *task,
         doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data

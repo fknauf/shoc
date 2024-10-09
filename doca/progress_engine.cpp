@@ -47,21 +47,21 @@ namespace doca {
         return event_handle;
     }
 
-    auto progress_engine::request_notification() -> void {
+    auto progress_engine::request_notification() const -> void {
         enforce_success(doca_pe_request_notification(handle_.handle()));
     }
 
-    auto progress_engine::clear_notification() -> void {
+    auto progress_engine::clear_notification() const -> void {
         // handle parameter not used in linux, according to doca sample doca_common/pe_event/pe_event_sample.c
         // in dev container 2.7.0
         enforce_success(doca_pe_clear_notification(handle_.handle(), 0));
     }
 
-    auto progress_engine::progress() -> std::uint8_t {
+    auto progress_engine::progress() const -> std::uint8_t {
         return doca_pe_progress(handle_.handle());
     }
 
-    auto progress_engine::wait(int timeout_ms) -> void {
+    auto progress_engine::wait(int timeout_ms) const -> void {
         request_notification();
         epoll_.wait(timeout_ms);
         clear_notification();
@@ -75,25 +75,6 @@ namespace doca {
         return num;
     }
 
-    auto progress_engine::submit_task(doca_task *task) -> void {
-        using namespace std::chrono_literals;
-
-        doca_error_t status;
-
-        do {
-            status = doca_task_submit(task);
-            if(status == DOCA_ERROR_AGAIN) {
-                logger->debug("failed to queue task, retrying...");
-                std::this_thread::sleep_for(100ms);
-            }
-        } while(status == DOCA_ERROR_AGAIN);
-
-        if(status != DOCA_SUCCESS) {
-            doca_task_free(task);
-            throw doca_exception(status);
-        }
-    }
-
     auto progress_engine::connect(context *ctx) -> void {
         enforce_success(doca_pe_connect_ctx(handle(), ctx->as_ctx()));
     }
@@ -102,13 +83,13 @@ namespace doca {
         connected_contexts_.remove_stopped_context(ctx);
     }
 
-    auto progress_engine::main_loop() -> void {
+    auto progress_engine::main_loop() const -> void {
         main_loop_while([this] {
             return !connected_contexts_.empty();
         });
     }
 
-    auto progress_engine::main_loop_while(std::function<bool()> condition) -> void {
+    auto progress_engine::main_loop_while(std::function<bool()> condition) const -> void {
         while(condition()) {
             request_notification();
             wait();

@@ -22,14 +22,14 @@ namespace doca {
         context::init_state_changed_callback();
         enforce_success(doca_compress_task_compress_deflate_set_conf(
             handle_.handle(),
-            &compress_context::task_completion_entry<doca_compress_task_compress_deflate>,
-            &compress_context::task_completion_entry<doca_compress_task_compress_deflate>,
+            &compress_context::task_completion_callback<doca_compress_task_compress_deflate>,
+            &compress_context::task_completion_callback<doca_compress_task_compress_deflate>,
             max_tasks
         ));
         enforce_success(doca_compress_task_decompress_deflate_set_conf(
             handle_.handle(),
-            &compress_context::task_completion_entry<doca_compress_task_decompress_deflate>,
-            &compress_context::task_completion_entry<doca_compress_task_decompress_deflate>,
+            &compress_context::task_completion_callback<doca_compress_task_decompress_deflate>,
+            &compress_context::task_completion_callback<doca_compress_task_decompress_deflate>,
             max_tasks
         ));
     }

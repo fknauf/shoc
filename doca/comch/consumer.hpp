@@ -15,7 +15,6 @@ namespace doca::comch {
     class consumer;
 
     struct consumer_recv_result {
-        buffer buf;
         std::span<std::uint8_t const> immediate;
         std::uint32_t producer_id = -1;
         doca_error_t status = DOCA_ERROR_EMPTY;
@@ -56,7 +55,7 @@ namespace doca::comch {
         auto post_recv(buffer dest) -> consumer_recv_awaitable;
 
     private:
-        static auto post_recv_task_completion_entry(
+        static auto post_recv_task_completion_callback(
             doca_comch_consumer_task_post_recv *task,
             doca_data task_user_data,
             doca_data ctx_user_data
