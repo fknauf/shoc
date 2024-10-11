@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -59,6 +60,11 @@ namespace doca {
         std::chrono::microseconds delay_;
     };
 
+    struct progress_engine_limits {
+        std::chrono::microseconds resubmission_delay = std::chrono::milliseconds(1);
+        int resubmission_attempts = 5;
+    };
+
     /**
      * RAII wrapper around a doca_pe (progress engine) handle. Manages its lifetime, can wait for
      * events with epoll.
@@ -79,7 +85,7 @@ namespace doca {
         friend class yield_awaitable;
         friend class timeout_awaitable;
 
-        progress_engine();
+        progress_engine(progress_engine_limits limits = {});
         ~progress_engine();
 
         auto stop() -> void;
@@ -121,7 +127,10 @@ namespace doca {
             return timeout_awaitable { this, delay };
         }
 
-        auto submit_task(doca_task *task, coro::error_receptable reportee) -> status_awaitable;
+        auto submit_task(
+            doca_task *task,
+            coro::error_receptable *reportee
+        ) -> void;
 
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
@@ -134,14 +143,14 @@ namespace doca {
 
         auto delayed_submission(
             doca_task *task,
-            coro::error_receptable *reportee,
-            std::chrono::microseconds delay,
-            int attempts
+            coro::error_receptable *reportee
         ) -> coro::fiber;
 
         auto process_trigger(int trigger_fd) -> void;
 
         unique_handle<doca_pe> handle_ { doca_pe_destroy };
+        progress_engine_limits limits_;
+
         event_counter yield_counter_;
         std::queue<std::coroutine_handle<>> pending_yielders_;
         std::unordered_map<int, detail::coro_timeout> timeout_waiters_;

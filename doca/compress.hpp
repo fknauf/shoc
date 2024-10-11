@@ -133,14 +133,7 @@ namespace doca {
             ));
 
             auto base_task = compress_task_helpers<TaskType>::as_task(compress_task);
-            auto err = doca_task_submit(base_task);
-
-            if(err != DOCA_SUCCESS) {
-                doca_task_free(base_task);
-                throw doca_exception(err);
-            } else {
-                doca_buf_inc_refcount(dest.handle(), nullptr);
-            }
+            engine()->submit_task(base_task, result.dest.get());
 
             return result;
         }

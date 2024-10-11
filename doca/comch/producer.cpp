@@ -52,13 +52,7 @@ namespace doca::comch {
         auto base_task = doca_comch_producer_task_send_as_task(task);
         doca_task_set_user_data(base_task, task_user_data);
 
-        if(
-            auto err = doca_task_submit(base_task);
-            err != DOCA_SUCCESS
-        ) {
-            doca_task_free(base_task);
-            result.dest->value = err;
-        }
+        engine()->submit_task(base_task, result.dest.get());
 
         return result;
     }

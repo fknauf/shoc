@@ -105,12 +105,7 @@ namespace doca::comch {
         doca_task_set_user_data(doca_comch_task_send_as_task(task), task_user_data);
 
         auto base_task = doca_comch_task_send_as_task(task);
-        auto err = doca_task_submit(base_task);
-
-        if(err != DOCA_SUCCESS) {
-            doca_task_free(base_task);
-            return status_awaitable::from_value(std::move(err));
-        }
+        engine()->submit_task(base_task, result.dest.get());
 
         return result;
     }

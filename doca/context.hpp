@@ -124,6 +124,11 @@ namespace doca {
          */
         [[nodiscard]]
         auto engine() -> progress_engine* override {
+            return static_cast<context const*>(this)->engine();
+        }
+
+        [[nodiscard]]
+        auto engine() const -> progress_engine* {
             return parent_->engine();
         }
 

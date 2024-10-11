@@ -1,6 +1,8 @@
 #include "dma.hpp"
 #include "error.hpp"
 
+#include <doca/progress_engine.hpp>
+
 #include <doca_pe.h>
 
 #include <cassert>
@@ -46,14 +48,7 @@ namespace doca {
         ));
 
         auto base_task = doca_dma_task_memcpy_as_task(task);
-
-        if(
-            auto err = doca_task_submit(base_task);
-            err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS
-        ) {
-            doca_task_free(base_task);
-            throw doca_exception(err);
-        }
+        engine()->submit_task(base_task, result.dest.get());
 
         return result;
     }
