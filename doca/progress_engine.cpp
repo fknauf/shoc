@@ -18,6 +18,7 @@ namespace doca {
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
         epoll_.add_event_source(notification_handle());
+        epoll_.add_event_source(yield_counter_.eventfd());
     }
 
     progress_engine::~progress_engine() {
@@ -28,12 +29,8 @@ namespace doca {
         logger->debug("~pe: Waiting for contexts to stop...");
 
         while(!connected_contexts_.empty()) {
-            request_notification();
-            wait(10);
-            clear_notification();
-            while(progress() > 0) {
-                // do nothing
-            }
+            auto trigger_fd = wait(10);
+            process_trigger(trigger_fd);
 
             logger->debug("~pe: {} contexts still running.", connected_contexts_.size());
         }
@@ -57,21 +54,9 @@ namespace doca {
         enforce_success(doca_pe_clear_notification(handle_.handle(), 0));
     }
 
-    auto progress_engine::progress() const -> std::uint8_t {
-        return doca_pe_progress(handle_.handle());
-    }
-
-    auto progress_engine::wait(int timeout_ms) const -> void {
-        request_notification();
-        epoll_.wait(timeout_ms);
-        clear_notification();
-    }
-
     auto progress_engine::inflight_tasks() const -> std::size_t {
         std::size_t num;
-
         enforce_success(doca_pe_get_num_inflight_tasks(handle_.handle(), &num));
-
         return num;
     }
 
@@ -83,20 +68,72 @@ namespace doca {
         connected_contexts_.remove_stopped_context(ctx);
     }
 
-    auto progress_engine::main_loop() const -> void {
+    auto progress_engine::wait(int timeout_ms) const -> int {
+        request_notification();
+        auto trigger = epoll_.wait(timeout_ms);
+        clear_notification();
+        return trigger;
+    }
+
+    auto progress_engine::process_trigger(int trigger_fd) -> void {
+        auto timer_it = timeout_waiters_.find(trigger_fd);
+
+        // timers take priority to ensure timely execution (as much as
+        // possible, i.e. no guarantees but reasonable effort)
+        if(timer_it != timeout_waiters_.end()) {
+            auto waiter = timer_it->second.waiter;
+            timeout_waiters_.erase(timer_it);
+            waiter.resume();
+            return;
+        }
+
+        while(doca_pe_progress(handle_.handle()) > 0) {
+            // do nothing; progress() calls the event handlers.
+        }
+
+        // yielders do not take priority.
+        if(trigger_fd == yield_counter_.eventfd()) {
+            auto triggers_left = yield_counter_.pop();
+
+            while(triggers_left > 0 && !pending_yielders_.empty()) {
+                auto coro = pending_yielders_.front();
+                pending_yielders_.pop();
+                coro.resume();
+            }
+        }
+    }
+
+    auto progress_engine::main_loop() -> void {
         main_loop_while([this] {
             return !connected_contexts_.empty();
         });
     }
 
-    auto progress_engine::main_loop_while(std::function<bool()> condition) const -> void {
+    auto progress_engine::main_loop_while(std::function<bool()> condition) -> void {
         while(condition()) {
-            request_notification();
-            wait();
-            clear_notification();
-            while(progress() > 0) {
-                // do nothing
-            }
+            auto trigger = wait();
+            process_trigger(trigger);
         }
+    }
+
+    auto progress_engine::push_yielding_coroutine(std::coroutine_handle<> yielder) -> void {
+        pending_yielders_.push(yielder);
+        yield_counter_.increase();
+    }
+
+    auto progress_engine::push_waiting_coroutine(std::coroutine_handle<> waiter, std::chrono::microseconds delay) -> void {
+        auto new_timer = duration_timer { delay };
+        auto fd = new_timer.timerfd();
+
+        timeout_waiters_[fd] = detail::coro_timeout { std::move(new_timer), waiter };
+        epoll_.add_event_source(fd);
+    }
+
+    auto yield_awaitable::await_suspend(std::coroutine_handle<> yielder) const -> void {
+        engine_->push_yielding_coroutine(yielder);
+    }
+
+    auto timeout_awaitable::await_suspend(std::coroutine_handle<> waiter) const -> void {
+        engine_->push_waiting_coroutine(waiter, delay_);
     }
 }

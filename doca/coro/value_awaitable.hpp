@@ -12,6 +12,13 @@
 #include <variant>
 
 namespace doca::coro {
+    struct error_receptable {
+        virtual ~error_receptable() = default;
+
+        virtual auto set_exception(std::exception_ptr ex) -> void = 0;
+        virtual auto set_error(doca_error_t err) -> void = 0;
+    };
+
     /**
      * Meeting point for waiting coroutines and result-providing event callbacks.
      *
@@ -22,20 +29,30 @@ namespace doca::coro {
      * used by value_awaitable.
      */
     template<typename T>
-    struct receptable {
+    struct receptable:
+        public error_receptable
+    {
         std::variant<std::monostate, std::exception_ptr, T> value;
         std::coroutine_handle<> coro_handle;
+
+        receptable() = default;
+        receptable(T &&val):
+            value { std::move(val) }
+        {}
+        receptable(std::exception_ptr ex):
+            value { ex }
+        {}
 
         template<typename... Args>
         auto emplace_value(Args &&...args) {
             value.template emplace<T>(std::forward<Args>(args)...);
         }
 
-        auto set_exception(std::exception_ptr ex) {
+        auto set_exception(std::exception_ptr ex) -> void override {
             value = ex;
         }
 
-        auto set_error(doca_error_t err) {
+        auto set_error(doca_error_t err) -> void override {
             value = std::make_exception_ptr(doca_exception { err });
         }
 
@@ -72,14 +89,14 @@ namespace doca::coro {
          * create a value_awaitable from an existing value (so that coroutines will not have to wait)
          */
         static auto from_value(T &&val) {
-            return value_awaitable(std::make_unique<payload_type>(std::move(val), nullptr));
+            return value_awaitable(std::make_unique<payload_type>(std::move(val)));
         }
 
         /**
          * Create a value_awaitable that will throw an exception upon value retrieval
          */
         static auto from_exception(std::exception_ptr ex) {
-            return value_awaitable(std::make_unique<payload_type>(ex, nullptr));
+            return value_awaitable(std::make_unique<payload_type>(ex));
         }
 
         /**

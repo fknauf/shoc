@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <chrono>
+#include <unordered_map>
 #include <utility>
 
 namespace doca {
@@ -72,6 +73,7 @@ namespace doca {
 
     class duration_timer {
     public:
+        duration_timer() = default;
         duration_timer(std::chrono::microseconds us);
 
         auto pop() -> std::uint64_t;

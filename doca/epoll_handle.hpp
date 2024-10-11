@@ -21,8 +21,9 @@ namespace doca {
         auto close() -> void;
         auto add_event_source(int event_fd) -> void;
 
+        [[nodiscard]]
         auto wait(int timeout_ms = -1) const -> int;
-    
+
     private:
         int fd_ = -1;
     };

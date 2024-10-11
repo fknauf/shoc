@@ -1,21 +1,63 @@
 #pragma once
 
+#include "common/status.hpp"
 #include "context.hpp"
+#include "coro/fiber.hpp"
+#include "coro/value_awaitable.hpp"
 #include "epoll_handle.hpp"
 #include "error.hpp"
+#include "event_sources.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_pe.h>
 
+#include <chrono>
 #include <concepts>
+#include <coroutine>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <queue>
 #include <utility>
 #include <vector>
 
 namespace doca {
-    class progress_engine;
+    namespace detail {
+        struct coro_timeout {
+            duration_timer timer;
+            std::coroutine_handle<> waiter;
+        };
+    }
+
+    class yield_awaitable:
+        public std::suspend_always
+    {
+    public:
+        yield_awaitable(progress_engine *engine):
+            engine_ { engine }
+        {}
+
+        auto await_suspend(std::coroutine_handle<> yielder) const -> void;
+
+    private:
+        progress_engine *engine_;
+    };
+
+    class timeout_awaitable:
+        public std::suspend_always
+    {
+    public:
+        timeout_awaitable(progress_engine *engine, std::chrono::microseconds delay):
+            engine_ { engine },
+            delay_ { delay }
+        {}
+
+        auto await_suspend(std::coroutine_handle<> waiter) const -> void;
+
+    private:
+        progress_engine *engine_;
+        std::chrono::microseconds delay_;
+    };
 
     /**
      * RAII wrapper around a doca_pe (progress engine) handle. Manages its lifetime, can wait for
@@ -34,6 +76,9 @@ namespace doca {
         public context_parent
     {
     public:
+        friend class yield_awaitable;
+        friend class timeout_awaitable;
+
         progress_engine();
         ~progress_engine();
 
@@ -45,15 +90,6 @@ namespace doca {
         [[nodiscard]] auto handle() const { return handle_.handle(); }
         [[nodiscard]] auto inflight_tasks() const -> std::size_t;
 
-        /**
-         * Process events for completed tasks.
-         *
-         * @return number of completed tasks that were handled
-         */
-        [[nodiscard]]
-        auto progress() const -> std::uint8_t;
-        auto wait(int timeout_ms = -1) const -> void;
-
         template<std::derived_from<context> Context, typename... Args>
         auto create_context(Args&&... args) {
             logger->trace("pe create_context this = {}", static_cast<void*>(this));
@@ -64,12 +100,12 @@ namespace doca {
          * Main event-handling loop: Wait for events and process them until there are no more
          * active dependent contexts.
          */
-        auto main_loop() const -> void;
+        auto main_loop() -> void;
 
         /**
          * Main event-handling loop with a custom loop condition.
          */
-        auto main_loop_while(std::function<bool()> condition) const -> void;
+        auto main_loop_while(std::function<bool()> condition) -> void;
 
         auto connect(context *ctx) -> void;
         auto signal_stopped_child(context *ctx) -> void override;
@@ -77,12 +113,38 @@ namespace doca {
             return this;
         }
 
+        auto yield() {
+            return yield_awaitable { this };
+        }
+
+        auto timeout(std::chrono::microseconds delay) {
+            return timeout_awaitable { this, delay };
+        }
+
+        auto submit_task(doca_task *task, coro::error_receptable reportee) -> status_awaitable;
+
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
         auto request_notification() const -> void;
         auto clear_notification() const -> void;
+        auto wait(int timeout_ms = -1) const -> int;
+
+        auto push_yielding_coroutine(std::coroutine_handle<> yielder) -> void;
+        auto push_waiting_coroutine(std::coroutine_handle<> waiter, std::chrono::microseconds delay) -> void;
+
+        auto delayed_submission(
+            doca_task *task,
+            coro::error_receptable *reportee,
+            std::chrono::microseconds delay,
+            int attempts
+        ) -> coro::fiber;
+
+        auto process_trigger(int trigger_fd) -> void;
 
         unique_handle<doca_pe> handle_ { doca_pe_destroy };
+        event_counter yield_counter_;
+        std::queue<std::coroutine_handle<>> pending_yielders_;
+        std::unordered_map<int, detail::coro_timeout> timeout_waiters_;
         epoll_handle epoll_;
         dependent_contexts<context> connected_contexts_;
     };
