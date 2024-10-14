@@ -15,12 +15,12 @@
 #define CO_FAIL(message) do { *report = (message); co_return; } while(false)
 #define CO_ASSERT(condition, message) do { if(!(condition)) { CO_FAIL(message); } } while(false)
 
-#define CO_ASSERT_EQ(val1, val2, message) CO_ASSERT((val1) == (val2), message);
-#define CO_ASSERT_NE(val1, val2, message) CO_ASSERT((val1) != (val2), message);
-#define CO_ASSERT_LT(val1, val2, message) CO_ASSERT((val1) <  (val2), message);
-#define CO_ASSERT_LE(val1, val2, message) CO_ASSERT((val1) <= (val2), message);
-#define CO_ASSERT_GT(val1, val2, message) CO_ASSERT((val1) >  (val2), message);
-#define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message);
+#define CO_ASSERT_EQ(val1, val2, message) CO_ASSERT((val1) == (val2), message)
+#define CO_ASSERT_NE(val1, val2, message) CO_ASSERT((val1) != (val2), message)
+#define CO_ASSERT_LT(val1, val2, message) CO_ASSERT((val1) <  (val2), message)
+#define CO_ASSERT_LE(val1, val2, message) CO_ASSERT((val1) <= (val2), message)
+#define CO_ASSERT_GT(val1, val2, message) CO_ASSERT((val1) >  (val2), message)
+#define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_compress, single_shot) {
     auto engine = doca::progress_engine {};

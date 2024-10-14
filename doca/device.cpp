@@ -116,7 +116,7 @@ namespace doca {
     }
 
     auto device::find_by_pci_addr(std::string const &pci_addr, std::initializer_list<device_capability> required_caps) -> device {
-        for(auto dev : device_list()) {
+        for(auto dev : device_list{}) {
             std::uint8_t is_addr_equal = 0;
             auto err = doca_devinfo_is_equal_pci_addr(dev, pci_addr.c_str(), &is_addr_equal);
 
