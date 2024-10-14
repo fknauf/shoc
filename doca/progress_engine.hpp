@@ -115,14 +115,18 @@ namespace doca {
 
         auto connect(context *ctx) -> void;
         auto signal_stopped_child(context *ctx) -> void override;
+
+        [[nodiscard]]
         auto engine() -> progress_engine* override {
             return this;
         }
 
+        [[nodiscard]]
         auto yield() {
             return yield_awaitable { this };
         }
 
+        [[nodiscard]]
         auto timeout(std::chrono::microseconds delay) {
             return timeout_awaitable { this, delay };
         }

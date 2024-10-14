@@ -37,11 +37,13 @@ TEST(docapp_event_sources, epoll_eventfd) {
 }
 
 TEST(docapp_event_sources, epoll_timerfd) {
+    using namespace std::chrono_literals;
+
     auto epoll = doca::epoll_handle{};
 
-    auto timer1 = doca::duration_timer{ std::chrono::milliseconds(50) };
-    auto timer2 = doca::duration_timer{ std::chrono::milliseconds(100) };
-    auto timer3 = doca::duration_timer{ std::chrono::milliseconds(150) };
+    auto timer1 = doca::duration_timer{ 50ms };
+    auto timer2 = doca::duration_timer{ 100ms };
+    auto timer3 = doca::duration_timer{ 150ms };
 
     epoll.add_event_source(timer2.timerfd());
     epoll.add_event_source(timer3.timerfd());
@@ -65,12 +67,14 @@ TEST(docapp_event_sources, epoll_timerfd) {
 }
 
 TEST(docapp_event_sources, combined_sources) {
+    using namespace std::chrono_literals;
+
     auto epoll = doca::epoll_handle{};
 
     auto eventfd_source = doca::event_counter{};
-    auto timer1 = doca::duration_timer{ std::chrono::milliseconds(50) };
-    auto timer2 = doca::duration_timer{ std::chrono::milliseconds(100) };
-    auto timer3 = doca::duration_timer{ std::chrono::milliseconds(150) };
+    auto timer1 = doca::duration_timer{ 50ms };
+    auto timer2 = doca::duration_timer{ 100ms };
+    auto timer3 = doca::duration_timer{ 150ms };
 
     epoll.add_event_source(eventfd_source.eventfd());
     epoll.add_event_source(timer2.timerfd());

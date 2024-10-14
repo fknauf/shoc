@@ -101,6 +101,7 @@ executable('test-docapp',
         [
                 'tests/coro/group_value_awaitable.cpp',
                 'tests/group_compress.cpp',
+                'tests/group_engine.cpp',
                 'tests/group_event_sources.cpp'
         ],
         dependencies : deps + [ dependency('gtest', main: true) ],

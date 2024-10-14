@@ -101,13 +101,17 @@ namespace doca {
                 auto coro = pending_yielders_.front();
                 pending_yielders_.pop();
                 coro.resume();
+                --triggers_left;
             }
         }
     }
 
     auto progress_engine::main_loop() -> void {
         main_loop_while([this] {
-            return !connected_contexts_.empty();
+            return
+                !connected_contexts_.empty() ||
+                !timeout_waiters_.empty() ||
+                !pending_yielders_.empty();
         });
     }
 
@@ -127,7 +131,7 @@ namespace doca {
         auto new_timer = duration_timer { delay };
         auto fd = new_timer.timerfd();
 
-        timeout_waiters_[fd] = detail::coro_timeout { std::move(new_timer), waiter };
+        timeout_waiters_.insert(std::make_pair(fd, detail::coro_timeout { std::move(new_timer), waiter }));
         epoll_.add_event_source(fd);
     }
 
