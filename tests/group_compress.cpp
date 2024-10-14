@@ -12,13 +12,8 @@
 #include <string>
 #include <vector>
 
-#define CO_ASSERT(condition, message) \
-    do { \
-        if(!(condition)) { \
-            *report = (message); \
-            co_return; \
-        } \
-    } while (false)
+#define CO_FAIL(message) do { *report = (message); co_return; } while(false)
+#define CO_ASSERT(condition, message) do { if(!(condition)) { CO_FAIL(message); } } while(false)
 
 #define CO_ASSERT_EQ(val1, val2, message) CO_ASSERT((val1) == (val2), message);
 #define CO_ASSERT_NE(val1, val2, message) CO_ASSERT((val1) != (val2), message);
@@ -65,9 +60,9 @@ TEST(docapp_compress, single_shot) {
             CO_ASSERT_EQ(DOCA_SUCCESS, decompressed.status(), std::string { "decompression failed: " } + doca_error_get_descr(decompressed.status()));
             CO_ASSERT(std::ranges::equal(src_data, decompressed_buf.data()), "decompressed data is different from source data");
         } catch(std::exception &ex) {
-            *report = ex.what();
+            CO_FAIL(ex.what());
         } catch(...) {
-            *report = "unknown error";
+            CO_FAIL("unknown error");
         }
     } (
         &engine,
