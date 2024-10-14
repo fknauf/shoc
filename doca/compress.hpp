@@ -55,7 +55,7 @@ namespace doca {
         auto adler_cs() const { return adler_cs_; }
 
     private:
-        std::uint32_t status_ = DOCA_ERROR_EMPTY;
+        doca_error_t status_ = DOCA_ERROR_EMPTY;
         std::uint32_t crc_cs_ = 0;
         std::uint32_t adler_cs_ = 0;
     };
