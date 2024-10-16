@@ -1,5 +1,6 @@
 #pragma once
 
+#include <doca/common/status.hpp>
 #include <doca/coro/value_awaitable.hpp>
 
 #include <cstdint>
@@ -12,7 +13,6 @@
 namespace doca::comch {
     using message = std::string;
 
-    using status_awaitable = coro::value_awaitable<doca_error_t>;
     using message_awaitable = coro::value_awaitable<message>;
     using id_awaitable = coro::value_awaitable<std::uint32_t>;
 
