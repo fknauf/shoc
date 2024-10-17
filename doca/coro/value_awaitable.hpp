@@ -1,5 +1,6 @@
 #pragma once
 
+#include "error_receptable.hpp"
 #include "overload.hpp"
 
 #include <doca/error.hpp>
@@ -12,13 +13,6 @@
 #include <variant>
 
 namespace doca::coro {
-    struct error_receptable {
-        virtual ~error_receptable() = default;
-
-        virtual auto set_exception(std::exception_ptr ex) -> void = 0;
-        virtual auto set_error(doca_error_t err) -> void = 0;
-    };
-
     /**
      * Meeting point for waiting coroutines and result-providing event callbacks.
      *
@@ -29,17 +23,17 @@ namespace doca::coro {
      * used by value_awaitable.
      */
     template<typename T>
-    struct receptable:
+    struct value_receptable:
         public error_receptable
     {
         std::variant<std::monostate, std::exception_ptr, T> value;
         std::coroutine_handle<> coro_handle;
 
-        receptable() = default;
-        receptable(T &&val):
+        value_receptable() = default;
+        value_receptable(T &&val):
             value { std::move(val) }
         {}
-        receptable(std::exception_ptr ex):
+        value_receptable(std::exception_ptr ex):
             value { ex }
         {}
 
@@ -68,7 +62,7 @@ namespace doca::coro {
      */
     template<typename T>
     struct [[nodiscard]] value_awaitable {
-        using payload_type = receptable<T>;
+        using payload_type = value_receptable<T>;
 
         std::unique_ptr<payload_type> dest;
 
@@ -79,7 +73,7 @@ namespace doca::coro {
         {}
 
         /**
-         * Create a value_awaitable referencing an empty receptable.
+         * Create a value_awaitable referencing an empty value_receptable.
          */
         static auto create_space() {
             return value_awaitable { std::make_unique<payload_type>() } ;

@@ -37,7 +37,9 @@ namespace doca {
         doca_dma_task_memcpy *task = nullptr;
 
         auto result = status_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result.dest.get() };
+        auto receptable = result.receptable_ptr();
+
+        doca_data task_user_data = { .ptr = receptable };
 
         enforce_success(doca_dma_task_memcpy_alloc_init(
             handle_.handle(),
@@ -48,7 +50,7 @@ namespace doca {
         ));
 
         auto base_task = doca_dma_task_memcpy_as_task(task);
-        engine()->submit_task(base_task, result.dest.get());
+        engine()->submit_task(base_task, receptable);
 
         return result;
     }

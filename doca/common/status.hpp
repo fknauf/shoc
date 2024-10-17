@@ -1,6 +1,6 @@
 #pragma once
 
-#include <doca/coro/value_awaitable.hpp>
+#include <doca/coro/status_awaitable.hpp>
 
 #include <cassert>
 #include <cstdint>
@@ -9,7 +9,7 @@
 #include <doca_pe.h>
 
 namespace doca {
-    using status_awaitable = coro::value_awaitable<doca_error_t>;
+    using coro::status_awaitable;
 
     template<typename TaskType, doca_task* (*AsTask)(TaskType *)>
     auto plain_status_callback_function(
@@ -17,8 +17,6 @@ namespace doca {
         doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data
     ) {
-        logger->debug("plain status callback");
-
         assert(task_user_data.ptr != nullptr);
 
         auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);

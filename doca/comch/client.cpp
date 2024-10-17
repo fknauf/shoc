@@ -1,5 +1,6 @@
 #include "client.hpp"
 
+#include <doca/common/status.hpp>
 #include <doca/logger.hpp>
 
 #include <doca_pe.h>
@@ -24,8 +25,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_client_task_send_set_conf(
             handle_.handle(),
-            &client::send_completion_callback,
-            &client::send_completion_callback,
+            &plain_status_callback_function<doca_comch_task_send, doca_comch_task_send_as_task>,
+            &plain_status_callback_function<doca_comch_task_send, doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_client_event_msg_recv_register(
@@ -98,35 +99,22 @@ namespace doca::comch {
         doca_comch_task_send *task;
 
         auto result = status_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result.dest.get() };
+        auto receptable = result.receptable_ptr();
+
+        doca_data task_user_data = { .ptr = receptable };
 
         enforce_success(doca_comch_client_get_connection(handle_.handle(), &connection));
         enforce_success(doca_comch_client_task_send_alloc_init(handle_.handle(), connection, message.data(), message.size(), &task));
         doca_task_set_user_data(doca_comch_task_send_as_task(task), task_user_data);
 
         auto base_task = doca_comch_task_send_as_task(task);
-        engine()->submit_task(base_task, result.dest.get());
+        engine()->submit_task(base_task, receptable);
 
         return result;
     }
 
     auto client::msg_recv() -> message_awaitable {
         return message_queues_.accept();
-    }
-
-    auto client::send_completion_callback(
-        [[maybe_unused]] doca_comch_task_send *task,
-        [[maybe_unused]] doca_data task_user_data,
-        [[maybe_unused]] doca_data ctx_user_data
-    ) -> void {
-        auto base_task = doca_comch_task_send_as_task(task);
-        auto status = doca_task_get_status(base_task);
-
-        doca_task_free(base_task);
-
-        auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
-        dest->emplace_value(status);
-        dest->resume();
     }
 
     auto client::msg_recv_callback(

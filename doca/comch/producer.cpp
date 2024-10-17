@@ -1,5 +1,6 @@
 #include "producer.hpp"
 
+#include <doca/common/status.hpp>
 #include <doca/logger.hpp>
 
 #include <cassert>
@@ -20,8 +21,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_producer_task_send_set_conf(
             handle_.handle(),
-            &producer::send_completion_callback,
-            &producer::send_completion_callback,
+            &plain_status_callback_function<doca_comch_producer_task_send, &doca_comch_producer_task_send_as_task>,
+            &plain_status_callback_function<doca_comch_producer_task_send, &doca_comch_producer_task_send_as_task>,
             max_tasks
         ));
     }
@@ -38,7 +39,9 @@ namespace doca::comch {
         doca_comch_producer_task_send *task = nullptr;
 
         auto result = status_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result.dest.get() };
+        auto receptable = result.receptable_ptr();
+
+        doca_data task_user_data = { .ptr = receptable };
 
         enforce_success(doca_comch_producer_task_send_alloc_init(
             handle_.handle(),
@@ -52,23 +55,8 @@ namespace doca::comch {
         auto base_task = doca_comch_producer_task_send_as_task(task);
         doca_task_set_user_data(base_task, task_user_data);
 
-        engine()->submit_task(base_task, result.dest.get());
+        engine()->submit_task(base_task, receptable);
 
         return result;
-    }
-
-    auto producer::send_completion_callback(
-        doca_comch_producer_task_send *task,
-        doca_data task_user_data,
-        [[maybe_unused]] doca_data ctx_user_data
-    ) -> void {
-        auto base_task = doca_comch_producer_task_send_as_task(task);
-        auto status = doca_task_get_status(base_task);
-
-        doca_task_free(base_task);
-
-        auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
-        dest->value = status;
-        dest->resume();
     }
 }

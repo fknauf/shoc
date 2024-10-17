@@ -1,4 +1,6 @@
 #include "server.hpp"
+
+#include <doca/common/status.hpp>
 #include <doca/logger.hpp>
 
 #include <doca_pe.h>
@@ -40,7 +42,9 @@ namespace doca::comch {
         doca_comch_task_send *send_task;
 
         auto result = status_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result.dest.get() };
+        auto receptable = result.receptable_ptr();
+
+        doca_data task_user_data = { .ptr = receptable };
 
         enforce_success(doca_comch_server_task_send_alloc_init(
             ctx_->handle(),
@@ -53,7 +57,7 @@ namespace doca::comch {
         auto task = doca_comch_task_send_as_task(send_task);
         doca_task_set_user_data(task, task_user_data);
 
-        engine()->submit_task(task, result.dest.get());
+        engine()->submit_task(task, receptable);
 
         return result;
     }
@@ -164,8 +168,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_server_task_send_set_conf(
             handle_.handle(),
-            &server::send_completion_callback,
-            &server::send_completion_callback,
+            &plain_status_callback_function<doca_comch_task_send, doca_comch_task_send_as_task>,
+            &plain_status_callback_function<doca_comch_task_send, doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_server_event_msg_recv_register(
@@ -298,21 +302,6 @@ namespace doca::comch {
         } else {
             logger->warn("comch server received disconnection event for unknown server_connection {}", static_cast<void*>(comch_connection));
         }
-    }
-
-    auto server::send_completion_callback(
-        doca_comch_task_send *task,
-        [[maybe_unused]] doca_data task_user_data,
-        [[maybe_unused]] doca_data ctx_user_data
-    ) -> void {
-        auto base_task = doca_comch_task_send_as_task(task);
-        auto status = doca_task_get_status(base_task);
-
-        doca_task_free(base_task);
-
-        auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
-        dest->emplace_value(status);
-        dest->resume();
     }
 
     auto server::msg_recv_callback(

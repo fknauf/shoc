@@ -91,7 +91,7 @@ namespace doca::comch {
 
     private:
         std::queue<Payload> pending_data_;
-        std::queue<coro::receptable<ScopeWrapper>*> pending_accepters_;
+        std::queue<coro::value_receptable<ScopeWrapper>*> pending_accepters_;
         bool disconnected_ = false;
     };
 }

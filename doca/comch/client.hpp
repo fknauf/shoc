@@ -94,12 +94,6 @@ namespace doca::comch {
         ) -> void override;
 
     private:
-        static auto send_completion_callback(
-            doca_comch_task_send *task,
-            doca_data task_user_data,
-            doca_data ctx_user_data
-        ) -> void;
-
         static auto msg_recv_callback(
             doca_comch_event_msg_recv *event,
             std::uint8_t *recv_buffer,
