@@ -49,15 +49,19 @@ TEST(docapp_compress, single_shot) {
             auto decompressed_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_mid, dst_data.end() });
 
             auto ctx = co_await engine->create_context<doca::compress_context>(dev, 1);
-            auto compressed = co_await ctx->compress(src_buf, compressed_buf);
 
-            CO_ASSERT_EQ(DOCA_SUCCESS, compressed.status(), std::string { "compression failed: " } + doca_error_get_descr(compressed.status()));
+            auto checksums = doca::compress_checksums {};
+            auto compress_status = co_await ctx->compress(src_buf, compressed_buf, &checksums);
+
+            CO_ASSERT_EQ(DOCA_SUCCESS, compress_status, std::string { "compression failed: " } + doca_error_get_descr(compress_status));
             CO_ASSERT_GT(compressed_buf.data().size(), 0, "compressed data is empty");
             CO_ASSERT_LT(compressed_buf.data().size(), src_data.size(), "compressed data is larger than source data");
+            CO_ASSERT_EQ(checksums.crc, 4025347724, fmt::format("unexpected crc checksum during compression, crc = {}", checksums.crc));
+            CO_ASSERT_EQ(checksums.adler, 2629515667, fmt::format("unexpected adler checksum during compression, adler = {}", checksums.adler));
 
-            auto decompressed = co_await ctx->decompress(compressed_buf, decompressed_buf);
+            auto decompress_status = co_await ctx->decompress(compressed_buf, decompressed_buf);
 
-            CO_ASSERT_EQ(DOCA_SUCCESS, decompressed.status(), std::string { "decompression failed: " } + doca_error_get_descr(decompressed.status()));
+            CO_ASSERT_EQ(DOCA_SUCCESS, decompress_status, std::string { "decompression failed: " } + doca_error_get_descr(decompress_status));
             CO_ASSERT(std::ranges::equal(src_data, decompressed_buf.data()), "decompressed data is different from source data");
         } catch(std::exception &ex) {
             CO_FAIL(ex.what());

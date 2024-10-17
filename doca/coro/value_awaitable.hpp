@@ -101,14 +101,11 @@ namespace doca::coro {
         }
 
         auto await_ready() const noexcept -> bool {
-            logger->trace("{}", __PRETTY_FUNCTION__);
             // no need to wait if the value is already there.
             return !std::holds_alternative<std::monostate>(dest->value);
         }
 
         auto await_suspend(std::coroutine_handle<> handle) {
-            logger->trace("{}, handle = {}", __PRETTY_FUNCTION__, handle.address());
-
             // this awaiter might be moved around a bit, but co_await should only ever be called
             // on the instance with the value.
             if(dest == nullptr) {

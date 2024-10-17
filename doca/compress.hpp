@@ -2,7 +2,7 @@
 
 #include "buffer.hpp"
 #include "context.hpp"
-#include "coro/value_awaitable.hpp"
+#include "coro/status_awaitable.hpp"
 #include "device.hpp"
 #include "logger.hpp"
 #include "progress_engine.hpp"
@@ -36,31 +36,22 @@ namespace doca {
     };
 
     /**
-     * Result of a compression operation: compressed data, checksums, status
+     * Additional results of a compression operation, i.e. checksums
      */
-    class compress_result {
-    public:
-        compress_result() = default;
+    struct compress_checksums {
+        std::uint32_t crc = 0;
+        std::uint32_t adler = 0;
+
+        compress_checksums() = default;
 
         template<typename TaskType>
-        compress_result(TaskType *task):
-            status_ { doca_task_get_status(compress_task_helpers<TaskType>::as_task(task)) },
-            crc_cs_ { compress_task_helpers<TaskType>::get_crc_cs(task) },
-            adler_cs_ { compress_task_helpers<TaskType>::get_adler_cs(task) }
-        {
-        }
-
-        auto status() const { return status_; }
-        auto crc_cs() const { return crc_cs_; }
-        auto adler_cs() const { return adler_cs_; }
-
-    private:
-        doca_error_t status_ = DOCA_ERROR_EMPTY;
-        std::uint32_t crc_cs_ = 0;
-        std::uint32_t adler_cs_ = 0;
+        compress_checksums(TaskType *task):
+            crc { compress_task_helpers<TaskType>::get_crc_cs(task) },
+            adler { compress_task_helpers<TaskType>::get_adler_cs(task) }
+        {}
     };
 
-    using compress_awaitable = coro::value_awaitable<compress_result>;
+    using compress_awaitable = coro::status_awaitable<compress_checksums>;
 
     /**
      * Context for compression tasks.
@@ -86,11 +77,16 @@ namespace doca {
          *
          * @param src source data buffer
          * @param dest destination data buffer
-         * @return a future that will be completed when the tasks completes
+         * @param checksums optional pointer to a struct that'll accept checksums
+         * @return a status awaitable that will be completed when the tasks completes
          */
-        auto compress(buffer const &src, buffer &dest) {
+        auto compress(
+            buffer const &src,
+            buffer &dest,
+            compress_checksums *checksums = nullptr
+        ) {
             logger->trace("{} start", __PRETTY_FUNCTION__);
-            return submit_task<doca_compress_task_compress_deflate>(src, dest);
+            return submit_task<doca_compress_task_compress_deflate>(src, dest, checksums);
         }
 
         /**
@@ -99,11 +95,16 @@ namespace doca {
          *
          * @param src source data buffer
          * @param dest destination data buffer
-         * @return a future that will be completed when the tasks completes
+         * @param checksums optional pointer to a struct that'll accept checksums
+         * @return a status awaitable that will be completed when the tasks completes
          */
-        auto decompress(buffer const &src, buffer &dest) {
+        auto decompress(
+            buffer const &src,
+            buffer &dest,
+            compress_checksums *checksums = nullptr
+        ) {
             logger->trace("{} start", __PRETTY_FUNCTION__);
-            return submit_task<doca_compress_task_decompress_deflate>(src, dest);
+            return submit_task<doca_compress_task_decompress_deflate>(src, dest, checksums);
         }
 
         [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx * override;
@@ -112,15 +113,18 @@ namespace doca {
 
     private:
         template<typename TaskType>
-        auto submit_task(buffer src, buffer dest) -> compress_awaitable {
+        auto submit_task(
+            buffer src,
+            buffer dest,
+            compress_checksums *checksums
+        ) -> compress_awaitable {
             logger->trace(__PRETTY_FUNCTION__);
 
-            auto result = compress_awaitable::create_space();
+            auto result = compress_awaitable::create_space(checksums);
+            auto receptable = result.receptable_ptr();
 
             TaskType *compress_task;
-            doca_data task_user_data = {
-                .ptr = result.dest.get()
-            };
+            doca_data task_user_data = { .ptr = receptable };
 
             logger->trace("{} dest = {}", __PRETTY_FUNCTION__, task_user_data.ptr);
 
@@ -133,7 +137,7 @@ namespace doca {
             ));
 
             auto base_task = compress_task_helpers<TaskType>::as_task(compress_task);
-            engine()->submit_task(base_task, result.dest.get());
+            engine()->submit_task(base_task, receptable);
 
             return result;
         }
@@ -145,13 +149,19 @@ namespace doca {
             [[maybe_unused]] doca_data ctx_user_data
         ) -> void {
             auto dest = static_cast<compress_awaitable::payload_type*>(task_user_data.ptr);
+            auto base_task = compress_task_helpers<TaskType>::as_task(compress_task);
 
-            dest->value = compress_result { compress_task };
+            auto status = doca_task_get_status(base_task);
+            dest->emplace_value(status);
+
+            if(dest->additional_data()) {
+                auto checksums = compress_checksums { compress_task };
+                dest->additional_data().overwrite(std::move(checksums));
+            }
+
             doca_task_free(compress_task_helpers<TaskType>::as_task(compress_task));
 
-            if(dest->coro_handle) {
-                dest->coro_handle.resume();
-            }
+            dest->resume();
         }
 
         unique_handle<doca_compress> handle_ { doca_compress_destroy };

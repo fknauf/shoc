@@ -56,8 +56,12 @@ auto compress_file(
         auto dst = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize);
 
         doca::logger->debug("compressing chunk {}...", i);
-        auto result = co_await compress->compress(src, dst);
-        doca::logger->debug("compress_chunk complete: {}, crc = {}, adler = {}", i, result.crc_cs(), result.adler_cs());
+
+        auto checksums = doca::compress_checksums{};
+        auto status = co_await compress->compress(src, dst, &checksums);
+
+        doca::logger->debug("compress_chunk complete: {}, status = {}, crc = {}, adler = {}",
+                            i, status, checksums.crc, checksums.adler);
 
         dst_ranges[i] = dst.data();
     }

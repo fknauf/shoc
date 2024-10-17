@@ -9,7 +9,7 @@
 #include <doca_pe.h>
 
 namespace doca {
-    using coro::status_awaitable;
+    using status_awaitable = coro::status_awaitable<>;
 
     template<typename TaskType, doca_task* (*AsTask)(TaskType *)>
     auto plain_status_callback_function(
