@@ -1,6 +1,7 @@
 #include "dma.hpp"
 #include "error.hpp"
 
+#include <doca/common/status.hpp>
 #include <doca/progress_engine.hpp>
 
 #include <doca_pe.h>
@@ -33,10 +34,10 @@ namespace doca {
     auto dma_context::memcpy(
         buffer const &src,
         buffer &dest
-    ) const -> status_awaitable {
+    ) const -> coro::status_awaitable<> {
         doca_dma_task_memcpy *task = nullptr;
 
-        auto result = status_awaitable::create_space();
+        auto result = coro::status_awaitable<>::create_space();
         auto receptable = result.receptable_ptr();
 
         doca_data task_user_data = { .ptr = receptable };

@@ -48,7 +48,7 @@ namespace doca::comch {
          *
          * @return awaitable for the send status
          */
-        auto send(std::string_view message) -> status_awaitable;
+        auto send(std::string_view message) -> coro::status_awaitable<>;
 
         /**
          * Receive/wait for a message from the server

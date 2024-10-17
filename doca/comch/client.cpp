@@ -90,15 +90,15 @@ namespace doca::comch {
         }
     }
 
-    auto client::send(std::string_view message) -> status_awaitable {
+    auto client::send(std::string_view message) -> coro::status_awaitable<> {
         if(state_ != connection_state::CONNECTED) {
-            return status_awaitable::from_value(DOCA_ERROR_NOT_CONNECTED);
+            return coro::status_awaitable<>::from_value(DOCA_ERROR_NOT_CONNECTED);
         }
 
         doca_comch_connection *connection;
         doca_comch_task_send *task;
 
-        auto result = status_awaitable::create_space();
+        auto result = coro::status_awaitable<>::create_space();
         auto receptable = result.receptable_ptr();
 
         doca_data task_user_data = { .ptr = receptable };

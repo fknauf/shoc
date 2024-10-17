@@ -47,7 +47,7 @@ namespace doca::comch {
             buffer buf,
             std::span<std::uint8_t> immediate_data,
             std::uint32_t consumer_id
-        ) -> status_awaitable;
+        ) -> coro::status_awaitable<>;
 
     private:
         unique_handle<doca_comch_producer> handle_ { doca_comch_producer_destroy };

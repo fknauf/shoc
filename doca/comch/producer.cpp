@@ -35,10 +35,10 @@ namespace doca::comch {
         buffer buf,
         std::span<std::uint8_t> immediate_data,
         std::uint32_t consumer_id
-    ) -> status_awaitable {
+    ) -> coro::status_awaitable<> {
         doca_comch_producer_task_send *task = nullptr;
 
-        auto result = status_awaitable::create_space();
+        auto result = coro::status_awaitable<>::create_space();
         auto receptable = result.receptable_ptr();
 
         doca_data task_user_data = { .ptr = receptable };

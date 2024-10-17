@@ -9,8 +9,6 @@
 #include <doca_pe.h>
 
 namespace doca {
-    using status_awaitable = coro::status_awaitable<>;
-
     template<typename TaskType, doca_task* (*AsTask)(TaskType *)>
     auto plain_status_callback_function(
         TaskType *task,
@@ -19,7 +17,7 @@ namespace doca {
     ) {
         assert(task_user_data.ptr != nullptr);
 
-        auto dest = static_cast<status_awaitable::payload_type*>(task_user_data.ptr);
+        auto dest = static_cast<typename coro::status_awaitable<>::payload_type*>(task_user_data.ptr);
         auto base_task = AsTask(task);
         auto status = doca_task_get_status(base_task);
 

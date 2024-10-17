@@ -1,9 +1,8 @@
 #pragma once
 
 #include "buffer.hpp"
-#include "common/status.hpp"
 #include "context.hpp"
-#include "coro/value_awaitable.hpp"
+#include "coro/status_awaitable.hpp"
 #include "device.hpp"
 #include "unique_handle.hpp"
 
@@ -25,7 +24,7 @@ namespace doca {
         auto memcpy(
             buffer const &src,
             buffer &dest
-        ) const -> status_awaitable;
+        ) const -> coro::status_awaitable<>;
 
         auto as_ctx() const noexcept -> doca_ctx* override {
             return doca_dma_as_ctx(handle_.handle());
