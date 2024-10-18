@@ -4,6 +4,7 @@
 #include <doca/memory_map.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <span>
 
 struct remote_buffer_descriptor {
@@ -44,8 +45,8 @@ struct remote_buffer_descriptor {
         auto src_base = reinterpret_cast<std::uint64_t>(src_range.data());
         auto src_length = src_range.size();
 
-        std::copy(&src_base, &src_base + 8, result.data());
-        std::copy(&src_length, &src_length + 8, result.data() + 8);
+        std::memcpy(result.data(), &src_base, 8);
+        std::memcpy(result.data() + 8, &src_length, 8);
 
         auto export_base = reinterpret_cast<char const *>(export_desc.base_ptr);
         auto export_end = export_base + export_desc.length;
