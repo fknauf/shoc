@@ -35,13 +35,11 @@ namespace doca {
         buffer const &src,
         buffer &dest
     ) const -> coro::status_awaitable<> {
-        doca_dma_task_memcpy *task = nullptr;
-
         auto result = coro::status_awaitable<>::create_space();
         auto receptable = result.receptable_ptr();
-
         doca_data task_user_data = { .ptr = receptable };
 
+        doca_dma_task_memcpy *task = nullptr;
         enforce_success(doca_dma_task_memcpy_alloc_init(
             handle_.handle(),
             src.handle(),

@@ -24,11 +24,11 @@ struct remote_buffer_descriptor {
         auto src_buffer_addr = std::uint64_t{};
         auto src_buffer_len = std::uint64_t{};
 
-        std::copy(msg.data()    , msg.data() +  8, &src_buffer_addr);
-        std::copy(msg.data() + 8, msg.data() + 16, &src_buffer_len );
+        std::memcpy(&src_buffer_addr, msg.data(), 8);
+        std::memcpy(&src_buffer_len, msg.data() + 8, 8);
 
         src_range = std::span {
-            reinterpret_cast<char*>(src_buffer_addr),
+            reinterpret_cast<char const*>(src_buffer_addr),
             src_buffer_len
         };
 
