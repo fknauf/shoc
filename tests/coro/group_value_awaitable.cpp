@@ -37,8 +37,8 @@ TEST(docapp_coro_value_awaitable, plain_value_suspended) {
 
     ASSERT_FALSE(checkpoint);
 
-    awaitable.dest->emplace_value(42);
-    awaitable.dest->resume();
+    awaitable.receptable_ptr()->emplace_value(42);
+    awaitable.receptable_ptr()->resume();
 
     ASSERT_TRUE(checkpoint);
 }
@@ -60,8 +60,8 @@ TEST(docapp_coro_value_awaitable, error_suspended) {
 
     ASSERT_FALSE(checkpoint);
 
-    awaitable.dest->set_error(DOCA_ERROR_NOT_CONNECTED);
-    awaitable.dest->resume();
+    awaitable.receptable_ptr()->set_error(DOCA_ERROR_NOT_CONNECTED);
+    awaitable.receptable_ptr()->resume();
 
     ASSERT_TRUE(checkpoint);
 }

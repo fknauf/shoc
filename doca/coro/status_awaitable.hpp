@@ -1,6 +1,6 @@
 #pragma once
 
-#include "error_receptable.hpp"
+#include "value_awaitable.hpp"
 #include "overload.hpp"
 
 #include <doca/error.hpp>
@@ -74,7 +74,7 @@ namespace doca::coro {
      */
     template<typename AdditionalData>
     class status_receptable:
-        public error_receptable
+        public value_receptable<doca_error_t>
     {
     public:
         status_receptable() = default;
@@ -84,23 +84,15 @@ namespace doca::coro {
         {}
 
         status_receptable(doca_error_t status):
-            value_ { status }
+            value_receptable(std::move(status))
         {}
         
         status_receptable(std::exception_ptr ex):
-            value_ { ex }
+            value_receptable(ex)
         {}
-
-        auto set_exception(std::exception_ptr ex) -> void override {
-            value_ = ex;
-        }
 
         auto set_error(doca_error_t status) -> void override {
             emplace_value(status);
-        }
-
-        auto emplace_value(doca_error_t status) -> void {
-            value_ = status;
         }
 
         [[nodiscard]]
@@ -108,53 +100,8 @@ namespace doca::coro {
             return additional_data_;
         }
 
-        [[nodiscard]]
-        auto has_value() -> bool {
-            return !std::holds_alternative<std::monostate>(value_);
-        }
-
-        auto set_waiter(std::coroutine_handle<> waiter) -> void {
-            if(waiter_ != nullptr) {
-                throw doca_exception(DOCA_ERROR_IN_USE);
-            }
-
-            waiter_ = waiter;
-        }
-
-        auto resume() const {
-            if(waiter_) {
-                waiter_.resume();
-            }
-        }
-
-        [[nodiscard]]
-        auto value() const {
-            return std::visit(
-                overload {
-                    [](std::monostate) -> doca_error_t {
-                        throw doca_exception(DOCA_ERROR_UNEXPECTED);
-                    },
-                    [](std::exception_ptr ex) -> doca_error_t {
-                        std::rethrow_exception(ex);
-                    },
-                    [](doca_error_t status) -> doca_error_t {
-                        return status;
-                    }
-                },
-                value_
-            );
-        }
-
     private:
-        std::variant<
-            std::monostate,
-            doca_error_t,
-            std::exception_ptr
-        > value_;
-
         additional_data_reference<AdditionalData> additional_data_;
-
-        std::coroutine_handle<> waiter_;
     };
 
     /**
@@ -199,23 +146,18 @@ namespace doca::coro {
 
         [[nodiscard]]
         auto await_ready() const noexcept -> bool {
-            return dest_ && dest_->has_value();
+            enforce(dest_ != nullptr, DOCA_ERROR_EMPTY);
+            return dest_->has_value();
         }
 
         auto await_suspend(std::coroutine_handle<> handle) const -> void {
-            if(dest_ == nullptr) {
-                throw doca_exception(DOCA_ERROR_UNEXPECTED);
-            }
-
+            enforce(dest_ != nullptr, DOCA_ERROR_EMPTY);
             dest_->set_waiter(handle);
         }
 
         [[nodiscard]]
         auto await_resume() const {
-            if(dest_ == nullptr) {
-                throw doca_exception(DOCA_ERROR_UNEXPECTED);
-            }
-
+            enforce(dest_ != nullptr, DOCA_ERROR_EMPTY);
             return dest_->value();
         }
 

@@ -7,6 +7,7 @@
 #include <string>
 #include <optional>
 #include <queue>
+#include <type_traits>
 
 #include <doca_comch.h>
 
@@ -56,7 +57,7 @@ namespace doca::comch {
                 return awaitable::from_error(DOCA_ERROR_NOT_CONNECTED);
             } else {
                 auto result = awaitable::create_space();
-                pending_accepters_.push(result.dest.get());
+                pending_accepters_.push(result.receptable_ptr());
                 return result;
             }
         }
@@ -69,7 +70,7 @@ namespace doca::comch {
                 pending_data_.emplace(std::move(new_payload));
             } else {
                 auto accepter = pending_accepters_.front();
-                accepter->value = ScopeWrapper { std::move(new_payload) };
+                accepter->emplace_value(std::move(new_payload));
                 pending_accepters_.pop();
                 accepter->resume();
             }

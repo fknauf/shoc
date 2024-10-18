@@ -5,6 +5,10 @@
 #include <exception>
 
 namespace doca::coro {
+    /**
+     * Common base class for receptables for error reporting regardless of
+     * return value
+     */
     struct error_receptable {
         virtual ~error_receptable() = default;
 

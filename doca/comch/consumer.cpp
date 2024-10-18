@@ -37,13 +37,15 @@ namespace doca::comch {
         doca_comch_consumer_task_post_recv *task;
 
         auto result = consumer_recv_awaitable::create_space();
-        doca_data task_user_data = { .ptr = result.dest.get() };
+        auto receptable = result.receptable_ptr();
+
+        doca_data task_user_data = { .ptr = receptable };
 
         enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle_.handle(), dest.handle(), &task));
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
         doca_task_set_user_data(base_task, task_user_data);
 
-        engine()->submit_task(base_task, result.dest.get());
+        engine()->submit_task(base_task, receptable);
 
         return result;
     }
@@ -67,7 +69,7 @@ namespace doca::comch {
 
         doca_task_free(base_task);
 
-        dest->value = std::move(result);
+        dest->set_value(std::move(result));
         dest->resume();
     }
 }

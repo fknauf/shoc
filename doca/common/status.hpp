@@ -23,7 +23,7 @@ namespace doca {
 
         doca_task_free(base_task);
 
-        dest->emplace_value(status);
+        dest->set_value(std::move(status));
         dest->resume();
     }
 }
