@@ -58,6 +58,12 @@ executable('comch_server', [ 'progs/comch_server.cpp' ],
         include_directories: inc_dirs,
         install: false)
 
+executable('comch_server_singleshot', [ 'progs/comch_server_singleshot.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
 executable('comch_data_client', [ 'progs/comch_data_client.cpp' ],
         dependencies : deps,
         link_with: libdocapp,

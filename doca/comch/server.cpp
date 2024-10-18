@@ -225,8 +225,8 @@ namespace doca::comch {
         if(open_connections_.empty()) {
             auto err = doca_ctx_stop(as_ctx());
 
-            if(err != DOCA_SUCCESS) {
-                logger->error("unable to stop comch server {}", static_cast<void*>(handle_.handle()));
+            if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
+                logger->error("unable to stop comch server {}: {}", static_cast<void*>(handle_.handle()), doca_error_get_descr(err));
             }
         }
     }
