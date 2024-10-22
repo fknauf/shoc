@@ -5,6 +5,8 @@
 #include <doca_comch_consumer.h>
 #include <doca_comch_producer.h>
 #include <doca_dma.h>
+#include <doca_rdma.h>
+#include <doca_sync_event.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -79,6 +81,18 @@ namespace doca {
                         && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS;
                 case device_capability::dma:
                     return doca_dma_cap_task_memcpy_is_supported(dev) == DOCA_SUCCESS;
+                case device_capability::rdma:
+                    return doca_rdma_cap_task_receive_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_send_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_send_imm_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_read_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_write_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_write_imm_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_atomic_cmp_swp_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_atomic_fetch_add_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_remote_net_sync_event_get_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_remote_net_sync_event_notify_set_is_supported(dev) == DOCA_SUCCESS
+                        && doca_rdma_cap_task_remote_net_sync_event_notify_add_is_supported(dev) == DOCA_SUCCESS;
                 default:
                     return false;
             }

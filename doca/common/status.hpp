@@ -9,12 +9,25 @@
 #include <doca_pe.h>
 
 namespace doca {
-    template<typename TaskType, doca_task* (*AsTask)(TaskType *)>
-    auto plain_status_callback_function(
-        TaskType *task,
+    namespace detail {
+        template<auto AsTask>
+        struct deduce_as_task_arg_type {};
+
+        template<typename TaskType, doca_task *AsTask(TaskType*)>
+        struct deduce_as_task_arg_type<AsTask> {
+            using type = TaskType;
+        };
+
+        template<auto AsTask>
+        using deduce_as_task_arg_type_t = typename deduce_as_task_arg_type<AsTask>::type;
+    }
+
+    template<auto AsTask>
+    auto plain_status_callback(
+        detail::deduce_as_task_arg_type_t<AsTask> *task,
         doca_data task_user_data,
         [[maybe_unused]] doca_data ctx_user_data
-    ) {
+    ) -> void {
         assert(task_user_data.ptr != nullptr);
 
         auto dest = static_cast<typename coro::status_awaitable<>::payload_type*>(task_user_data.ptr);

@@ -21,8 +21,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_producer_task_send_set_conf(
             handle_.handle(),
-            &plain_status_callback_function<doca_comch_producer_task_send, &doca_comch_producer_task_send_as_task>,
-            &plain_status_callback_function<doca_comch_producer_task_send, &doca_comch_producer_task_send_as_task>,
+            &plain_status_callback<&doca_comch_producer_task_send_as_task>,
+            &plain_status_callback<&doca_comch_producer_task_send_as_task>,
             max_tasks
         ));
     }

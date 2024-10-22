@@ -118,28 +118,16 @@ namespace doca {
             buffer dest,
             compress_checksums *checksums
         ) -> compress_awaitable {
-            logger->trace(__PRETTY_FUNCTION__);
-
-            auto result = compress_awaitable::create_space(checksums);
-            auto receptable = result.receptable_ptr();
-
-            TaskType *compress_task;
-            doca_data task_user_data = { .ptr = receptable };
-
-            logger->trace("{} dest = {}", __PRETTY_FUNCTION__, task_user_data.ptr);
-
-            enforce_success(compress_task_helpers<TaskType>::alloc_init(
+            return detail::status_offload<
+                compress_task_helpers<TaskType>::alloc_init,
+                compress_task_helpers<TaskType>::as_task
+            >(
+                engine(),
+                compress_awaitable::create_space(checksums),
                 handle_.handle(),
                 src.handle(),
-                dest.handle(),
-                task_user_data,
-                &compress_task
-            ));
-
-            auto base_task = compress_task_helpers<TaskType>::as_task(compress_task);
-            engine()->submit_task(base_task, receptable);
-
-            return result;
+                dest.handle()
+            );
         }
 
         template<typename TaskType>

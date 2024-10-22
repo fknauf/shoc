@@ -161,4 +161,41 @@ namespace doca {
         epoll_handle epoll_;
         dependent_contexts<context> connected_contexts_;
     };
+
+    namespace detail {
+        template<auto AllocInit, auto AsTask, typename AdditionalData, typename... Args>
+        auto status_offload(
+            progress_engine *engine,
+            coro::status_awaitable<AdditionalData> result,
+            Args&&... args
+        ) {
+            auto receptable = result.receptable_ptr();
+
+            detail::deduce_as_task_arg_type_t<AsTask> *task;
+            doca_data task_user_data = { .ptr = receptable };
+
+            auto err = AllocInit(
+                std::forward<Args>(args)...,
+                task_user_data,
+                &task
+            );
+
+            if(err != DOCA_SUCCESS) {
+                receptable->set_error(err);
+            } else {
+                auto base_task = AsTask(task);
+                engine->submit_task(base_task, receptable);
+            }
+
+            return result;        
+        }
+
+        template<auto AllocInit, auto AsTask, typename... Args>
+        auto plain_status_offload(
+            progress_engine *engine,
+            Args&&... args
+        ) {
+            return status_offload<AllocInit, AsTask>(engine, coro::status_awaitable<>::create_space(), std::forward<Args>(args)...);
+        }
+    }
 }

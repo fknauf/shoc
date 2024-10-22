@@ -15,7 +15,8 @@ namespace doca {
         compress_deflate,
         comch_server,
         comch_client,
-        dma
+        dma,
+        rdma
     };
 
     /**

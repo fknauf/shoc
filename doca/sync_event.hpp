@@ -1,0 +1,64 @@
+#pragma once
+
+#include "context.hpp"
+#include "coro/status_awaitable.hpp"
+#include "device.hpp"
+#include "unique_handle.hpp"
+
+#include <doca_sync_event.h>
+
+#include <cstdint>
+#include <span>
+
+namespace doca {
+    class sync_event:
+        public context
+    {
+    public:
+        sync_event(
+            context_parent *parent,
+            device &subscriber_dev,
+            std::uint32_t max_tasks
+        );
+
+        [[nodiscard]]
+        auto as_ctx() const noexcept -> doca_ctx* override {
+            return doca_sync_event_as_ctx(handle_.handle());
+        }
+
+        auto export_to_remote_pci(device const &dev) const -> std::span<std::uint8_t const>;
+        auto export_to_remote_net() const -> std::span<std::uint8_t const>;
+
+        auto get(std::uint64_t *dest) const -> coro::status_awaitable<>;
+
+        auto notify_add(
+            std::uint64_t inc_val,
+            std::uint64_t *fetched = nullptr
+        ) const -> coro::status_awaitable<>;
+
+        auto notify_set(
+            std::uint64_t set_val
+        ) const -> coro::status_awaitable<>;
+
+        auto wait_eq(
+            std::uint64_t wait_val,
+            std::uint64_t mask
+        ) const -> coro::status_awaitable<>;
+
+        auto wait_neq(
+            std::uint64_t wait_val,
+            std::uint64_t mask
+        ) const -> coro::status_awaitable<>;
+
+    private:
+        unique_handle<doca_sync_event> handle_ { doca_sync_event_destroy };
+    };
+
+//    class sync_event_remote_net {
+//    public:
+//        sync_event_remote_net
+//
+//    private:
+//        unique_handle<doca_sync_event_remote_net> handle_ { doca_sync_event_remote_net_destroy };
+//    };
+}

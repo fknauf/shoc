@@ -25,8 +25,8 @@ namespace doca {
         init_state_changed_callback();
         enforce_success(doca_dma_task_memcpy_set_conf(
             handle_.handle(),
-            plain_status_callback_function<doca_dma_task_memcpy, doca_dma_task_memcpy_as_task>,
-            plain_status_callback_function<doca_dma_task_memcpy, doca_dma_task_memcpy_as_task>,
+            plain_status_callback<doca_dma_task_memcpy_as_task>,
+            plain_status_callback<doca_dma_task_memcpy_as_task>,
             max_tasks
         ));
     }
@@ -35,22 +35,14 @@ namespace doca {
         buffer const &src,
         buffer &dest
     ) const -> coro::status_awaitable<> {
-        auto result = coro::status_awaitable<>::create_space();
-        auto receptable = result.receptable_ptr();
-        doca_data task_user_data = { .ptr = receptable };
-
-        doca_dma_task_memcpy *task = nullptr;
-        enforce_success(doca_dma_task_memcpy_alloc_init(
+        return detail::plain_status_offload<
+            doca_dma_task_memcpy_alloc_init,
+            doca_dma_task_memcpy_as_task
+        >(
+            engine(),
             handle_.handle(),
             src.handle(),
-            dest.handle(),
-            task_user_data,
-            &task
-        ));
-
-        auto base_task = doca_dma_task_memcpy_as_task(task);
-        engine()->submit_task(base_task, receptable);
-
-        return result;
+            dest.handle()
+        );
     }
 }

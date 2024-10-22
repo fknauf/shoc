@@ -16,6 +16,7 @@ deps = [
         dependency('doca-compress'),
         dependency('doca-comch'),
         dependency('doca-dma'),
+        dependency('doca-rdma'),
         dependency('spdlog')
 ]
 
@@ -35,7 +36,9 @@ common_srcs = [
     'doca/event_sources.cpp',
     'doca/logger.cpp',
     'doca/memory_map.cpp',
-    'doca/progress_engine.cpp'
+    'doca/progress_engine.cpp',
+    'doca/rdma.cpp',
+    'doca/sync_event.cpp'
 ]
 
 inc_dirs  = [

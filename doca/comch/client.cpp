@@ -25,8 +25,8 @@ namespace doca::comch {
 
         enforce_success(doca_comch_client_task_send_set_conf(
             handle_.handle(),
-            &plain_status_callback_function<doca_comch_task_send, doca_comch_task_send_as_task>,
-            &plain_status_callback_function<doca_comch_task_send, doca_comch_task_send_as_task>,
+            &plain_status_callback<doca_comch_task_send_as_task>,
+            &plain_status_callback<doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_client_event_msg_recv_register(
