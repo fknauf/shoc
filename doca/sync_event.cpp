@@ -145,4 +145,24 @@ namespace doca {
             mask
         );
     }
+
+    auto sync_event_remote_net::from_export(
+        device const &dev,
+        std::span<std::uint8_t const> data_stream
+    ) -> sync_event_remote_net {
+        doca_sync_event_remote_net *event = nullptr;
+
+        enforce_success(doca_sync_event_remote_net_create_from_export(
+            dev.handle(),
+            data_stream.data(),
+            data_stream.size(),
+            &event
+        ));
+
+        return sync_event_remote_net { event };
+    }
+
+    sync_event_remote_net::sync_event_remote_net(doca_sync_event_remote_net *handle):
+        handle_ { handle }
+    { }
 }

@@ -17,6 +17,9 @@ namespace doca {
     class unique_handle {
     public:
         unique_handle() = default;
+        unique_handle(Handle *handle):
+            handle_ { handle }
+        {}
 
         ~unique_handle() {
             clear();

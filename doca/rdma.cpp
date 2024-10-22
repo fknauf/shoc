@@ -170,6 +170,89 @@ namespace doca {
         );
     }
 
+    auto rdma_context::atomic_cmp_swp(
+        buffer dst,
+        buffer result,
+        std::uint64_t cmp_data,
+        std::uint64_t swap_data
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_atomic_cmp_swp_allocate_init,
+            doca_rdma_task_atomic_cmp_swp_as_task
+        >(
+            engine(),
+            handle_.handle(),
+            dst.handle(),
+            result.handle(),
+            cmp_data,
+            swap_data
+        );
+    }
+
+    auto rdma_context::atomic_fetch_add(
+        buffer dst,
+        buffer result,
+        std::uint64_t add_data
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_atomic_fetch_add_allocate_init,
+            doca_rdma_task_atomic_fetch_add_as_task
+        >(
+            engine(),
+            handle_.handle(),
+            dst.handle(),
+            result.handle(),
+            add_data
+        );
+    }
+
+    auto rdma_context::remote_net_sync_event_get(
+        sync_event_remote_net const &event,
+        buffer dst
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_remote_net_sync_event_get_allocate_init,
+            doca_rdma_task_remote_net_sync_event_get_as_task
+        >(
+            engine(),
+            handle_.handle(),
+            event.handle(),
+            dst.handle()
+        );
+    }
+        
+    auto rdma_context::remote_net_sync_event_notify_set(
+        sync_event_remote_net const &event,
+        buffer src
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_remote_net_sync_event_notify_set_allocate_init,
+            doca_rdma_task_remote_net_sync_event_notify_set_as_task
+        >(
+            engine(),
+            handle_.handle(),
+            event.handle(),
+            src.handle()
+        );
+    }
+
+    auto rdma_context::remote_net_sync_event_notify_add(
+        sync_event_remote_net const &event,
+        buffer result,
+        std::uint64_t add_data
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_remote_net_sync_event_notify_add_allocate_init,
+            doca_rdma_task_remote_net_sync_event_notify_add_as_task
+        >(
+            engine(),
+            handle_.handle(),
+            event.handle(),
+            result.handle(),
+            add_data
+        );
+    }
+
     auto rdma_context::connection_request(doca_rdma_connection *conn, doca_data ctx_user_data) -> void {
     }
 

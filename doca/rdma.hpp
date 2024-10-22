@@ -40,17 +40,17 @@ namespace doca {
         ) -> coro::status_awaitable<>;
 
         auto remote_net_sync_event_get(
-            doca_sync_event_remote_net *event,
+            sync_event_remote_net const &event,
             buffer dst
         ) -> coro::status_awaitable<>;
         
         auto remote_net_sync_event_notify_set(
-            doca_sync_event_remote_net *event,
+            sync_event_remote_net const &event,
             buffer src
         ) -> coro::status_awaitable<>;
 
         auto remote_net_sync_event_notify_add(
-            doca_sync_event_remote_net *event,
+            sync_event_remote_net const &event,
             buffer result,
             std::uint64_t add_data
         ) -> coro::status_awaitable<>;
