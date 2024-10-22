@@ -119,7 +119,7 @@ namespace doca::comch {
         auto signal_stopped_child(context *child) -> void override;
         auto disconnect_if_able() -> void;
 
-        unique_handle<doca_comch_client> handle_ { doca_comch_client_destroy };
+        unique_handle<doca_comch_client, doca_comch_client_destroy> handle_;
         connection_state state_ = connection_state::DISCONNECTED;
 
         accepter_queues<message> message_queues_;

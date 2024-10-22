@@ -61,6 +61,6 @@ namespace doca::comch {
             doca_data ctx_user_data
         ) -> void;
 
-        unique_handle<doca_comch_consumer> handle_ { doca_comch_consumer_destroy };
+        unique_handle<doca_comch_consumer, doca_comch_consumer_destroy> handle_;
     };
 }

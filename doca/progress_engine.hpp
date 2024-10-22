@@ -152,7 +152,7 @@ namespace doca {
 
         auto process_trigger(int trigger_fd) -> void;
 
-        unique_handle<doca_pe> handle_ { doca_pe_destroy };
+        unique_handle<doca_pe, doca_pe_destroy> handle_;
         progress_engine_limits limits_;
 
         event_counter yield_counter_;

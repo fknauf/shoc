@@ -31,6 +31,6 @@ namespace doca {
         }
 
     private:
-        unique_handle<doca_dma> handle_ { doca_dma_destroy };
+        unique_handle<doca_dma, doca_dma_destroy> handle_;
     };
 }

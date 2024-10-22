@@ -50,6 +50,6 @@ namespace doca::comch {
         ) -> coro::status_awaitable<>;
 
     private:
-        unique_handle<doca_comch_producer> handle_ { doca_comch_producer_destroy };
+        unique_handle<doca_comch_producer, doca_comch_producer_destroy> handle_;
     };
 }

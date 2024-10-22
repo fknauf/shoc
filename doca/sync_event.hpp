@@ -51,7 +51,7 @@ namespace doca {
         ) const -> coro::status_awaitable<>;
 
     private:
-        unique_handle<doca_sync_event> handle_ { doca_sync_event_destroy };
+        unique_handle<doca_sync_event, doca_sync_event_destroy> handle_;
     };
 
 //    class sync_event_remote_net {
@@ -59,6 +59,6 @@ namespace doca {
 //        sync_event_remote_net
 //
 //    private:
-//        unique_handle<doca_sync_event_remote_net> handle_ { doca_sync_event_remote_net_destroy };
+//        unique_handle<doca_sync_event_remote_net, doca_sync_event_remote_net_destroy> handle_;
 //    };
 }

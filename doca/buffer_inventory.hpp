@@ -45,6 +45,6 @@ namespace doca {
         [[nodiscard]] auto get_num_free_elements() const -> std::uint32_t;
 
     private:
-        unique_handle<doca_buf_inventory> handle_ { doca_buf_inventory_destroy };
+        unique_handle<doca_buf_inventory, doca_buf_inventory_destroy> handle_;
     };
 }

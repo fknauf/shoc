@@ -152,6 +152,6 @@ namespace doca {
             dest->resume();
         }
 
-        unique_handle<doca_compress> handle_ { doca_compress_destroy };
+        unique_handle<doca_compress, doca_compress_destroy> handle_;
     };
 }

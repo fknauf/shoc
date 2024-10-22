@@ -67,6 +67,6 @@ namespace doca {
             doca_data ctx_user_data
         ) -> void;
 
-        unique_handle<doca_rdma> handle_ { doca_rdma_destroy };
+        unique_handle<doca_rdma, doca_rdma_destroy> handle_;
     };
 }

@@ -44,7 +44,7 @@ namespace doca {
         [[nodiscard]] auto allocate_buffer(std::size_t data_length, std::size_t data_offset = 0) -> buffer;
 
     private:
-        unique_handle<doca_buf_pool> handle_;
+        unique_handle<doca_buf_pool, doca_buf_pool_destroy> handle_;
         std::vector<std::uint8_t> memory_;
         memory_map mmap_;
     };

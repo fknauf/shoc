@@ -52,7 +52,7 @@ namespace doca {
     private:
         device(doca_dev *doca_handle);
 
-        unique_handle<doca_dev> handle_ { doca_dev_close };
+        unique_handle<doca_dev, doca_dev_close> handle_;
     };
 
     class device_representor {
@@ -81,6 +81,6 @@ namespace doca {
     private:
         device_representor(doca_dev_rep *doca_handle);
 
-        unique_handle<doca_dev_rep> handle_ { doca_dev_rep_close };
+        unique_handle<doca_dev_rep, doca_dev_rep_close> handle_;
     };
 }

@@ -68,7 +68,7 @@ namespace doca {
         [[nodiscard]] auto export_pci(device const &dev) const -> export_descriptor;
 
     private:
-        unique_handle<doca_mmap> handle_ { doca_mmap_destroy };
+        unique_handle<doca_mmap, doca_mmap_destroy> handle_;
         std::span<std::uint8_t> range_;
     };
 }

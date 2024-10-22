@@ -13,12 +13,10 @@ namespace doca {
      * May in the future be refactored to static deleter binding to save the space for the function
      * pointer.
      */
-    template<typename Handle, typename Deleter = doca_error_t(*)(Handle*)>
+    template<typename Handle, auto Deleter>
     class unique_handle {
     public:
-        unique_handle(Deleter deleter):
-            deleter_(deleter) 
-        {}
+        unique_handle() = default;
 
         ~unique_handle() {
             clear();
@@ -47,13 +45,12 @@ namespace doca {
 
         auto clear() -> void {
             if(handle_ != nullptr) {
-                deleter_(handle_);
+                Deleter(handle_);
                 handle_ = nullptr;
             }
         }
 
     private:
         Handle *handle_ { nullptr };
-        Deleter deleter_;
     };
 }

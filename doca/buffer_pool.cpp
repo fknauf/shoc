@@ -9,7 +9,6 @@ namespace doca {
         std::size_t element_size,
         std::size_t element_alignment
     ):
-        handle_(doca_buf_pool_destroy),
         memory_(num_elements * element_size),
         mmap_(dev, memory_)
     {

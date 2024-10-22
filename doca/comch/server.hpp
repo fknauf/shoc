@@ -295,7 +295,7 @@ namespace doca::comch {
         static auto resolve_server(doca_comch_server *handle) -> server*;
         static auto resolve_connection(doca_comch_connection *handle) -> server_connection*;
 
-        unique_handle<doca_comch_server> handle_ { doca_comch_server_destroy };
+        unique_handle<doca_comch_server, doca_comch_server_destroy> handle_;
 
         accepter_queues<
             std::shared_ptr<server_connection>,
