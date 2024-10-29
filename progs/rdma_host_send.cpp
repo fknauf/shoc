@@ -60,6 +60,9 @@ auto rdma_send(
 }
 
 auto main() -> int {
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    doca::logger->set_level(spdlog::level::debug);
+
     auto engine = doca::progress_engine {};
 
     rdma_send(&engine);
