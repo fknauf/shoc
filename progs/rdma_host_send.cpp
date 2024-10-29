@@ -14,7 +14,7 @@ auto rdma_exchange_connection_details(
     doca::progress_engine *engine,
     std::span<std::byte const> local_conn_details
 ) -> doca::coro::eager_task<std::string> {
-    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_server);
+    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_client);
     auto client = co_await engine->create_context<doca::comch::client>("vss-rdma-oob-send-receive-test", dev);
     
     auto err = co_await client->send(local_conn_details);

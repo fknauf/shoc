@@ -296,10 +296,8 @@ namespace doca {
             auto new_context = std::make_shared<ConcreteContext>(parent, std::forward<Args>(args)...);
             new_context->connect();
 
-            // make sure that registering the new context after starting cannot throw an exception (like bad_alloc)
-            auto &slot = active_contexts_[new_context.get()];
             auto start_awaitable = new_context->start();
-            slot = new_context;
+            active_contexts_[new_context.get()] = new_context;
 
             return create_context_awaitable { std::move(new_context), std::move(start_awaitable) };
         }
