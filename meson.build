@@ -120,6 +120,7 @@ executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
 
 executable('test-docapp',
         [
+                'tests/coro/group_task.cpp',
                 'tests/coro/group_value_awaitable.cpp',
                 'tests/group_compress.cpp',
                 'tests/group_dma.cpp',
