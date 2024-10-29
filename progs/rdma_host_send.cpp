@@ -12,9 +12,9 @@
 
 auto rdma_exchange_connection_details(
     doca::progress_engine *engine,
-    doca::device &dev,
     std::span<std::byte const> local_conn_details
 ) -> doca::coro::eager_task<std::string> {
+    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_server);
     auto client = co_await engine->create_context<doca::comch::client>("vss-rdma-oob-send-receive-test", dev);
     
     auto err = co_await client->send(local_conn_details);
@@ -29,18 +29,12 @@ auto rdma_exchange_connection_details(
 auto rdma_send(
     doca::progress_engine *engine
 ) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr(
-        "81:00.0",
-        {
-            doca::device_capability::rdma,
-            doca::device_capability::comch_client
-        }
-    );
+    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::rdma);
 
     auto rdma = co_await engine->create_context<doca::rdma_context>(dev);
     auto conn_details = rdma->oob_export();
 
-    auto remote_conn_details_as_string = co_await rdma_exchange_connection_details(engine, dev, conn_details);
+    auto remote_conn_details_as_string = co_await rdma_exchange_connection_details(engine, conn_details);
     auto remote_conn_details = std::span { 
         reinterpret_cast<std::byte const*>(remote_conn_details_as_string.data()), 
         remote_conn_details_as_string.size()
