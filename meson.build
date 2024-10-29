@@ -103,6 +103,18 @@ executable('dma_server', [ 'progs/dma_server.cpp' ],
         include_directories: inc_dirs,
         install: false)
 
+executable('rdma_dpu_receive', [ 'progs/rdma_dpu_receive.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
+executable('rdma_host_send', [ 'progs/rdma_host_send.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
 executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)
 

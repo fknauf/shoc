@@ -95,7 +95,10 @@ namespace doca::comch {
          * @param len message length
          * @return awaitable for the send operation status result
          */
-        auto send(std::string_view message) -> coro::status_awaitable<>;
+        auto send(char const *message_cstr) -> coro::status_awaitable<>;
+        auto send(std::span<char const> message) -> coro::status_awaitable<>;
+        auto send(std::span<std::uint8_t const> message) -> coro::status_awaitable<>;
+        auto send(std::span<std::byte const> message) -> coro::status_awaitable<>;
 
         /**
          * Receive message from the connected client. Returns an awaitable with which a message

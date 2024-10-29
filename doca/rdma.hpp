@@ -9,14 +9,31 @@
 
 #include <doca_rdma.h>
 
+#include <concepts>
 #include <cstdint>
 #include <optional>
 
 namespace doca {
+    struct rdma_config {
+        std::uint32_t rdma_permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE;
+        std::optional<std::uint32_t> gid_index = std::nullopt;
+        std::uint32_t max_tasks = 16;
+    };
+
     class rdma_context:
         public context
     {
-        rdma_context(context_parent *parent, device &dev, std::uint32_t max_tasks);
+    public:
+        rdma_context(
+            context_parent *parent,
+            device &dev,
+            rdma_config config = {}
+        );
+
+        [[nodiscard]]
+        auto as_ctx() const noexcept -> doca_ctx* override {
+            return doca_rdma_as_ctx(handle_.handle());
+        }
 
         auto receive(buffer &dest, std::uint32_t *immediate_data = nullptr) -> coro::status_awaitable<std::uint32_t>;
         auto send(buffer const &src) -> coro::status_awaitable<>;
@@ -25,6 +42,18 @@ namespace doca {
         auto read(buffer const &src, buffer &dest) -> coro::status_awaitable<>;
         auto write(buffer const &src, buffer &dest) -> coro::status_awaitable<>;
         auto write(buffer const &src, buffer &dest, std::uint32_t immediate_data) -> coro::status_awaitable<>;
+
+        // template<std::predicate<doca_rdma_connection*> AcceptCondition>
+        // auto accept(std::uint16_t port) -> coro::value_awaitable<rdma_connection>;
+        // 
+        // auto connect(
+        //     doca_rdma_addr_type address_type,
+        //     char const *address,
+        //     std::uint16_t port
+        // ) -> coro::status_awaitable<>;
+
+        auto oob_export() const -> std::span<std::byte const>;
+        auto oob_connect(std::span<std::byte const> remote_conn_details) -> doca_error_t;
 
         auto atomic_cmp_swp(
             buffer dst,
@@ -56,10 +85,10 @@ namespace doca {
         ) -> coro::status_awaitable<>;
 
     private:
-        static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) -> void;
-        static auto connection_established (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
-        static auto connection_failure     (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
-        static auto connection_disconnected(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
+        //static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) -> void;
+        //static auto connection_established (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
+        //static auto connection_failure     (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
+        //static auto connection_disconnected(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
 
         static auto receive_completion_callback(
             doca_rdma_task_receive *task,
@@ -68,5 +97,8 @@ namespace doca {
         ) -> void;
 
         unique_handle<doca_rdma, doca_rdma_destroy> handle_;
+
+        bool connected_ = false;
+        coro::status_awaitable<>::payload_type *accept_receptable_ = nullptr;
     };
 }

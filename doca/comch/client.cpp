@@ -90,7 +90,28 @@ namespace doca::comch {
         }
     }
 
-    auto client::send(std::string_view message) -> coro::status_awaitable<> {
+    auto client::send(std::span<std::byte const> message) -> coro::status_awaitable<> {
+        return send(std::span {
+            reinterpret_cast<char const*>(message.data()),
+            message.size()
+        });
+    }
+
+    auto client::send(std::span<std::uint8_t const> message) -> coro::status_awaitable<> {
+        return send(std::span {
+            reinterpret_cast<char const*>(message.data()),
+            message.size()
+        });
+    }
+
+    auto client::send(char const *message_cstr) -> coro::status_awaitable<> {
+        return send(std::span {
+            message_cstr,
+            std::strlen(message_cstr)
+        });
+    }
+
+    auto client::send(std::span<char const> message) -> coro::status_awaitable<> {
         if(state_ != connection_state::CONNECTED) {
             return coro::status_awaitable<>::from_value(DOCA_ERROR_NOT_CONNECTED);
         }

@@ -24,7 +24,7 @@ namespace doca {
 
     inline auto enforce(bool condition, doca_error_t err) -> void {
         if(!condition) {
-            throw doca_exception(err);
+            [[unlikely]] throw doca_exception(err);
         }
     }
 
@@ -34,7 +34,7 @@ namespace doca {
 
     inline auto enforce_success(doca_error_t result, std::initializer_list<int> expected) -> void {
         if(std::ranges::count(expected, result) == 0) {
-            throw doca_exception(result);
+            [[unlikely]] throw doca_exception(result);
         }
     }
 }

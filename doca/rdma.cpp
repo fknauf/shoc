@@ -9,7 +9,7 @@ namespace doca {
     rdma_context::rdma_context(
         context_parent *parent,
         device &dev,
-        std::uint32_t max_tasks
+        rdma_config config
     ):
         context { parent }
     {
@@ -19,78 +19,83 @@ namespace doca {
 
         init_state_changed_callback();
 
-        enforce_success(doca_rdma_set_connection_state_callbacks(
-            handle_.handle(),
-            &rdma_context::connection_request,
-            &rdma_context::connection_established,
-            &rdma_context::connection_failure,
-            &rdma_context::connection_disconnected
-        ));
+        enforce_success(doca_rdma_set_permissions(handle_.handle(), config.rdma_permissions));
+        if(config.gid_index.has_value()) {
+            enforce_success(doca_rdma_set_gid_index(handle_.handle(), config.gid_index.value()));
+        }
+
+        //enforce_success(doca_rdma_set_connection_state_callbacks(
+        //    handle_.handle(),
+        //    &rdma_context::connection_request,
+        //    &rdma_context::connection_established,
+        //    &rdma_context::connection_failure,
+        //    &rdma_context::connection_disconnected
+        //));
         enforce_success(doca_rdma_task_receive_set_conf(
             handle_.handle(),
             &rdma_context::receive_completion_callback,
             &rdma_context::receive_completion_callback,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_send_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_send_as_task>,
             &plain_status_callback<doca_rdma_task_send_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_send_imm_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_send_imm_as_task>,
             &plain_status_callback<doca_rdma_task_send_imm_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_read_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_read_as_task>,
             &plain_status_callback<doca_rdma_task_read_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_write_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_write_as_task>,
             &plain_status_callback<doca_rdma_task_write_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_write_imm_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_write_imm_as_task>,
             &plain_status_callback<doca_rdma_task_write_imm_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_atomic_cmp_swp_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_atomic_cmp_swp_as_task>,
             &plain_status_callback<doca_rdma_task_atomic_cmp_swp_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_atomic_fetch_add_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_atomic_fetch_add_as_task>,
             &plain_status_callback<doca_rdma_task_atomic_fetch_add_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_remote_net_sync_event_get_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_get_as_task>,
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_get_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_remote_net_sync_event_notify_set_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_set_as_task>,
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_set_as_task>,
-            max_tasks
+            config.max_tasks
         ));
         enforce_success(doca_rdma_task_remote_net_sync_event_notify_add_set_conf(
             handle_.handle(),
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_add_as_task>,
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_add_as_task>,
-            max_tasks
+            config.max_tasks
         ));
     }
 
@@ -253,19 +258,6 @@ namespace doca {
         );
     }
 
-    auto rdma_context::connection_request(doca_rdma_connection *conn, doca_data ctx_user_data) -> void {
-    }
-
-    auto rdma_context::connection_established(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void {
-    }
-
-    auto rdma_context::connection_failure(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void {
-    }
-
-    auto rdma_context::connection_disconnected(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void {
-    }
-
-
     auto rdma_context::receive_completion_callback(
         doca_rdma_task_receive *task,
         doca_data task_user_data,
@@ -284,4 +276,107 @@ namespace doca {
         dest->additional_data().overwrite(be32toh(imm_be32));
         dest->resume();
     }
+
+    auto rdma_context::oob_export() const -> std::span<std::byte const> {
+        void const *base;
+        std::size_t size;
+
+        enforce_success(doca_rdma_export(handle_.handle(), &base, &size));
+
+        return std::span { static_cast<std::byte const*>(base), size };
+    }
+
+    auto rdma_context::oob_connect(std::span<std::byte const> remote_conn_details) -> doca_error_t {
+        return doca_rdma_connect(handle_.handle(), remote_conn_details.data(), remote_conn_details.size());
+    }
+
+/*
+    auto rdma_context::connect(
+        doca_rdma_addr_type address_type,
+        char const *address,
+        std::uint16_t port
+    ) -> coro::status_awaitable<> {
+        doca_rdma_addr *addr = nullptr;
+
+        auto err = doca_rdma_addr_create(address_type, address, port, &addr);
+
+        if(err != DOCA_SUCCESS) {
+            
+        }
+    }
+ 
+    auto rdma_context::accept_connection(
+        std::uint16_t port
+    ) -> coro::status_awaitable<> {
+        auto err = doca_rdma_listen_to_port(handle_.handle(), port);
+
+        if(err != DOCA_SUCCESS) {
+            return coro::status_awaitable<>::from_value(err);
+        }
+
+        auto result = coro::status_awaitable<>::create_space();
+        accept_receptable_ = result.receptable_ptr();
+        return result;
+    }
+
+    auto rdma_context::connection_request(
+        doca_rdma_connection *conn,
+        doca_data ctx_user_data
+    ) -> void {
+        auto ctx = static_cast<context*>(ctx_user_data.ptr);
+        auto rdma = static_cast<rdma_context*>(ctx);
+
+        assert(!rdma->connected_);
+        assert(rdma->accept_receptable_ != nullptr);
+    
+        // TODO: mechanism to decide when to accept a connection
+        auto err = doca_rdma_connection_accept(conn);
+
+        if(err != DOCA_SUCCESS) {
+            rdma->accept_receptable_->set_error(err);
+        }
+    }
+
+    auto rdma_context::connection_established(
+        doca_rdma_connection *conn,
+        [[maybe_unused]] doca_data conn_user_data,
+        doca_data ctx_user_data
+    ) -> void {
+        auto ctx = static_cast<context*>(ctx_user_data.ptr);
+        auto rdma = static_cast<rdma_context*>(ctx);
+
+        assert(!rdma->connected_);
+        assert(rdma->accept_receptable_ != nullptr);
+    
+        rdma->connected_ = true;
+        rdma->accept_receptable_->set_value(DOCA_SUCCESS);
+    }
+
+    auto rdma_context::connection_failure(
+        doca_rdma_connection *conn,
+        doca_data conn_user_data,
+        doca_data ctx_user_data
+    ) -> void {
+        auto ctx = static_cast<context*>(ctx_user_data.ptr);
+        auto rdma = static_cast<rdma_context*>(ctx);
+
+        assert(!rdma->connected_);
+        assert(rdma->accept_receptable_ != nullptr);
+    
+        rdma->accept_receptable_->set_error(DOCA_ERROR_CONNECTION_ABORTED);    
+    }
+
+    auto rdma_context::connection_disconnected(
+        doca_rdma_connection *conn,
+        doca_data conn_user_data,
+        doca_data ctx_user_data
+    ) -> void {
+        auto ctx = static_cast<context*>(ctx_user_data.ptr);
+        auto rdma = static_cast<rdma_context*>(ctx);
+
+        assert(rdma->connected_);
+
+        rdma->connected_ = false;
+    }
+ */
 }
