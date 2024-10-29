@@ -14,10 +14,10 @@
 
 auto rdma_exchange_connection_details(
     doca::progress_engine *engine,
-    doca::device &dev,
     std::span<std::byte const> local_conn_details
 ) -> doca::coro::eager_task<std::vector<std::byte>> {
-    auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0", DOCA_DEVINFO_REP_FILTER_NET );
+    auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
+    auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0", DOCA_DEVINFO_REP_FILTER_NET);
     auto server = co_await engine->create_context<doca::comch::server>("vss-rdma-oob-send-receive-test", dev, rep);
 
     auto conn = co_await server->accept();
@@ -28,10 +28,10 @@ auto rdma_exchange_connection_details(
         throw doca::doca_exception(err);
     }
 
-    auto bytes = std::vector<std::byte>{
+    auto bytes = std::vector<std::byte>(
         reinterpret_cast<std::byte*>(remote_msg.data()),
         reinterpret_cast<std::byte*>(remote_msg.data()) + remote_msg.size()
-    };
+    );
 
     co_return bytes;
 }
@@ -39,17 +39,10 @@ auto rdma_exchange_connection_details(
 auto rdma_receive(
     doca::progress_engine *engine
 ) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr(
-        "03:00.0",
-        {
-            doca::device_capability::rdma,
-            doca::device_capability::comch_client
-        }
-    );
-
+    auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::rdma);
     auto rdma = co_await engine->create_context<doca::rdma_context>(dev);
     auto local_conn_details = rdma->oob_export();
-    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, dev, local_conn_details);
+    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, local_conn_details);
 
     auto err = rdma->oob_connect(remote_conn_details);
 
