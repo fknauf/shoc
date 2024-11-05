@@ -12,6 +12,7 @@ add_project_arguments('-fcoroutines', language: ['cpp'])
 
 
 deps = [
+        dependency('doca-aes-gcm'),
         dependency('doca-common'),
         dependency('doca-compress'),
         dependency('doca-comch'),
@@ -21,6 +22,7 @@ deps = [
 ]
 
 common_srcs = [
+    'doca/aes_gcm.cpp',
     'doca/buffer.cpp',
     'doca/buffer_inventory.cpp',
     'doca/buffer_pool.cpp',
@@ -122,6 +124,7 @@ executable('test-docapp',
         [
                 'tests/coro/group_task.cpp',
                 'tests/coro/group_value_awaitable.cpp',
+                'tests/group_aes_gcm.cpp',
                 'tests/group_compress.cpp',
                 'tests/group_dma.cpp',
                 'tests/group_engine.cpp',

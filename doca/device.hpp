@@ -16,7 +16,8 @@ namespace doca {
         comch_server,
         comch_client,
         dma,
-        rdma
+        rdma,
+        aes_gcm
     };
 
     /**

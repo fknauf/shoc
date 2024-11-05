@@ -1,5 +1,6 @@
 #include "device.hpp"
 
+#include <doca_aes_gcm.h>
 #include <doca_compress.h>
 #include <doca_comch.h>
 #include <doca_comch_consumer.h>
@@ -70,17 +71,21 @@ namespace doca {
             switch(required_cap) {
                 case device_capability::compress_deflate:
                     return doca_compress_cap_task_compress_deflate_is_supported(dev) == DOCA_SUCCESS
-                        && doca_compress_cap_task_decompress_deflate_is_supported(dev) == DOCA_SUCCESS;
+                        && doca_compress_cap_task_decompress_deflate_is_supported(dev) == DOCA_SUCCESS
+                        ;
                 case device_capability::comch_client:
                     return doca_comch_cap_client_is_supported(dev) == DOCA_SUCCESS
                         && doca_comch_consumer_cap_is_supported(dev) == DOCA_SUCCESS
-                        && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS;
+                        && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS
+                        ;
                 case device_capability::comch_server:
                     return doca_comch_cap_server_is_supported(dev) == DOCA_SUCCESS
                         && doca_comch_consumer_cap_is_supported(dev) == DOCA_SUCCESS
-                        && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS;
+                        && doca_comch_producer_cap_is_supported(dev) == DOCA_SUCCESS
+                        ;
                 case device_capability::dma:
-                    return doca_dma_cap_task_memcpy_is_supported(dev) == DOCA_SUCCESS;
+                    return doca_dma_cap_task_memcpy_is_supported(dev) == DOCA_SUCCESS
+                        ;
                 case device_capability::rdma:
                     return doca_rdma_cap_task_receive_is_supported(dev) == DOCA_SUCCESS
                         && doca_rdma_cap_task_send_is_supported(dev) == DOCA_SUCCESS
@@ -92,7 +97,20 @@ namespace doca {
                         && doca_rdma_cap_task_atomic_fetch_add_is_supported(dev) == DOCA_SUCCESS
                         && doca_rdma_cap_task_remote_net_sync_event_get_is_supported(dev) == DOCA_SUCCESS
                         && doca_rdma_cap_task_remote_net_sync_event_notify_set_is_supported(dev) == DOCA_SUCCESS
-                        && doca_rdma_cap_task_remote_net_sync_event_notify_add_is_supported(dev) == DOCA_SUCCESS;
+                        && doca_rdma_cap_task_remote_net_sync_event_notify_add_is_supported(dev) == DOCA_SUCCESS
+                        ;
+                case device_capability::aes_gcm:
+                    return doca_aes_gcm_cap_task_encrypt_is_supported(dev) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_encrypt_is_tag_96_supported(dev) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_encrypt_is_tag_128_supported(dev) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_encrypt_is_key_type_supported(dev, DOCA_AES_GCM_KEY_128) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_encrypt_is_key_type_supported(dev, DOCA_AES_GCM_KEY_256) == DOCA_SUCCESS
+                        && doca_aes_gcm_cap_task_decrypt_is_supported(dev) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_decrypt_is_tag_96_supported(dev) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_decrypt_is_tag_128_supported(dev) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_decrypt_is_key_type_supported(dev, DOCA_AES_GCM_KEY_128) == DOCA_SUCCESS
+                        //&& doca_aes_gcm_cap_task_decrypt_is_key_type_supported(dev, DOCA_AES_GCM_KEY_256) == DOCA_SUCCESS
+                        ;
                 default:
                     return false;
             }
