@@ -124,7 +124,8 @@ executable('test-docapp',
         [
                 'tests/coro/group_task.cpp',
                 'tests/coro/group_value_awaitable.cpp',
-                'tests/group_aes_gcm.cpp',
+                # keep commented until we have a crypto-enabled bluefield
+                # 'tests/group_aes_gcm.cpp',
                 'tests/group_compress.cpp',
                 'tests/group_dma.cpp',
                 'tests/group_engine.cpp',
