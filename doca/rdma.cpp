@@ -3,7 +3,7 @@
 #include "common/status.hpp"
 #include "progress_engine.hpp"
 
-#include <endian.h>
+#include <doca_bitfield.h>
 
 namespace doca {
     rdma_context::rdma_context(
@@ -123,7 +123,7 @@ namespace doca {
     }
 
     auto rdma_context::send(buffer const &src, std::uint32_t immediate_data) -> coro::status_awaitable<> {
-        auto imm_be32 = htobe32(immediate_data);
+        auto imm_be32 = DOCA_HTOBE32(immediate_data);
 
         return detail::plain_status_offload<
             doca_rdma_task_send_imm_allocate_init,
@@ -273,7 +273,7 @@ namespace doca {
         doca_task_free(base_task);
 
         dest->set_value(std::move(status));
-        dest->additional_data().overwrite(be32toh(imm_be32));
+        dest->additional_data().overwrite(DOCA_BETOH32(imm_be32));
         dest->resume();
     }
 
