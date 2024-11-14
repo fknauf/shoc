@@ -1,8 +1,8 @@
 #pragma once
 
 #include "error_receptable.hpp"
-#include "overload.hpp"
 
+#include <doca/common/overload.hpp>
 #include <doca/error.hpp>
 #include <doca/logger.hpp>
 
@@ -96,10 +96,10 @@ namespace doca::coro {
 
     /**
      * Awaitable that allows a single coroutine to wait for a single value.
-     * 
+     *
      * Must be kept alive long enough for the corresponding callback to fill the
      * receptable. Normally this can be done by co_await-ing it.
-     * 
+     *
      * Most member functions here are intended for internal use; the user is only
      * expected to use co_await, move assignment, move construction, and default
      * construction (in which case co_awaiting the empty awaitable will throw an
@@ -169,7 +169,7 @@ namespace doca::coro {
             enforce(dest_ != nullptr, DOCA_ERROR_EMPTY);
             return dest_->value();
         }
-    
+
     private:
         std::unique_ptr<payload_type> dest_;
     };

@@ -117,6 +117,18 @@ executable('rdma_host_send', [ 'progs/rdma_host_send.cpp' ],
         include_directories: inc_dirs,
         install: false)
 
+executable('sync_event_host', [ 'progs/sync_event_host.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
+executable('sync_event_dpu', [ 'progs/sync_event_dpu.cpp' ],
+        dependencies : deps,
+        link_with: libdocapp,
+        include_directories: inc_dirs,
+        install: false)
+
 executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)
 

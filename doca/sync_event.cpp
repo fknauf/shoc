@@ -6,22 +6,54 @@
 namespace doca {
     sync_event::sync_event(
         context_parent *parent,
-        device &subscriber_dev,
+        sync_event_publisher_location publisher,
+        sync_event_subscriber_location subscriber,
         std::uint32_t max_tasks
-    ): 
+    ):
         context { parent }
     {
         doca_sync_event *event;
         enforce_success(doca_sync_event_create(&event));
         handle_.reset(event);
 
-        init_state_changed_callback();
+        init_callbacks(max_tasks);
+        init_add_publisher(publisher);
+        init_add_subscriber(subscriber);
+    }
 
-        enforce_success(doca_sync_event_add_publisher_location_remote_pci(handle_.handle()));
-        enforce_success(doca_sync_event_add_subscriber_location_cpu(
-            handle_.handle(),
-            subscriber_dev.handle()
+    auto sync_event::init_add_publisher(sync_event::publisher_location const &pub) -> void {
+        enforce_success(std::visit(
+            overload {
+                [this](sync_event_location_pci) -> doca_error_t {
+                    return doca_sync_event_add_publisher_location_remote_pci(handle_.handle());
+                },
+                [this](sync_event_location_remote_net) -> doca_error_t {
+                    return doca_sync_event_add_publisher_location_remote_net(handle_.handle());
+                },
+                [this](device const &dev) -> doca_error_t {
+                    return doca_sync_event_add_publisher_location_cpu(handle_.handle(), dev.handle());
+                }
+            },
+            pub
         ));
+    }
+
+    auto sync_event::init_add_subscriber(sync_event::subscriber_location const &sub) -> void {
+        enforce_success(std::visit(
+            overload {
+                [this](sync_event_location_pci) -> doca_error_t {
+                    return doca_sync_event_add_subscriber_location_remote_pci(handle_.handle());
+                },
+                [this](device const &dev) -> doca_error_t {
+                    return doca_sync_event_add_subscriber_location_cpu(handle_.handle(), dev.handle());
+                }
+            },
+            sub
+        ));
+    }
+
+    auto sync_event::init_callbacks(std::uint32_t max_tasks) -> void {
+        init_state_changed_callback();
 
         enforce_success(doca_sync_event_task_get_set_conf(
             handle_.handle(),
@@ -67,7 +99,7 @@ namespace doca {
 
         return std::span { base, size };
     }
-    
+
     auto sync_event::export_to_remote_net() const -> std::span<std::uint8_t const> {
         std::uint8_t const *base = nullptr;
         std::size_t size = 0;

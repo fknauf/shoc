@@ -161,7 +161,7 @@ namespace doca {
     }
 
     auto rdma_context::write(buffer const &src, buffer &dest, std::uint32_t immediate_data) -> coro::status_awaitable<> {
-        auto imm_be32 = htobe32(immediate_data);
+        auto imm_be32 = DOCA_HTOBE32(immediate_data);
 
         return detail::plain_status_offload<
             doca_rdma_task_write_imm_allocate_init,

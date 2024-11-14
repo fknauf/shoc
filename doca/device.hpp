@@ -17,7 +17,8 @@ namespace doca {
         comch_client,
         dma,
         rdma,
-        aes_gcm
+        aes_gcm,
+        sync_event_pci
     };
 
     /**

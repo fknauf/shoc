@@ -1,8 +1,8 @@
 #pragma once
 
 #include "value_awaitable.hpp"
-#include "overload.hpp"
 
+#include <doca/common/overload.hpp>
 #include <doca/error.hpp>
 
 #include <concepts>
@@ -12,14 +12,14 @@
 
 /**
  * This module defines an awaitable whose result is a status code (doca_error_t).
- * 
+ *
  * Calls that use these will return an error code when something in the DOCA API returns
  * an error and only throw exceptions for errors that don't originate from DOCA. When an
  * operation generates a status code in addition to optional additional data, a buffer that
  * will accept these data can be supplied, as in the compress subsystem, where after
- * 
+ *
  * auto status = co_await ctx->compress(src, dest, &checksums);
- * 
+ *
  * status will be the error code (e.g. DOCA_SUCCESS), dest will contain the compressed
  * data, and checksums will contain the CRC and Adler checksums calculated during compression.
  */
@@ -45,7 +45,7 @@ namespace doca::coro {
         explicit operator bool() const noexcept {
             return buf_ != nullptr;
         }
-    
+
     private:
         AdditionalData *buf_;
     };
@@ -64,12 +64,12 @@ namespace doca::coro {
      * such that the waiter on suspend will register itself in this receptable upon suspend, and
      * the callback will set the value, overwrite the additional data buffer (if any), and then
      * resume the waiting coroutine.
-     * 
+     *
      * Only a single waiting coroutine is supported.
-     * 
+     *
      * The receptable will be owned by the awaitable, so the awaitable must be kept alive long
      * enough for the callback to write data into it.
-     * 
+     *
      * Not part of the API.
      */
     template<typename AdditionalData>
@@ -86,7 +86,7 @@ namespace doca::coro {
         status_receptable(doca_error_t status):
             value_receptable(std::move(status))
         {}
-        
+
         status_receptable(std::exception_ptr ex):
             value_receptable(ex)
         {}
@@ -106,14 +106,14 @@ namespace doca::coro {
 
     /**
      * Awaitable class for a status code with support for an additional data buffer.
-     * 
+     *
      * Must be co_awaited by exactly one coroutine during its lifetime. More technically: must
      * be kept alive long enough for a callback to fill the receptable, and only one waiting
      * coroutine is supported.
-     * 
+     *
      * Most functionality here is internal to the library; client code should only use co_await
      * on these objects and possibly move them around the place a bit before co_awaiting.
-     * 
+     *
      * TODO: Make the abstraction less leaky, so that client code can't use what it isn't supposed
      * to use.
      */

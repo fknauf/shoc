@@ -111,6 +111,10 @@ namespace doca {
                         //&& doca_aes_gcm_cap_task_decrypt_is_key_type_supported(dev, DOCA_AES_GCM_KEY_128) == DOCA_SUCCESS
                         //&& doca_aes_gcm_cap_task_decrypt_is_key_type_supported(dev, DOCA_AES_GCM_KEY_256) == DOCA_SUCCESS
                         ;
+                case device_capability::sync_event_pci:
+                    return doca_sync_event_cap_is_export_to_remote_pci_supported(dev) == DOCA_SUCCESS
+                        && doca_sync_event_cap_task_wait_eq_is_supported(dev) == DOCA_SUCCESS
+                        ;
                 default:
                     return false;
             }
