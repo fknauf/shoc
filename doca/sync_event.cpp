@@ -6,6 +6,26 @@
 namespace doca {
     sync_event::sync_event(
         context_parent *parent,
+        device const &dev,
+        std::span<std::byte const> export_data,
+        std::uint32_t max_tasks
+    ):
+        context { parent }
+    {
+        doca_sync_event *event;
+        enforce_success(doca_sync_event_create_from_export(
+            dev.handle(),
+            reinterpret_cast<std::uint8_t const*>(export_data.data()),
+            export_data.size(),
+            &event
+        ));
+        handle_.reset(event);
+
+        init_callbacks(max_tasks);
+    }
+
+    sync_event::sync_event(
+        context_parent *parent,
         sync_event_publisher_location publisher,
         sync_event_subscriber_location subscriber,
         std::uint32_t max_tasks
@@ -91,20 +111,28 @@ namespace doca {
         ));
     }
 
-    auto sync_event::export_to_remote_pci(device const &dev) const -> std::span<std::uint8_t const> {
-        std::uint8_t const *base = nullptr;
+    auto sync_event::export_to_remote_pci(device const &dev) const -> std::span<std::byte const> {
+        std::byte const *base = nullptr;
         std::size_t size = 0;
 
-        enforce_success(doca_sync_event_export_to_remote_pci(handle_.handle(), dev.handle(), &base, &size));
+        enforce_success(doca_sync_event_export_to_remote_pci(
+            handle_.handle(),
+            dev.handle(),
+            reinterpret_cast<std::uint8_t const**>(&base),
+            &size));
 
         return std::span { base, size };
     }
 
-    auto sync_event::export_to_remote_net() const -> std::span<std::uint8_t const> {
-        std::uint8_t const *base = nullptr;
+    auto sync_event::export_to_remote_net() const -> std::span<std::byte const> {
+        std::byte const *base = nullptr;
         std::size_t size = 0;
 
-        enforce_success(doca_sync_event_export_to_remote_net(handle_.handle(), &base, &size));
+        enforce_success(doca_sync_event_export_to_remote_net(
+            handle_.handle(),
+            reinterpret_cast<std::uint8_t const**>(&base),
+            &size
+        ));
 
         return std::span { base, size };
     }
@@ -180,13 +208,13 @@ namespace doca {
 
     auto sync_event_remote_net::from_export(
         device const &dev,
-        std::span<std::uint8_t const> data_stream
+        std::span<std::byte const> data_stream
     ) -> sync_event_remote_net {
         doca_sync_event_remote_net *event = nullptr;
 
         enforce_success(doca_sync_event_remote_net_create_from_export(
             dev.handle(),
-            data_stream.data(),
+            reinterpret_cast<std::uint8_t const*>(data_stream.data()),
             data_stream.size(),
             &event
         ));

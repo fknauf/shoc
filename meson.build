@@ -117,13 +117,13 @@ executable('rdma_host_send', [ 'progs/rdma_host_send.cpp' ],
         include_directories: inc_dirs,
         install: false)
 
-executable('sync_event_host', [ 'progs/sync_event_host.cpp' ],
+executable('sync_event_local_pci', [ 'progs/sync_event_local_pci.cpp' ],
         dependencies : deps,
         link_with: libdocapp,
         include_directories: inc_dirs,
         install: false)
 
-executable('sync_event_dpu', [ 'progs/sync_event_dpu.cpp' ],
+executable('sync_event_remote_pci', [ 'progs/sync_event_remote_pci.cpp' ],
         dependencies : deps,
         link_with: libdocapp,
         include_directories: inc_dirs,

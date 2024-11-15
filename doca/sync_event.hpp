@@ -71,6 +71,13 @@ namespace doca {
             }
         }
 
+        sync_event(
+            context_parent *parent,
+            device const &dev,
+            std::span<std::byte const> export_data,
+            std::uint32_t max_tasks
+        );
+
         [[nodiscard]]
         auto as_ctx() const noexcept -> doca_ctx* override {
             return doca_sync_event_as_ctx(handle_.handle());
@@ -80,9 +87,9 @@ namespace doca {
         auto handle() const noexcept { return handle_.handle(); }
 
         [[nodiscard]]
-        auto export_to_remote_pci(device const &dev) const -> std::span<std::uint8_t const>;
+        auto export_to_remote_pci(device const &dev) const -> std::span<std::byte const>;
         [[nodiscard]]
-        auto export_to_remote_net() const -> std::span<std::uint8_t const>;
+        auto export_to_remote_net() const -> std::span<std::byte const>;
 
         [[nodiscard]]
         auto get(std::uint64_t *dest) const -> coro::status_awaitable<>;
@@ -123,7 +130,7 @@ namespace doca {
         [[nodiscard]]
         static auto from_export(
             device const &dev,
-            std::span<std::uint8_t const> data_stream
+            std::span<std::byte const> data_stream
         ) -> sync_event_remote_net;
 
         [[nodiscard]]
