@@ -22,9 +22,9 @@ namespace doca {
     };
 
     /**
-     * Base class for DOCA devices.
+     * DOCA device handle, used by contexts and memory mappings.
      */
-    class device
+    class device final
     {
     public:
         device() = default;
@@ -33,8 +33,9 @@ namespace doca {
         device &operator=(device const &) = delete;
         device &operator=(device&&) = default;
 
-        virtual ~device() = default;
-
+        /**
+         * Underlying handle for use in DOCA SDK functions. Mainly for library-internal use.
+         */
         [[nodiscard]] auto handle() const { return handle_.handle(); }
         [[nodiscard]] auto as_devinfo() const -> doca_devinfo*;
         [[nodiscard]] auto has_capability(device_capability required_cap) const noexcept -> bool;
@@ -57,7 +58,10 @@ namespace doca {
         unique_handle<doca_dev, doca_dev_close> handle_;
     };
 
-    class device_representor {
+    /**
+     * Device representor handle, e.g. for comch servers
+     */
+    class device_representor final {
     public:
         device_representor() = default;
         device_representor(device_representor const &) = delete;

@@ -25,7 +25,7 @@ auto sync_event_remote(
     auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0");
 
     auto server = co_await engine->create_context<doca::comch::server>("vss-sync-event-test", dev, rep);
-    auto conn = co_await server->accept_connection();
+    auto conn = co_await server->accept();
     msg = co_await conn->msg_recv();
 #else
     auto dev = doca::device::find_by_pci_addr(

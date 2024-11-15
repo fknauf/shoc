@@ -25,7 +25,7 @@ auto sync_event_local(doca::progress_engine *engine) -> doca::coro::fiber {
     [[maybe_unused]] auto event_descriptor = sync->export_to_remote_pci(dev);
 
     auto server = co_await engine->create_context<doca::comch::server>("vss-sync-event-test", dev, rep);
-    auto conn = co_await server->accept_connection();
+    auto conn = co_await server->accept();
     err = co_await conn->send(event_descriptor);
 #else
     auto dev = doca::device::find_by_pci_addr(
