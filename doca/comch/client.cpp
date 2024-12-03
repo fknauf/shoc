@@ -43,10 +43,8 @@ namespace doca::comch {
     }
 
     client::~client() {
-        //assert(get_state() == DOCA_CTX_STATE_IDLE);
-
-        if(get_state() != DOCA_CTX_STATE_IDLE) {
-            logger->error("client not idle upon destruction, state = {}", get_state());
+        if(doca_state() != DOCA_CTX_STATE_IDLE) {
+            logger->error("client not idle upon destruction, state = {}", doca_state());
         }
     }
 

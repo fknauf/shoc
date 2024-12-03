@@ -41,15 +41,10 @@ auto rdma_receive(
 ) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::rdma);
     auto rdma = co_await engine->create_context<doca::rdma_context>(dev);
-    auto local_conn_details = rdma->oob_export();
-    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, local_conn_details);
+    auto conn = rdma->export_connection();
 
-    auto err = rdma->oob_connect(remote_conn_details);
-
-    if(err != DOCA_SUCCESS) {
-        doca::logger->error("could not establish connection: {}", doca_error_get_descr(err));
-        co_return;
-    }
+    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, conn.details());
+    conn.connect(remote_conn_details);
 
     auto space = std::vector<char>(1024);
     auto mmap = doca::memory_map { dev, space };
@@ -57,7 +52,7 @@ auto rdma_receive(
     auto recv_buf = bufinv.buf_get_by_addr(mmap, space);
 
     std::uint32_t immediate_data = 0;
-    err = co_await rdma->receive(recv_buf, &immediate_data);
+    auto err = co_await rdma->receive(recv_buf, &immediate_data);
 
     if(err == DOCA_SUCCESS) {
         fmt::printf("{}\nimm = {}", std::string_view{ recv_buf.data().begin(), recv_buf.data().end() }, immediate_data);

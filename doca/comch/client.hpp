@@ -96,6 +96,11 @@ namespace doca::comch {
             doca_ctx_states next_state
         ) -> void override;
 
+        [[nodiscard]]
+        auto preparing_stop() const noexcept -> bool override {
+            return state_ == connection_state::DISCONNECTING;
+        }
+
     private:
         static auto msg_recv_callback(
             doca_comch_event_msg_recv *event,

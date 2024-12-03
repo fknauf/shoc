@@ -218,7 +218,7 @@ namespace doca::comch {
     }
 
     server::~server() {
-        assert(get_state() == DOCA_CTX_STATE_IDLE);
+        assert(doca_state() == DOCA_CTX_STATE_IDLE);
     }
 
     auto server::stop() -> context_state_awaitable {

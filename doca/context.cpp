@@ -75,7 +75,23 @@ namespace doca {
         return { shared_from_this(), DOCA_CTX_STATE_IDLE };
     }
 
-    auto context::connect() -> void {
+    auto context::state() const -> context_state {
+        // context should not be available to users while doca_ctx is starting.
+        assert(doca_state() != DOCA_CTX_STATE_STARTING);
+
+        switch(doca_state()) {
+        case DOCA_CTX_STATE_IDLE:
+            return context_state::idle;
+        case DOCA_CTX_STATE_STARTING:
+            throw doca_error(DOCA_ERROR_BAD_STATE);
+        case DOCA_CTX_STATE_RUNNING:
+            return preparing_stop() ? context_state::stopping : context_state::running;
+        case DOCA_CTX_STATE_STOPPING:
+            return context_state::stopping;
+        }        
+    }
+
+    auto context::connect_to_engine() -> void {
         engine()->connect(this);
     }
 
@@ -89,7 +105,7 @@ namespace doca {
         // depending on the concrete context, doca_ctx_start will go either into DOCA_CTX_STATE_STARTING,
         // in which case this awaitable has to suspend and wait for an async event to continue, or
         // directly into DOCA_CTX_STATE_RUNNING, in which case suspension is unnecessary.
-        return ctx_->get_state() == desired_state_;
+        return ctx_->doca_state() == desired_state_;
     }
 
     auto context_state_awaitable::await_suspend(std::coroutine_handle<> caller) noexcept -> void {

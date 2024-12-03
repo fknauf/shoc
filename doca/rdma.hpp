@@ -12,6 +12,7 @@
 #include <concepts>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 namespace doca {
     struct rdma_config {
@@ -20,40 +21,44 @@ namespace doca {
         std::uint32_t max_tasks = 16;
     };
 
-    class rdma_context:
-        public context
-    {
+    class rdma_context;
+
+    class rdma_connection {
     public:
-        rdma_context(
-            context_parent *parent,
-            device &dev,
-            rdma_config config = {}
-        );
+        rdma_connection(rdma_context *parent);
+
+        auto connect(std::span<std::byte const> remote_details) -> void;
+        auto connect(std::string_view remote_details) -> void;
 
         [[nodiscard]]
-        auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_rdma_as_ctx(handle_.handle());
+        auto details() const noexcept {
+            return details_;
         }
 
-        auto receive(buffer &dest, std::uint32_t *immediate_data = nullptr) -> coro::status_awaitable<std::uint32_t>;
-        auto send(buffer const &src) -> coro::status_awaitable<>;
-        auto send(buffer const &src, std::uint32_t immediate_data) -> coro::status_awaitable<>;
+        auto send(
+            buffer const &src
+        ) -> coro::status_awaitable<>;
 
-        auto read(buffer const &src, buffer &dest) -> coro::status_awaitable<>;
-        auto write(buffer const &src, buffer &dest) -> coro::status_awaitable<>;
-        auto write(buffer const &src, buffer &dest, std::uint32_t immediate_data) -> coro::status_awaitable<>;
+        auto send(
+            buffer const &src,
+            std::uint32_t immediate_data
+        ) -> coro::status_awaitable<>;
 
-        // template<std::predicate<doca_rdma_connection*> AcceptCondition>
-        // auto accept(std::uint16_t port) -> coro::value_awaitable<rdma_connection>;
-        // 
-        // auto connect(
-        //     doca_rdma_addr_type address_type,
-        //     char const *address,
-        //     std::uint16_t port
-        // ) -> coro::status_awaitable<>;
+        auto read(
+            buffer const &src,
+            buffer &dest
+        ) -> coro::status_awaitable<>;
 
-        auto oob_export() const -> std::span<std::byte const>;
-        auto oob_connect(std::span<std::byte const> remote_conn_details) -> doca_error_t;
+        auto write(
+            buffer const &src,
+            buffer &dest
+        ) -> coro::status_awaitable<>;
+
+        auto write(
+            buffer const &src,
+            buffer &dest,
+            std::uint32_t immediate_data
+        ) -> coro::status_awaitable<>;
 
         auto atomic_cmp_swp(
             buffer dst,
@@ -83,6 +88,38 @@ namespace doca {
             buffer result,
             std::uint64_t add_data
         ) -> coro::status_awaitable<>;
+
+    private:
+        rdma_context *parent_ = nullptr;
+        std::span<std::byte const> details_;
+        doca_rdma_connection *handle_ = nullptr;
+    };
+
+    class rdma_context:
+        public context
+    {
+    public:
+        rdma_context(
+            context_parent *parent,
+            device &dev,
+            rdma_config config = {}
+        );
+
+        [[nodiscard]]
+        auto as_ctx() const noexcept -> doca_ctx* override {
+            return doca_rdma_as_ctx(handle_.handle());
+        }
+
+        auto receive(
+            buffer &dest,
+            std::uint32_t *immediate_data = nullptr
+        ) -> coro::status_awaitable<std::uint32_t>;
+
+        [[nodiscard]]
+        auto export_connection() -> rdma_connection;
+
+        [[nodiscard]]
+        auto handle() const noexcept { return handle_.handle(); }
 
     private:
         //static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) -> void;

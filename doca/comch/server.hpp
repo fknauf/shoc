@@ -139,6 +139,8 @@ namespace doca::comch {
         auto accept_consumer() -> id_awaitable;
 
         auto signal_stopped_child(context *stopped_child) -> void override;
+
+        [[nodiscard]]
         auto engine() -> progress_engine* override;
 
     private:
@@ -250,6 +252,11 @@ namespace doca::comch {
             doca_ctx_states prev_state,
             doca_ctx_states next_state
         ) -> void override;
+
+        [[nodiscard]]
+        auto preparing_stop() const noexcept -> bool override {
+            return stop_requested_ && doca_state() == DOCA_CTX_STATE_RUNNING;
+        }
 
     private:
         auto do_stop_if_able() -> void;

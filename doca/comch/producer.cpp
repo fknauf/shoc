@@ -28,7 +28,7 @@ namespace doca::comch {
     }
 
     producer::~producer() {
-        assert(get_state() == DOCA_CTX_STATE_IDLE);
+        assert(doca_state() == DOCA_CTX_STATE_IDLE);
     }
 
     auto producer::send(

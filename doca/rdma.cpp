@@ -6,6 +6,188 @@
 #include <doca_bitfield.h>
 
 namespace doca {
+    rdma_connection::rdma_connection(rdma_context *parent):
+        parent_ { parent }
+    {
+        void const *base = nullptr;
+        std::size_t size = 0;
+
+        enforce_success(doca_rdma_export(parent_->handle(), &base, &size, &handle_));
+        details_ = std::span { static_cast<std::byte const*>(base), size };
+
+        doca_data conn_user_data = { .ptr = this };
+        enforce_success(doca_rdma_connection_set_user_data(handle_, conn_user_data));
+    }
+
+    auto rdma_connection::connect(std::span<std::byte const> remote_details) -> void {
+        enforce_success(doca_rdma_connect(parent_->handle(), remote_details.data(), remote_details.size(), handle_));
+    }
+
+    auto rdma_connection::connect(std::string_view remote_details) -> void {
+        auto bytes = std::span {
+            reinterpret_cast<std::byte const*>(remote_details.data()),
+            remote_details.size()
+        };
+        connect(bytes);
+    }
+
+    auto rdma_connection::send(buffer const &src) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_send_allocate_init,
+            doca_rdma_task_send_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            src.handle()
+        );
+    }
+
+    auto rdma_connection::send(buffer const &src, std::uint32_t immediate_data) -> coro::status_awaitable<> {
+        auto imm_be32 = DOCA_HTOBE32(immediate_data);
+
+        return detail::plain_status_offload<
+            doca_rdma_task_send_imm_allocate_init,
+            doca_rdma_task_send_imm_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            src.handle(),
+            imm_be32
+        );
+    }
+
+    auto rdma_connection::read(buffer const &src, buffer &dest) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_read_allocate_init,
+            doca_rdma_task_read_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            src.handle(),
+            dest.handle()
+        );
+    }
+
+    auto rdma_connection::write(buffer const &src, buffer &dest) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_write_allocate_init,
+            doca_rdma_task_write_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            src.handle(),
+            dest.handle()
+        );
+    }
+
+    auto rdma_connection::write(buffer const &src, buffer &dest, std::uint32_t immediate_data) -> coro::status_awaitable<> {
+        auto imm_be32 = DOCA_HTOBE32(immediate_data);
+
+        return detail::plain_status_offload<
+            doca_rdma_task_write_imm_allocate_init,
+            doca_rdma_task_write_imm_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            src.handle(),
+            dest.handle(),
+            imm_be32
+        );
+    }
+
+    auto rdma_connection::atomic_cmp_swp(
+        buffer dst,
+        buffer result,
+        std::uint64_t cmp_data,
+        std::uint64_t swap_data
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_atomic_cmp_swp_allocate_init,
+            doca_rdma_task_atomic_cmp_swp_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            dst.handle(),
+            result.handle(),
+            cmp_data,
+            swap_data
+        );
+    }
+
+    auto rdma_connection::atomic_fetch_add(
+        buffer dst,
+        buffer result,
+        std::uint64_t add_data
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_atomic_fetch_add_allocate_init,
+            doca_rdma_task_atomic_fetch_add_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            dst.handle(),
+            result.handle(),
+            add_data
+        );
+    }
+
+    auto rdma_connection::remote_net_sync_event_get(
+        sync_event_remote_net const &event,
+        buffer dst
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_remote_net_sync_event_get_allocate_init,
+            doca_rdma_task_remote_net_sync_event_get_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            event.handle(),
+            dst.handle()
+        );
+    }
+        
+    auto rdma_connection::remote_net_sync_event_notify_set(
+        sync_event_remote_net const &event,
+        buffer src
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_remote_net_sync_event_notify_set_allocate_init,
+            doca_rdma_task_remote_net_sync_event_notify_set_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            event.handle(),
+            src.handle()
+        );
+    }
+
+    auto rdma_connection::remote_net_sync_event_notify_add(
+        sync_event_remote_net const &event,
+        buffer result,
+        std::uint64_t add_data
+    ) -> coro::status_awaitable<> {
+        return detail::plain_status_offload<
+            doca_rdma_task_remote_net_sync_event_notify_add_allocate_init,
+            doca_rdma_task_remote_net_sync_event_notify_add_as_task
+        >(
+            parent_->engine(),
+            parent_->handle(),
+            handle_,
+            event.handle(),
+            result.handle(),
+            add_data
+        );
+    }
+
     rdma_context::rdma_context(
         context_parent *parent,
         device &dev,
@@ -111,153 +293,6 @@ namespace doca {
         );
     }
 
-    auto rdma_context::send(buffer const &src) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_send_allocate_init,
-            doca_rdma_task_send_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            src.handle()
-        );
-    }
-
-    auto rdma_context::send(buffer const &src, std::uint32_t immediate_data) -> coro::status_awaitable<> {
-        auto imm_be32 = DOCA_HTOBE32(immediate_data);
-
-        return detail::plain_status_offload<
-            doca_rdma_task_send_imm_allocate_init,
-            doca_rdma_task_send_imm_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            src.handle(),
-            imm_be32
-        );
-    }
-
-    auto rdma_context::read(buffer const &src, buffer &dest) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_read_allocate_init,
-            doca_rdma_task_read_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            src.handle(),
-            dest.handle()
-        );
-    }
-
-    auto rdma_context::write(buffer const &src, buffer &dest) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_write_allocate_init,
-            doca_rdma_task_write_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            src.handle(),
-            dest.handle()
-        );
-    }
-
-    auto rdma_context::write(buffer const &src, buffer &dest, std::uint32_t immediate_data) -> coro::status_awaitable<> {
-        auto imm_be32 = DOCA_HTOBE32(immediate_data);
-
-        return detail::plain_status_offload<
-            doca_rdma_task_write_imm_allocate_init,
-            doca_rdma_task_write_imm_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            src.handle(),
-            dest.handle(),
-            imm_be32
-        );
-    }
-
-    auto rdma_context::atomic_cmp_swp(
-        buffer dst,
-        buffer result,
-        std::uint64_t cmp_data,
-        std::uint64_t swap_data
-    ) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_atomic_cmp_swp_allocate_init,
-            doca_rdma_task_atomic_cmp_swp_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            dst.handle(),
-            result.handle(),
-            cmp_data,
-            swap_data
-        );
-    }
-
-    auto rdma_context::atomic_fetch_add(
-        buffer dst,
-        buffer result,
-        std::uint64_t add_data
-    ) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_atomic_fetch_add_allocate_init,
-            doca_rdma_task_atomic_fetch_add_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            dst.handle(),
-            result.handle(),
-            add_data
-        );
-    }
-
-    auto rdma_context::remote_net_sync_event_get(
-        sync_event_remote_net const &event,
-        buffer dst
-    ) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_remote_net_sync_event_get_allocate_init,
-            doca_rdma_task_remote_net_sync_event_get_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            event.handle(),
-            dst.handle()
-        );
-    }
-        
-    auto rdma_context::remote_net_sync_event_notify_set(
-        sync_event_remote_net const &event,
-        buffer src
-    ) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_remote_net_sync_event_notify_set_allocate_init,
-            doca_rdma_task_remote_net_sync_event_notify_set_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            event.handle(),
-            src.handle()
-        );
-    }
-
-    auto rdma_context::remote_net_sync_event_notify_add(
-        sync_event_remote_net const &event,
-        buffer result,
-        std::uint64_t add_data
-    ) -> coro::status_awaitable<> {
-        return detail::plain_status_offload<
-            doca_rdma_task_remote_net_sync_event_notify_add_allocate_init,
-            doca_rdma_task_remote_net_sync_event_notify_add_as_task
-        >(
-            engine(),
-            handle_.handle(),
-            event.handle(),
-            result.handle(),
-            add_data
-        );
-    }
-
     auto rdma_context::receive_completion_callback(
         doca_rdma_task_receive *task,
         doca_data task_user_data,
@@ -277,17 +312,8 @@ namespace doca {
         dest->resume();
     }
 
-    auto rdma_context::oob_export() const -> std::span<std::byte const> {
-        void const *base;
-        std::size_t size;
-
-        enforce_success(doca_rdma_export(handle_.handle(), &base, &size));
-
-        return std::span { static_cast<std::byte const*>(base), size };
-    }
-
-    auto rdma_context::oob_connect(std::span<std::byte const> remote_conn_details) -> doca_error_t {
-        return doca_rdma_connect(handle_.handle(), remote_conn_details.data(), remote_conn_details.size());
+    auto rdma_context::export_connection() -> rdma_connection {
+        return { this };
     }
 
 /*

@@ -32,27 +32,17 @@ auto rdma_send(
     auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::rdma);
 
     auto rdma = co_await engine->create_context<doca::rdma_context>(dev);
-    auto conn_details = rdma->oob_export();
+    auto conn = rdma->export_connection();
 
-    auto remote_conn_details_as_string = co_await rdma_exchange_connection_details(engine, conn_details);
-    auto remote_conn_details = std::span { 
-        reinterpret_cast<std::byte const*>(remote_conn_details_as_string.data()), 
-        remote_conn_details_as_string.size()
-    };
-
-    auto err = rdma->oob_connect(remote_conn_details);
-
-    if(err != DOCA_SUCCESS) {
-        doca::logger->error("could not connect to remote RDMA context: {}", doca_error_get_descr(err));
-        co_return;
-    }
+    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, conn.details());
+    conn.connect(remote_conn_details);
 
     auto data = std::string { "Hello, bRainDMAged." };
     auto mmap = doca::memory_map { dev, data };
     auto bufinv = doca::buffer_inventory { 1 };
     auto send_buf = bufinv.buf_get_by_data(mmap, data);
 
-    err = co_await rdma->send(send_buf, 42);
+    auto err = co_await conn.send(send_buf, 42);
 
     if(err != DOCA_SUCCESS) {
         doca::logger->error("failed to send data: {}", doca_error_get_descr(err));

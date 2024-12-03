@@ -30,7 +30,7 @@ namespace doca::comch {
     }
 
     consumer::~consumer() {
-        assert(get_state() == DOCA_CTX_STATE_IDLE);
+        assert(doca_state() == DOCA_CTX_STATE_IDLE);
     }
 
     auto consumer::post_recv(buffer dest) -> consumer_recv_awaitable {

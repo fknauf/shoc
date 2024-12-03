@@ -61,6 +61,12 @@ namespace doca {
         doca_ctx_states desired_state_;
     };
 
+    enum context_state {
+        idle,
+        running,
+        stopping
+    };
+
     /**
      * Base class for DOCA contexts. Modelled as a context_parent for ease of implementation, even
      * though not all contexts can have child contexts.
@@ -110,9 +116,12 @@ namespace doca {
          * Get current context state (idle, starting, running, stopping)
          */
         [[nodiscard]]
-        auto get_state() const noexcept -> doca_ctx_states {
+        auto doca_state() const noexcept -> doca_ctx_states {
             return current_state_;
         }
+
+        [[nodiscard]]
+        auto state() const -> context_state;
 
         /**
          * Called by child contexts to signal that they have been stopped.
@@ -139,6 +148,11 @@ namespace doca {
         auto inflight_tasks() const -> std::size_t;
 
     protected:
+        [[nodiscard]]
+        virtual auto preparing_stop() const noexcept -> bool {
+            return false;
+        }
+
         /**
          * Called by child classes in the constructor to set the state-change callback and context user data
          *
@@ -174,7 +188,7 @@ namespace doca {
         /**
          * Connects this context to engine()
          */
-        auto connect() -> void;
+        auto connect_to_engine() -> void;
 
         context_parent *parent_ = nullptr;
         doca_ctx_states current_state_ = DOCA_CTX_STATE_IDLE;
@@ -294,7 +308,7 @@ namespace doca {
             logger->trace("dependent_contexts::create_context, parent = {}", static_cast<void*>(parent));
 
             auto new_context = std::make_shared<ConcreteContext>(parent, std::forward<Args>(args)...);
-            new_context->connect();
+            new_context->connect_to_engine();
 
             auto start_awaitable = new_context->start();
             active_contexts_[new_context.get()] = new_context;
