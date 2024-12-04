@@ -82,13 +82,14 @@ namespace doca {
         switch(doca_state()) {
         case DOCA_CTX_STATE_IDLE:
             return context_state::idle;
-        case DOCA_CTX_STATE_STARTING:
-            throw doca_error(DOCA_ERROR_BAD_STATE);
         case DOCA_CTX_STATE_RUNNING:
             return preparing_stop() ? context_state::stopping : context_state::running;
         case DOCA_CTX_STATE_STOPPING:
             return context_state::stopping;
-        }        
+        case DOCA_CTX_STATE_STARTING:
+        default:
+            throw doca_error(DOCA_ERROR_BAD_STATE);
+        }
     }
 
     auto context::connect_to_engine() -> void {
