@@ -85,8 +85,7 @@ namespace doca::coro {
             return Task { std::coroutine_handle<task_promise>::from_promise(*this) };
         }
 
-        template<std::convertible_to<Result> Value>
-        auto return_value(Value &&val) {
+        auto return_value(std::convertible_to<Result> auto &&val) {
             logger->trace("{}", __PRETTY_FUNCTION__);
             storage_.template emplace<stored_type>(std::move(val));
         }

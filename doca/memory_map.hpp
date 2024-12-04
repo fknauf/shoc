@@ -43,22 +43,20 @@ namespace doca {
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         );
 
-        template<non_cv_byte_range MemRange>
         memory_map(
             std::initializer_list<device> devices,
-            MemRange &&range,
+            non_cv_byte_range auto &&range,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         ):
-            memory_map { devices, create_span<std::byte>(std::forward<MemRange>(range)), permissions }
+            memory_map { devices, create_span<std::byte>(std::forward<decltype(range)>(range)), permissions }
         {}
 
-        template<non_cv_byte_range MemRange>
         memory_map(
             device dev,
-            MemRange &&range,
+            non_cv_byte_range auto &&range,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         ): 
-            memory_map(std::initializer_list{dev}, std::forward<MemRange>(range), permissions)
+            memory_map(std::initializer_list{dev}, std::forward<decltype(range)>(range), permissions)
         {}
 
         memory_map(

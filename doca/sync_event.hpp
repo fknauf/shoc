@@ -44,14 +44,10 @@ namespace doca {
             std::uint32_t max_tasks
         );
 
-        template<
-            std::ranges::range Publishers,
-            std::ranges::range Subscribers
-        >
         sync_event(
             context_parent *parent,
-            Publishers &&publishers,
-            Subscribers &&subscribers,
+            std::ranges::range auto &&publishers,
+            std::ranges::range auto &&subscribers,
             std::uint32_t max_tasks
         ):
             context { parent }
