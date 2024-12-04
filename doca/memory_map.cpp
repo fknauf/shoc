@@ -7,15 +7,6 @@
 namespace doca {
     memory_map::memory_map(
         std::initializer_list<device> devices,
-        void *base,
-        std::size_t len,
-        std::uint32_t permissions
-    ):
-        memory_map(devices, create_span<std::byte>(base, len), permissions)
-    {}
-
-    memory_map::memory_map(
-        std::initializer_list<device> devices,
         std::span<std::byte> range,
         std::uint32_t permissions
     ):
