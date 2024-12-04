@@ -1,5 +1,6 @@
 #include "client.hpp"
 
+#include <doca/common/raw_memory.hpp>
 #include <doca/common/status.hpp>
 #include <doca/logger.hpp>
 
@@ -90,24 +91,15 @@ namespace doca::comch {
     }
 
     auto client::send(std::span<std::byte const> message) -> coro::status_awaitable<> {
-        return send(std::span {
-            reinterpret_cast<char const*>(message.data()),
-            message.size()
-        });
+        return send(reinterpret_span<char const>(message));
     }
 
     auto client::send(std::span<std::uint8_t const> message) -> coro::status_awaitable<> {
-        return send(std::span {
-            reinterpret_cast<char const*>(message.data()),
-            message.size()
-        });
+        return send(reinterpret_span<char const>(message));
     }
 
     auto client::send(char const *message_cstr) -> coro::status_awaitable<> {
-        return send(std::span {
-            message_cstr,
-            std::strlen(message_cstr)
-        });
+        return send(create_span<char const>(message_cstr, std::strlen(message_cstr)));
     }
 
     auto client::send(std::span<char const> message) -> coro::status_awaitable<> {

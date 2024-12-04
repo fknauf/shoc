@@ -6,24 +6,17 @@
 
 namespace doca {
     memory_map::memory_map(
-        device const &dev,
-        void *base, std::size_t len,
+        std::initializer_list<device> devices,
+        void *base,
+        std::size_t len,
         std::uint32_t permissions
     ):
-        memory_map(dev, {static_cast<std::uint8_t*>(base), len}, permissions)
+        memory_map(devices, create_span<std::byte>(base, len), permissions)
     {}
 
     memory_map::memory_map(
-        device const &dev,
-        std::span<char> range,
-        std::uint32_t permissions
-    ):
-        memory_map(dev, range.data(), range.size(), permissions)
-    {}
-
-    memory_map::memory_map(
-        device const &dev,
-        std::span<std::uint8_t> range,
+        std::initializer_list<device> devices,
+        std::span<std::byte> range,
         std::uint32_t permissions
     ):
         range_(range)
@@ -35,8 +28,13 @@ namespace doca {
         enforce_success(doca_mmap_create(&map));
         handle_.reset(map);
 
-        enforce_success(doca_mmap_set_memrange(handle_.handle(), range_.data(), range_.size()));
-        enforce_success(doca_mmap_add_dev(handle_.handle(), dev.handle()));
+        auto u8range = reinterpret_span<std::uint8_t>(range);
+        enforce_success(doca_mmap_set_memrange(handle_.handle(), u8range.data(), u8range.size()));
+
+        for(auto &dev : devices) {
+            enforce_success(doca_mmap_add_dev(handle_.handle(), dev.handle()));
+        }
+
         enforce_success(doca_mmap_set_permissions(handle_.handle(), permissions));
         enforce_success(doca_mmap_start(handle_.handle()));
     }
@@ -52,7 +50,7 @@ namespace doca {
         void *range_base = nullptr;
         std::size_t range_length = 0;
         enforce_success(doca_mmap_get_memrange(handle_.handle(), &range_base, &range_length));
-        range_ = std::span { reinterpret_cast<std::uint8_t*>(range_base), range_length };
+        range_ = create_span<std::byte>(range_base, range_length);
     }
 
     auto memory_map::export_pci(device const &dev) const -> export_descriptor {

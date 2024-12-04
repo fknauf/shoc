@@ -1,14 +1,14 @@
 #pragma once
 
-#include "unique_handle.hpp"
 #include "buffer.hpp"
+#include "common/raw_memory.hpp"
 #include "device.hpp"
+#include "unique_handle.hpp"
 
 #include <doca_mmap.h>
 
 #include <cstdint>
 #include <span>
-#include <vector>
 
 namespace doca {
     /**
@@ -31,23 +31,35 @@ namespace doca {
          * @param size size of the memory to allocate and map
          */
         memory_map(
-            device const &dev,
+            std::initializer_list<device> devices,
             void *base,
             std::size_t len,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         );
 
         memory_map(
-            device const &dev,
-            std::span<std::uint8_t> range,
+            std::initializer_list<device> devices,
+            std::span<std::byte> range,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         );
 
+        template<non_cv_byte_range MemRange>
         memory_map(
-            device const &dev,
-            std::span<char> range,
+            std::initializer_list<device> devices,
+            MemRange &&range,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
-        );
+        ):
+            memory_map { devices, create_span<std::byte>(std::forward<MemRange>(range)), permissions }
+        {}
+
+        template<non_cv_byte_range MemRange>
+        memory_map(
+            device dev,
+            MemRange &&range,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
+        ): 
+            memory_map(std::initializer_list{dev}, std::forward<MemRange>(range), permissions)
+        {}
 
         memory_map(
             device const &dev,
@@ -57,18 +69,35 @@ namespace doca {
         /**
          * @return the managed doca_mmap handle
          */
-        [[nodiscard]] auto handle() const { return handle_.handle(); }
+        [[nodiscard]] auto handle() const {
+            return handle_.handle();
+        }
 
         /**
          * @return the mapped memory region
          */
-        [[nodiscard]] auto span() const -> std::span<std::uint8_t const> { return range_; }
-        [[nodiscard]] auto span() -> std::span<std::uint8_t> { return range_; }
+        [[nodiscard]] auto span() const -> std::span<std::byte const> {
+            return range_;
+        }
+        
+        [[nodiscard]] auto span() -> std::span<std::byte> {
+            return range_;
+        }
+
+        template<byteish OutByte>
+        [[nodiscard]] auto span_as() const {
+            return reinterpret_span<OutByte const>(range_);
+        }
+        
+        template<byteish OutByte>
+        [[nodiscard]] auto span_as() {
+            return reinterpret_span<OutByte>(range_);
+        }
 
         [[nodiscard]] auto export_pci(device const &dev) const -> export_descriptor;
 
     private:
         unique_handle<doca_mmap, doca_mmap_destroy> handle_;
-        std::span<std::uint8_t> range_;
+        std::span<std::byte> range_;
     };
 }
