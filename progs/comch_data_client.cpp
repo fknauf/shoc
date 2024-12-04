@@ -20,6 +20,7 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
         "ok" == co_await(client->msg_recv())
     ) {
         auto memory = std::vector<char>(1024);
+
         auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
         auto bufinv = doca::buffer_inventory { 1 };
         auto buffer = bufinv.buf_get_by_addr(mmap, memory);
@@ -37,8 +38,8 @@ auto ask_for_x(doca::progress_engine *engine) -> doca::coro::fiber {
 }
 
 int main() {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    doca::logger->set_level(spdlog::level::debug);
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    doca::logger->set_level(spdlog::level::warn);
 
     auto engine = doca::progress_engine{};
 

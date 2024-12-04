@@ -66,10 +66,9 @@ namespace doca {
          */
         compress_context(
             progress_engine *parent,
-            device const &dev,
+            device dev,
             std::uint32_t max_tasks = 1
         );
-        ~compress_context();
 
         /**
          * Compress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
@@ -152,6 +151,7 @@ namespace doca {
             dest->resume();
         }
 
+        device dev_;
         unique_handle<doca_compress, doca_compress_destroy> handle_;
     };
 }

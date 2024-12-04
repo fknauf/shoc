@@ -16,6 +16,18 @@
 
 namespace doca {
     namespace {
+        auto dev_cleanup(doca_dev *handle) noexcept -> void {
+            if(handle != nullptr) {
+                doca_dev_close(handle);
+            }
+        }
+
+        auto dev_rep_cleanup(doca_dev_rep *handle) noexcept -> void {
+            if(handle != nullptr) {
+                doca_dev_rep_close(handle);
+            }
+        }
+
         class device_list {
         public:
             using tasks_check = auto (doca_devinfo const *) -> doca_error_t;
@@ -136,7 +148,7 @@ namespace doca {
             throw doca_exception(DOCA_ERROR_NOT_FOUND);
         }
 
-        handle_.reset(doca_handle);
+        handle_.reset(doca_handle, dev_cleanup);
     }
 
     auto device::as_devinfo() const -> doca_devinfo* {
@@ -189,7 +201,7 @@ namespace doca {
     }
 
     device_representor::device_representor(doca_dev_rep *doca_handle) {
-        handle_.reset(doca_handle);
+        handle_.reset(doca_handle, dev_rep_cleanup);
     }
 
     auto device_representor::find_by_pci_addr(

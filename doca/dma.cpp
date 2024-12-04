@@ -11,15 +11,16 @@
 namespace doca {
     dma_context::dma_context(
         context_parent *parent,
-        device const &dev,
+        device dev,
         std::uint32_t max_tasks
     ):
-        context { parent }
+        context { parent },
+        dev_ { std::move(dev) }
     {
-        enforce(dev.has_capability(device_capability::dma), DOCA_ERROR_NOT_SUPPORTED);
+        enforce(dev_.has_capability(device_capability::dma), DOCA_ERROR_NOT_SUPPORTED);
 
         doca_dma *raw_handle;
-        enforce_success(doca_dma_create(dev.handle(), &raw_handle));
+        enforce_success(doca_dma_create(dev_.handle(), &raw_handle));
         handle_.reset(raw_handle);
 
         init_state_changed_callback();

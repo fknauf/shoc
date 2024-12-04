@@ -101,7 +101,7 @@ namespace doca {
     public:
         rdma_context(
             context_parent *parent,
-            device &dev,
+            device dev,
             rdma_config config = {}
         );
 
@@ -133,6 +133,7 @@ namespace doca {
             doca_data ctx_user_data
         ) -> void;
 
+        device dev_;
         unique_handle<doca_rdma, doca_rdma_destroy> handle_;
 
         bool connected_ = false;

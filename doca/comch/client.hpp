@@ -35,7 +35,7 @@ namespace doca::comch {
         client(
             context_parent *parent,
             std::string const &server_name,
-            device const &dev,
+            device dev,
             client_limits const &limits = {}
         );
 
@@ -126,6 +126,10 @@ namespace doca::comch {
         auto connection_handle() const -> doca_comch_connection*;
         auto signal_stopped_child(context *child) -> void override;
         auto disconnect_if_able() -> void;
+
+        // dev remembered here to extend its lifetime until after
+        // the context handle is destroyed.
+        device dev_;
 
         unique_handle<doca_comch_client, doca_comch_client_destroy> handle_;
         connection_state state_ = connection_state::DISCONNECTED;

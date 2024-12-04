@@ -122,6 +122,8 @@ namespace doca {
         auto init_add_publisher(publisher_location const &publisher) -> void;
         auto init_add_subscriber(subscriber_location const &subscriber) -> void;
 
+        // to extend lifetime of the referenced DOCA devices
+        std::vector<device> referenced_devices_;
         unique_handle<doca_sync_event, doca_sync_event_destroy> handle_;
     };
 
@@ -137,8 +139,9 @@ namespace doca {
         auto handle() const noexcept { return handle_.handle(); }
 
     private:
-        sync_event_remote_net(doca_sync_event_remote_net *handle);
+        sync_event_remote_net(doca_sync_event_remote_net *handle, device dev);
 
+        device dev_;
         unique_handle<doca_sync_event_remote_net, doca_sync_event_remote_net_destroy> handle_;
     };
 }

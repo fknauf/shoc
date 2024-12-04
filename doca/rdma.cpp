@@ -190,13 +190,14 @@ namespace doca {
 
     rdma_context::rdma_context(
         context_parent *parent,
-        device &dev,
+        device dev,
         rdma_config config
     ):
-        context { parent }
+        context { parent },
+        dev_ { std::move(dev) }
     {
         doca_rdma *rdma;
-        enforce_success(doca_rdma_create(dev.handle(), &rdma));
+        enforce_success(doca_rdma_create(dev_.handle(), &rdma));
         handle_.reset(rdma);
 
         init_state_changed_callback();

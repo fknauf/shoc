@@ -222,8 +222,8 @@ namespace doca::comch {
         server(
             context_parent *parent,
             std::string const &server_name,
-            device const &dev,
-            device_representor &rep,
+            device dev,
+            device_representor rep,
             server_limits const &limits = {}
         );
 
@@ -304,6 +304,12 @@ namespace doca::comch {
         static auto resolve_server(doca_comch_connection *handle) -> server*;
         static auto resolve_server(doca_comch_server *handle) -> server*;
         static auto resolve_connection(doca_comch_connection *handle) -> server_connection*;
+
+        // dev + rep remembered here to extend their lifetime until
+        // after the context handle is destroyed
+
+        device dev_;
+        device_representor rep_;
 
         unique_handle<doca_comch_server, doca_comch_server_destroy> handle_;
 

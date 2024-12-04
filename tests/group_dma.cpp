@@ -36,6 +36,8 @@ TEST(docapp_dma, local_copy) {
             auto dev = doca::device::find_by_capabilities(doca::device_capability::dma);
             auto ctx = co_await engine->create_context<doca::dma_context>(dev, 1);
 
+            CO_ASSERT_EQ(doca::context_state::running, ctx->state(), "state not running after acquiry");
+
             auto buf_inv = doca::buffer_inventory { 2 };
 
             auto src_data = std::string { "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua." };
@@ -50,6 +52,14 @@ TEST(docapp_dma, local_copy) {
 
             CO_ASSERT_EQ(DOCA_SUCCESS, status, std::string { "dma memcpy failed: " } + doca_error_get_descr(status));
             CO_ASSERT(std::ranges::equal(src_data, dst_buf.data()), "destination data is different from source data");
+
+            auto stop_awaitable = ctx->stop();
+
+            CO_ASSERT_EQ(doca::context_state::stopping, ctx->state(), "state not stopping after stop()");
+
+            co_await stop_awaitable;
+
+            CO_ASSERT_EQ(doca::context_state::idle, ctx->state(), "state not idle after waiting for stoppage");
         } catch(std::exception &ex) {
             CO_FAIL(ex.what());
         } catch(...) {

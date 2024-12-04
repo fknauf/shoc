@@ -17,7 +17,7 @@ namespace doca {
     public:
         dma_context(
             context_parent *parent,
-            device const &dev,
+            device dev,
             std::uint32_t max_tasks
         );
 
@@ -31,6 +31,7 @@ namespace doca {
         }
 
     private:
+        device dev_;
         unique_handle<doca_dma, doca_dma_destroy> handle_;
     };
 }

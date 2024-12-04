@@ -170,19 +170,21 @@ namespace doca::comch {
     server::server(
         context_parent *parent,
         std::string const &server_name,
-        device const &dev,
-        device_representor &rep,
+        device dev,
+        device_representor rep,
         server_limits const &limits
     ):
-        context { parent }
+        context { parent },
+        dev_ { std::move(dev) },
+        rep_ { std::move(rep) }
     {
-        enforce(dev.has_capability(device_capability::comch_server), DOCA_ERROR_NOT_SUPPORTED);
+        enforce(dev_.has_capability(device_capability::comch_server), DOCA_ERROR_NOT_SUPPORTED);
 
         open_connections_.max_load_factor(0.75);
 
         doca_comch_server *doca_server;
 
-        enforce_success(doca_comch_server_create(dev.handle(), rep.handle(), server_name.c_str(), &doca_server));
+        enforce_success(doca_comch_server_create(dev_.handle(), rep_.handle(), server_name.c_str(), &doca_server));
         handle_.reset(doca_server);
 
         context::init_state_changed_callback();

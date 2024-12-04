@@ -38,15 +38,16 @@ namespace doca {
 
     aes_gcm_context::aes_gcm_context(
         context_parent *parent,
-        device const &dev,
+        device dev,
         std::uint32_t num_tasks
     ):
-        context { parent }
+        context { parent },
+        dev_ { std::move(dev) }
     {
         doca_aes_gcm *raw_handle;
 
         enforce_success(doca_aes_gcm_create(
-            dev.handle(),
+            dev_.handle(),
             &raw_handle
         ));
         handle_.reset(raw_handle);

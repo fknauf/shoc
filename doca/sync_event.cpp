@@ -10,7 +10,8 @@ namespace doca {
         std::span<std::byte const> export_data,
         std::uint32_t max_tasks
     ):
-        context { parent }
+        context { parent },
+        referenced_devices_ { dev }
     {
         doca_sync_event *event;
         enforce_success(doca_sync_event_create_from_export(
@@ -51,6 +52,7 @@ namespace doca {
                     return doca_sync_event_add_publisher_location_remote_net(handle_.handle());
                 },
                 [this](device const &dev) -> doca_error_t {
+                    referenced_devices_.push_back(dev);
                     return doca_sync_event_add_publisher_location_cpu(handle_.handle(), dev.handle());
                 }
             },
@@ -65,6 +67,7 @@ namespace doca {
                     return doca_sync_event_add_subscriber_location_remote_pci(handle_.handle());
                 },
                 [this](device const &dev) -> doca_error_t {
+                    referenced_devices_.push_back(dev);                    
                     return doca_sync_event_add_subscriber_location_cpu(handle_.handle(), dev.handle());
                 }
             },
@@ -219,10 +222,14 @@ namespace doca {
             &event
         ));
 
-        return sync_event_remote_net { event };
+        return sync_event_remote_net { event, dev };
     }
 
-    sync_event_remote_net::sync_event_remote_net(doca_sync_event_remote_net *handle):
+    sync_event_remote_net::sync_event_remote_net(
+        doca_sync_event_remote_net *handle,
+        device dev
+    ):
+        dev_ { std::move(dev) },
         handle_ { handle }
     { }
 }

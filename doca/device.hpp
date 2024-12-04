@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -28,15 +29,11 @@ namespace doca {
     {
     public:
         device() = default;
-        device(device const &) = delete;
-        device(device &&) = default;
-        device &operator=(device const &) = delete;
-        device &operator=(device&&) = default;
 
         /**
          * Underlying handle for use in DOCA SDK functions. Mainly for library-internal use.
          */
-        [[nodiscard]] auto handle() const { return handle_.handle(); }
+        [[nodiscard]] auto handle() const { return handle_.get(); }
         [[nodiscard]] auto as_devinfo() const -> doca_devinfo*;
         [[nodiscard]] auto has_capability(device_capability required_cap) const noexcept -> bool;
         [[nodiscard]] auto has_capabilities(std::initializer_list<device_capability> required_caps) const noexcept -> bool;
@@ -55,7 +52,7 @@ namespace doca {
     private:
         device(doca_dev *doca_handle);
 
-        unique_handle<doca_dev, doca_dev_close> handle_;
+        std::shared_ptr<doca_dev> handle_;
     };
 
     /**
@@ -64,13 +61,8 @@ namespace doca {
     class device_representor final {
     public:
         device_representor() = default;
-        device_representor(device_representor const &) = delete;
-        device_representor(device_representor&&) = default;
 
-        device_representor &operator=(device_representor const &) = delete;
-        device_representor &operator=(device_representor&&) = default;
-
-        auto handle() const { return handle_.handle(); }
+        auto handle() const { return handle_.get(); }
 
         [[nodiscard]] static auto find_by_pci_addr(
             device const &dev,
@@ -87,6 +79,6 @@ namespace doca {
     private:
         device_representor(doca_dev_rep *doca_handle);
 
-        unique_handle<doca_dev_rep, doca_dev_rep_close> handle_;
+        std::shared_ptr<doca_dev_rep> handle_;
     };
 }

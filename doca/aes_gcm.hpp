@@ -36,7 +36,7 @@ namespace doca {
     public:
         aes_gcm_context(
             context_parent *parent,
-            device const &dev,
+            device dev,
             std::uint32_t num_tasks
         );
 
@@ -67,6 +67,7 @@ namespace doca {
         ) -> coro::status_awaitable<>;
 
     private:
+        device dev_;
         unique_handle<doca_aes_gcm, doca_aes_gcm_destroy> handle_;
     };
 }
