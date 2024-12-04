@@ -29,14 +29,14 @@ namespace doca {
         handle_.reset(map);
 
         auto u8range = reinterpret_span<std::uint8_t>(range);
-        enforce_success(doca_mmap_set_memrange(handle_.handle(), u8range.data(), u8range.size()));
+        enforce_success(doca_mmap_set_memrange(handle(), u8range.data(), u8range.size()));
 
         for(auto &dev : devices) {
-            enforce_success(doca_mmap_add_dev(handle_.handle(), dev.handle()));
+            enforce_success(doca_mmap_add_dev(handle(), dev.handle()));
         }
 
-        enforce_success(doca_mmap_set_permissions(handle_.handle(), permissions));
-        enforce_success(doca_mmap_start(handle_.handle()));
+        enforce_success(doca_mmap_set_permissions(handle(), permissions));
+        enforce_success(doca_mmap_start(handle()));
     }
 
     memory_map::memory_map(
@@ -49,7 +49,7 @@ namespace doca {
 
         void *range_base = nullptr;
         std::size_t range_length = 0;
-        enforce_success(doca_mmap_get_memrange(handle_.handle(), &range_base, &range_length));
+        enforce_success(doca_mmap_get_memrange(handle(), &range_base, &range_length));
         range_ = create_span<std::byte>(range_base, range_length);
     }
 
@@ -57,7 +57,7 @@ namespace doca {
         void const *export_desc = nullptr;
         std::size_t export_len = 0;
 
-        enforce_success(doca_mmap_export_pci(handle_.handle(), dev.handle(), &export_desc, &export_len));
+        enforce_success(doca_mmap_export_pci(handle(), dev.handle(), &export_desc, &export_len));
 
         return {
             .base_ptr = export_desc,

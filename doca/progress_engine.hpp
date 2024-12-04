@@ -93,7 +93,7 @@ namespace doca {
         /**
          * @return the managed doca_pe handle
          */
-        [[nodiscard]] auto handle() const { return handle_.handle(); }
+        [[nodiscard]] auto handle() const { return handle_.get(); }
         [[nodiscard]] auto inflight_tasks() const -> std::size_t;
 
         template<std::derived_from<context> Context, typename... Args>

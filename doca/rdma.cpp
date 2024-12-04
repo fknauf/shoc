@@ -202,80 +202,80 @@ namespace doca {
 
         init_state_changed_callback();
 
-        enforce_success(doca_rdma_set_permissions(handle_.handle(), config.rdma_permissions));
+        enforce_success(doca_rdma_set_permissions(handle_.get(), config.rdma_permissions));
         if(config.gid_index.has_value()) {
-            enforce_success(doca_rdma_set_gid_index(handle_.handle(), config.gid_index.value()));
+            enforce_success(doca_rdma_set_gid_index(handle_.get(), config.gid_index.value()));
         }
 
         //enforce_success(doca_rdma_set_connection_state_callbacks(
-        //    handle_.handle(),
+        //    handle_.get(),
         //    &rdma_context::connection_request,
         //    &rdma_context::connection_established,
         //    &rdma_context::connection_failure,
         //    &rdma_context::connection_disconnected
         //));
         enforce_success(doca_rdma_task_receive_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &rdma_context::receive_completion_callback,
             &rdma_context::receive_completion_callback,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_send_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_send_as_task>,
             &plain_status_callback<doca_rdma_task_send_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_send_imm_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_send_imm_as_task>,
             &plain_status_callback<doca_rdma_task_send_imm_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_read_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_read_as_task>,
             &plain_status_callback<doca_rdma_task_read_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_write_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_write_as_task>,
             &plain_status_callback<doca_rdma_task_write_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_write_imm_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_write_imm_as_task>,
             &plain_status_callback<doca_rdma_task_write_imm_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_atomic_cmp_swp_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_atomic_cmp_swp_as_task>,
             &plain_status_callback<doca_rdma_task_atomic_cmp_swp_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_atomic_fetch_add_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_atomic_fetch_add_as_task>,
             &plain_status_callback<doca_rdma_task_atomic_fetch_add_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_remote_net_sync_event_get_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_get_as_task>,
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_get_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_remote_net_sync_event_notify_set_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_set_as_task>,
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_set_as_task>,
             config.max_tasks
         ));
         enforce_success(doca_rdma_task_remote_net_sync_event_notify_add_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_add_as_task>,
             &plain_status_callback<doca_rdma_task_remote_net_sync_event_notify_add_as_task>,
             config.max_tasks
@@ -289,7 +289,7 @@ namespace doca {
         >(
             engine(),
             coro::status_awaitable<std::uint32_t>::create_space(immediate_data),
-            handle_.handle(),
+            handle_.get(),
             dest.handle()
         );
     }
@@ -335,7 +335,7 @@ namespace doca {
     auto rdma_context::accept_connection(
         std::uint16_t port
     ) -> coro::status_awaitable<> {
-        auto err = doca_rdma_listen_to_port(handle_.handle(), port);
+        auto err = doca_rdma_listen_to_port(handle_.get(), port);
 
         if(err != DOCA_SUCCESS) {
             return coro::status_awaitable<>::from_value(err);

@@ -27,7 +27,7 @@ namespace doca {
         ) const -> coro::status_awaitable<>;
 
         auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_dma_as_ctx(handle_.handle());
+            return doca_dma_as_ctx(handle_.get());
         }
 
     private:

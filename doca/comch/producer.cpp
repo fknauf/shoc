@@ -20,7 +20,7 @@ namespace doca::comch {
         context::init_state_changed_callback();
 
         enforce_success(doca_comch_producer_task_send_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<&doca_comch_producer_task_send_as_task>,
             &plain_status_callback<&doca_comch_producer_task_send_as_task>,
             max_tasks
@@ -44,7 +44,7 @@ namespace doca::comch {
         doca_data task_user_data = { .ptr = receptable };
 
         enforce_success(doca_comch_producer_task_send_alloc_init(
-            handle_.handle(),
+            handle_.get(),
             buf.handle(),
             immediate_data.data(),
             immediate_data.size(),

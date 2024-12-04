@@ -55,14 +55,14 @@ namespace doca {
         init_state_changed_callback();
 
         enforce_success(doca_aes_gcm_task_encrypt_set_conf(
-            handle_.handle(),
+            handle(),
             plain_status_callback<doca_aes_gcm_task_encrypt_as_task>,
             plain_status_callback<doca_aes_gcm_task_encrypt_as_task>,
             num_tasks
         ));
 
         enforce_success(doca_aes_gcm_task_decrypt_set_conf(
-            handle_.handle(),
+            handle(),
             plain_status_callback<doca_aes_gcm_task_decrypt_as_task>,
             plain_status_callback<doca_aes_gcm_task_decrypt_as_task>,
             num_tasks
@@ -82,7 +82,7 @@ namespace doca {
             doca_aes_gcm_task_encrypt_as_task
         >(
             engine(),
-            handle_.handle(),
+            handle(),
             plaintext.handle(),
             dest.handle(),
             key.handle(),
@@ -106,7 +106,7 @@ namespace doca {
             doca_aes_gcm_task_decrypt_as_task
         >(
             engine(),
-            handle_.handle(),
+            handle(),
             encrypted.handle(),
             dest.handle(),
             key.handle(),

@@ -44,7 +44,7 @@ namespace doca::comch {
 
         [[nodiscard]]
         auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_comch_consumer_as_ctx(handle_.handle());
+            return doca_comch_consumer_as_ctx(handle_.get());
         }
 
         /**

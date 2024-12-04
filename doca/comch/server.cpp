@@ -182,31 +182,31 @@ namespace doca::comch {
         context::init_state_changed_callback();
 
         enforce_success(doca_comch_server_task_send_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_comch_task_send_as_task>,
             &plain_status_callback<doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_server_event_msg_recv_register(
-            handle_.handle(),
+            handle_.get(),
             &server::msg_recv_callback
         ));
         enforce_success(doca_comch_server_event_connection_status_changed_register(
-            handle_.handle(),
+            handle_.get(),
             &server::connection_callback,
             &server::disconnection_callback
         ));
         enforce_success(doca_comch_server_event_consumer_register(
-            handle_.handle(),
+            handle_.get(),
             &server::new_consumer_callback,
             &server::expired_consumer_callback
         ));
         enforce_success(doca_comch_server_set_max_msg_size(
-            handle_.handle(),
+            handle_.get(),
             limits.max_msg_size
         ));
         enforce_success(doca_comch_server_set_recv_queue_size(
-            handle_.handle(),
+            handle_.get(),
             limits.recv_queue_size
         ));
     }
@@ -241,7 +241,7 @@ namespace doca::comch {
             auto err = doca_ctx_stop(as_ctx());
 
             if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
-                logger->error("unable to stop comch server {}: {}", static_cast<void*>(handle_.handle()), doca_error_get_descr(err));
+                logger->error("unable to stop comch server {}: {}", static_cast<void*>(handle_.get()), doca_error_get_descr(err));
             }
         }
     }
@@ -253,7 +253,7 @@ namespace doca::comch {
 
         if(count_erased == 0) {
             logger->error("comch server {} got disconnect signal for unknown connection {}",
-                static_cast<void*>(handle_.handle()), static_cast<void*>(con));
+                static_cast<void*>(handle_.get()), static_cast<void*>(con));
         }
 
         if(stop_requested_) {

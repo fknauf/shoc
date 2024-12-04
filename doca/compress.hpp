@@ -123,7 +123,7 @@ namespace doca {
             >(
                 engine(),
                 compress_awaitable::create_space(checksums),
-                handle_.handle(),
+                handle_.get(),
                 src.handle(),
                 dest.handle()
             );

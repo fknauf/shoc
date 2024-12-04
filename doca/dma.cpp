@@ -25,7 +25,7 @@ namespace doca {
 
         init_state_changed_callback();
         enforce_success(doca_dma_task_memcpy_set_conf(
-            handle_.handle(),
+            handle_.get(),
             plain_status_callback<doca_dma_task_memcpy_as_task>,
             plain_status_callback<doca_dma_task_memcpy_as_task>,
             max_tasks
@@ -41,7 +41,7 @@ namespace doca {
             doca_dma_task_memcpy_as_task
         >(
             engine(),
-            handle_.handle(),
+            handle_.get(),
             src.handle(),
             dest.handle()
         );

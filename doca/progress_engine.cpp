@@ -42,23 +42,23 @@ namespace doca {
 
     auto progress_engine::notification_handle() const -> doca_event_handle_t {
         doca_event_handle_t event_handle = doca_event_invalid_handle;
-        enforce_success(doca_pe_get_notification_handle(handle_.handle(), &event_handle));
+        enforce_success(doca_pe_get_notification_handle(handle_.get(), &event_handle));
         return event_handle;
     }
 
     auto progress_engine::request_notification() const -> void {
-        enforce_success(doca_pe_request_notification(handle_.handle()));
+        enforce_success(doca_pe_request_notification(handle_.get()));
     }
 
     auto progress_engine::clear_notification() const -> void {
         // handle parameter not used in linux, according to doca sample doca_common/pe_event/pe_event_sample.c
         // in dev container 2.7.0
-        enforce_success(doca_pe_clear_notification(handle_.handle(), 0));
+        enforce_success(doca_pe_clear_notification(handle_.get(), 0));
     }
 
     auto progress_engine::inflight_tasks() const -> std::size_t {
         std::size_t num;
-        enforce_success(doca_pe_get_num_inflight_tasks(handle_.handle(), &num));
+        enforce_success(doca_pe_get_num_inflight_tasks(handle_.get(), &num));
         return num;
     }
 
@@ -89,7 +89,7 @@ namespace doca {
             return;
         }
 
-        while(doca_pe_progress(handle_.handle()) > 0) {
+        while(doca_pe_progress(handle_.get()) > 0) {
             // do nothing; progress() calls the event handlers.
         }
 

@@ -107,7 +107,7 @@ namespace doca {
 
         [[nodiscard]]
         auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_rdma_as_ctx(handle_.handle());
+            return doca_rdma_as_ctx(handle_.get());
         }
 
         auto receive(
@@ -119,7 +119,7 @@ namespace doca {
         auto export_connection() -> rdma_connection;
 
         [[nodiscard]]
-        auto handle() const noexcept { return handle_.handle(); }
+        auto handle() const noexcept { return handle_.get(); }
 
     private:
         //static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) -> void;

@@ -26,22 +26,22 @@ namespace doca::comch {
         context::init_state_changed_callback();
 
         enforce_success(doca_comch_client_task_send_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &plain_status_callback<doca_comch_task_send_as_task>,
             &plain_status_callback<doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_client_event_msg_recv_register(
-            handle_.handle(),
+            handle_.get(),
             &client::msg_recv_callback
         ));
         enforce_success(doca_comch_client_event_consumer_register(
-            handle_.handle(),
+            handle_.get(),
             &client::new_consumer_callback,
             &client::expired_consumer_callback
         ));
-        enforce_success(doca_comch_client_set_max_msg_size(handle_.handle(), limits.max_msg_size));
-        enforce_success(doca_comch_client_set_recv_queue_size(handle_.handle(), limits.recv_queue_size));
+        enforce_success(doca_comch_client_set_max_msg_size(handle_.get(), limits.max_msg_size));
+        enforce_success(doca_comch_client_set_recv_queue_size(handle_.get(), limits.recv_queue_size));
     }
 
     client::~client() {
@@ -51,12 +51,12 @@ namespace doca::comch {
     }
 
     auto client::as_ctx() const noexcept -> doca_ctx* {
-        return doca_comch_client_as_ctx(handle_.handle());
+        return doca_comch_client_as_ctx(handle_.get());
     }
 
     auto client::connection_handle() const -> doca_comch_connection* {
         doca_comch_connection *result;
-        enforce_success(doca_comch_client_get_connection(handle_.handle(), &result));
+        enforce_success(doca_comch_client_get_connection(handle_.get(), &result));
         return result;
     }
 
@@ -115,8 +115,8 @@ namespace doca::comch {
 
         doca_data task_user_data = { .ptr = receptable };
 
-        enforce_success(doca_comch_client_get_connection(handle_.handle(), &connection));
-        enforce_success(doca_comch_client_task_send_alloc_init(handle_.handle(), connection, message.data(), message.size(), &task));
+        enforce_success(doca_comch_client_get_connection(handle_.get(), &connection));
+        enforce_success(doca_comch_client_task_send_alloc_init(handle_.get(), connection, message.data(), message.size(), &task));
         doca_task_set_user_data(doca_comch_task_send_as_task(task), task_user_data);
 
         auto base_task = doca_comch_task_send_as_task(task);

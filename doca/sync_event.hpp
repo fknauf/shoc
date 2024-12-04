@@ -80,11 +80,11 @@ namespace doca {
 
         [[nodiscard]]
         auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_sync_event_as_ctx(handle_.handle());
+            return doca_sync_event_as_ctx(handle_.get());
         }
 
         [[nodiscard]]
-        auto handle() const noexcept { return handle_.handle(); }
+        auto handle() const noexcept { return handle_.get(); }
 
         [[nodiscard]]
         auto export_to_remote_pci(device const &dev) const -> std::span<std::byte const>;
@@ -136,7 +136,7 @@ namespace doca {
         ) -> sync_event_remote_net;
 
         [[nodiscard]]
-        auto handle() const noexcept { return handle_.handle(); }
+        auto handle() const noexcept { return handle_.get(); }
 
     private:
         sync_event_remote_net(doca_sync_event_remote_net *handle, device dev);

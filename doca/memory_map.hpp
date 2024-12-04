@@ -70,7 +70,7 @@ namespace doca {
          * @return the managed doca_mmap handle
          */
         [[nodiscard]] auto handle() const {
-            return handle_.handle();
+            return handle_.get();
         }
 
         /**

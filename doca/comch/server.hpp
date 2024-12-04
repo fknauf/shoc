@@ -230,11 +230,11 @@ namespace doca::comch {
         ~server();
 
         [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_comch_server_as_ctx(handle_.handle());
+            return doca_comch_server_as_ctx(handle_.get());
         }
 
         auto handle() const noexcept {
-            return handle_.handle();
+            return handle_.get();
         }
 
         auto stop() -> context_state_awaitable override;

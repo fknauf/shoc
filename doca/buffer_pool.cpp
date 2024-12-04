@@ -16,25 +16,25 @@ namespace doca {
         enforce_success(doca_buf_pool_create(num_elements, element_size, mmap_.handle(), &pool));
         handle_.reset(pool);
 
-        enforce_success(doca_buf_pool_set_element_alignment(handle_.handle(), element_alignment));
-        enforce_success(doca_buf_pool_start(handle_.handle()));
+        enforce_success(doca_buf_pool_set_element_alignment(handle_.get(), element_alignment));
+        enforce_success(doca_buf_pool_start(handle_.get()));
     }
 
     auto buffer_pool::num_elements() const -> std::uint32_t {
         std::uint32_t result;
-        enforce_success(doca_buf_pool_get_num_elements(handle_.handle(), &result));
+        enforce_success(doca_buf_pool_get_num_elements(handle_.get(), &result));
         return result;
     }
 
     auto buffer_pool::num_free_elements() const -> std::uint32_t {
         std::uint32_t result;
-        enforce_success(doca_buf_pool_get_num_free_elements(handle_.handle(), &result));
+        enforce_success(doca_buf_pool_get_num_free_elements(handle_.get(), &result));
         return result;
     }
 
     auto buffer_pool::allocate_buffer() -> buffer {
         doca_buf *buf_handle;
-        enforce_success(doca_buf_pool_buf_alloc(handle_.handle(), &buf_handle));
+        enforce_success(doca_buf_pool_buf_alloc(handle_.get(), &buf_handle));
         return { buf_handle };
     }
 

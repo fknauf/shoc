@@ -23,7 +23,7 @@ namespace doca {
         );
 
         [[nodiscard]] auto handle() const noexcept {
-            return handle_.handle();
+            return handle_.get();
         }
 
     private:
@@ -41,11 +41,11 @@ namespace doca {
         );
 
         [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_aes_gcm_as_ctx(handle_.handle());
+            return doca_aes_gcm_as_ctx(handle_.get());
         }
 
         [[nodiscard]] auto handle() const noexcept {
-            return handle_.handle();
+            return handle_.get();
         }
 
         [[nodiscard]] auto encrypt(

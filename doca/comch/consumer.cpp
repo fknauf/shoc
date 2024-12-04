@@ -22,7 +22,7 @@ namespace doca::comch {
         context::init_state_changed_callback();
 
         enforce_success(doca_comch_consumer_task_post_recv_set_conf(
-            handle_.handle(),
+            handle_.get(),
             &consumer::post_recv_task_completion_callback,
             &consumer::post_recv_task_completion_callback,
             max_tasks
@@ -41,7 +41,7 @@ namespace doca::comch {
 
         doca_data task_user_data = { .ptr = receptable };
 
-        enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle_.handle(), dest.handle(), &task));
+        enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle_.get(), dest.handle(), &task));
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
         doca_task_set_user_data(base_task, task_user_data);
 
