@@ -68,7 +68,7 @@ auto compress_file(
 
     auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    doca::logger->info("elapsed time: {} us", elapsed.count());
+    doca::logger->error("elapsed time: {} us", elapsed.count());
 
     co_await compress->stop();
 
@@ -83,8 +83,8 @@ auto compress_file(
 }
 
 auto main(int argc, char *argv[]) -> int try {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    doca::logger->set_level(spdlog::level::trace);
+    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    doca::logger->set_level(spdlog::level::warn);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";

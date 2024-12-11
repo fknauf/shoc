@@ -1,4 +1,4 @@
-project('doca_sample', 'cpp',
+project('doca_sample', [ 'c', 'cpp' ], 
     default_options: ['buildtype=debug', 'cpp_std=c++20', 'warning_level=2'],
     meson_version: '>= 0.61.2'
 )
@@ -146,4 +146,8 @@ executable('test-docapp',
         dependencies : deps + [ dependency('gtest', main: true) ],
         link_with: libdocapp,
         include_directories: inc_dirs,
+        install: false)
+
+executable('doca_simple_compress', [ 'progs/plain_doca/simple_compress.c' ],
+        dependencies : deps,
         install: false)
