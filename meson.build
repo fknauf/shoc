@@ -151,3 +151,7 @@ executable('test-docapp',
 executable('doca_simple_compress', [ 'progs/plain_doca/simple_compress.c' ],
         dependencies : deps,
         install: false)
+
+executable('doca_parallel_compress', [ 'progs/plain_doca/parallel_compress.c' ],
+        dependencies : deps,
+        install: false)
