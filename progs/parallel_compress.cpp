@@ -79,7 +79,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
         auto end = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-        doca::logger->info("elapsed time: {} us", elapsed.count());
+        std::cout << "elapsed time: " << elapsed.count() << " us\n";
     } catch(std::exception &e) {
         doca::logger->error("unexpected error: {}", e.what());
     }
@@ -97,7 +97,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
 
 auto main(int argc, char *argv[]) -> int try {
     doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    doca::logger->set_level(spdlog::level::info);
+    doca::logger->set_level(spdlog::level::warn);
 
     if(argc < 3) {
         std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
