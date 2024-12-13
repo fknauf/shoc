@@ -159,6 +159,7 @@ void compress_error_callback(
 }
 
 struct doca_dev *open_compress_device(void) {
+    struct doca_dev *result = NULL;
     struct doca_devinfo **dev_list;
     uint32_t nb_devs;
     doca_error_t err;
@@ -172,19 +173,21 @@ struct doca_dev *open_compress_device(void) {
 
     for(uint32_t i = 0; i < nb_devs; ++i) {
         if(doca_compress_cap_task_compress_deflate_is_supported(dev_list[i]) == DOCA_SUCCESS) {
-            struct doca_dev *result;
             err = doca_dev_open(dev_list[i], &result);
 
             if(err == DOCA_SUCCESS) {
-                return result;
+                goto cleanup;
             } else {
-                fprintf(stderr, "[open dev] could not open device: %s", doca_error_get_descr(err));
+                fprintf(stderr, "[open dev] could not open device: %s\n", doca_error_get_descr(err));
             }
         }
     }
 
     fprintf(stderr, "[open dev] no compression device found\n");
-    return NULL;
+
+cleanup:
+    doca_devinfo_destroy_list(dev_list);
+    return result;
 }
 
 struct doca_compress *open_compress_context(
@@ -325,7 +328,7 @@ struct region *compress_buffers(
 
     int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if(epoll_fd == -1) {
-        fprintf(stderr, "[compress buffers] could not create epoll file descriptor: %s", strerror(errno));
+        fprintf(stderr, "[compress buffers] could not create epoll file descriptor: %s\n", strerror(errno));
         return NULL;
     }
 
@@ -395,7 +398,7 @@ struct region *compress_buffers(
 
         err = doca_ctx_get_state(doca_compress_as_ctx(compress), &ctx_state);
         if(err != DOCA_SUCCESS) {
-            fprintf(stderr, "[compress buffers] could not obtain context state: %s", doca_error_get_descr(err));
+            fprintf(stderr, "[compress buffers] could not obtain context state: %s\n", doca_error_get_descr(err));
             break;
         }
 
@@ -408,7 +411,7 @@ struct region *compress_buffers(
         nfd = epoll_wait(epoll_fd, &ep_event, 1, 100);
 
         if(nfd == -1) {
-            fprintf(stderr, "[compress buffers] epoll_wait failed: %s", strerror(errno));
+            fprintf(stderr, "[compress buffers] epoll_wait failed: %s\n", strerror(errno));
             goto cleanup_context;
         }
 

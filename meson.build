@@ -155,3 +155,7 @@ executable('doca_simple_compress', [ 'progs/plain_doca/simple_compress.c' ],
 executable('doca_parallel_compress', [ 'progs/plain_doca/parallel_compress.c' ],
         dependencies : deps,
         install: false)
+
+executable('doca_comch_server', [ 'progs/plain_doca/comch_server.c' ],
+        dependencies : deps,
+        install: false)
