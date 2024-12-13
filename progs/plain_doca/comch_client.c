@@ -17,52 +17,68 @@
 #include <stdlib.h>
 #include <time.h>
 
-struct server_config {
+struct client_config {
     char const *server_name;
     uint32_t num_send_tasks;
     uint32_t max_msg_size;
     uint32_t recv_queue_size;
 };
 
-void send_pong(struct doca_comch_connection *connection) {
+struct client_state {
+    struct doca_comch_client *client;
+
+    struct timespec start;
+    struct timespec end;
+};
+
+void send_ping(struct doca_comch_client *client) {
     doca_error_t err;
     struct doca_comch_task_send *send_task;
     struct doca_task *task;
-    struct doca_comch_server *server = doca_comch_server_get_server_ctx(connection);
+    struct doca_comch_connection *connection;
 
-    assert(server != NULL);
+    assert(client != NULL);
 
-    err = doca_comch_server_task_send_alloc_init(server, connection, "pong", 4, &send_task);
+    err = doca_comch_client_get_connection(client, &connection);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[send pong] could not allocate task: %s\n", doca_error_get_descr(err));
-        goto failure_connection;
+        fprintf(stderr, "[send ping] could not get client connection: %s\n", doca_error_get_descr(err));
+        goto failure;
+    }
+
+    err = doca_comch_client_task_send_alloc_init(client, connection, "ping", 4, &send_task);
+    if(err != DOCA_SUCCESS) {
+        fprintf(stderr, "[send ping] could not allocate task: %s\n", doca_error_get_descr(err));
+        goto failure;
     }
 
     task = doca_comch_task_send_as_task(send_task);
     err = doca_task_submit(task);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[send pong] could not submit task: %s\n", doca_error_get_descr(err));
-        goto failure_task;
+        fprintf(stderr, "[send ping] could not submit task: %s\n", doca_error_get_descr(err));
+        goto failure_cleanup_task;
     }
 
     return;
 
-failure_task:
+failure_cleanup_task:
     doca_task_free(task);
-failure_connection:
-    doca_comch_server_disconnect(server, connection);
+failure:
 }
 
-void connection_event_callback(
-    struct doca_comch_event_connection_status_changed *event,
-    struct doca_comch_connection *comch_connection,
-    uint8_t change_successful    
+void state_changed_callback(
+    union doca_data user_data,
+    struct doca_ctx *ctx,
+    enum doca_ctx_states prev_state,
+    enum doca_ctx_states next_state
 ) {
-    // dummy function because there's nothing do do upon connection/disconnection.
-    // We need to register one though, or the context won't start.
-    (void) event;
-    (void) comch_connection;
-    (void) change_successful;
+    (void) ctx;
+    (void) prev_state;
+
+    if(next_state == DOCA_CTX_STATE_RUNNING) {
+        struct client_state *state = (struct client_state *) user_data.ptr;
+        clock_gettime(CLOCK_REALTIME, &state->start);
+        send_ping(state->client);
+    }
 }
 
 void msg_recv_callback(
@@ -73,9 +89,26 @@ void msg_recv_callback(
 ) {
     (void) event;
 
+    doca_error_t err;
+    struct doca_comch_client *client = doca_comch_client_get_client_ctx(connection);
+    struct doca_ctx *ctx = doca_comch_client_as_ctx(client);
+    union doca_data ctx_user_data;
+
+    err = doca_ctx_get_user_data(ctx, &ctx_user_data);
+    if(err != DOCA_SUCCESS || ctx_user_data.ptr == NULL) {
+        fprintf(stderr, "[msg recv callback] failed to get user data: %s\n", doca_error_get_descr(err));
+    }
+
+    struct client_state *state = (struct client_state*) ctx_user_data.ptr;
+    clock_gettime(CLOCK_REALTIME, &state->end);
+
     fwrite(recv_buffer, 1, msg_len, stdout);
     puts("");
-    send_pong(connection);
+
+    err = doca_ctx_stop(ctx);
+    if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
+        fprintf(stderr, "[msg recv callback] failed to stop client: %s\n", doca_error_get_descr(err));
+    }
 }
 
 void send_task_completed_callback(
@@ -102,7 +135,7 @@ void send_task_error_callback(
     doca_task_free(doca_comch_task_send_as_task(task));
 }
 
-struct doca_dev *open_server_device(char const *pci_addr) {
+struct doca_dev *open_client_device(char const *pci_addr) {
     struct doca_dev *result = NULL;
     struct doca_devinfo **dev_list;
     uint32_t nb_devs;
@@ -124,7 +157,7 @@ struct doca_dev *open_server_device(char const *pci_addr) {
             continue;
         }
 
-        if(is_addr_equal && doca_comch_cap_server_is_supported(dev_list[i]) == DOCA_SUCCESS) {
+        if(is_addr_equal && doca_comch_cap_client_is_supported(dev_list[i]) == DOCA_SUCCESS) {
             err = doca_dev_open(dev_list[i], &result);
 
             if(err == DOCA_SUCCESS) {
@@ -135,99 +168,67 @@ struct doca_dev *open_server_device(char const *pci_addr) {
         }
     }
 
-    fprintf(stderr, "[open dev] no comch server device found\n");
+    fprintf(stderr, "[open dev] no comch client device found\n");
 
 cleanup:
     doca_devinfo_destroy_list(dev_list);
     return result;
 }
 
-struct doca_dev_rep *open_server_device_representor(struct doca_dev *server_dev, char const *pci_addr) {
-    struct doca_dev_rep *result = NULL;
-    struct doca_devinfo_rep **rep_list = NULL;
-    uint32_t nb_reps;
-    doca_error_t err;
-
-    err = doca_devinfo_rep_create_list(server_dev, DOCA_DEVINFO_REP_FILTER_NET, &rep_list, &nb_reps);
-    if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[open rep] could not create representor list: %s\n", doca_error_get_descr(err));
-        return NULL;
-    }
-
-    for(uint32_t i = 0; i < nb_reps; ++i) {
-        uint8_t is_addr_equal;
-
-        err = doca_devinfo_rep_is_equal_pci_addr(rep_list[i], pci_addr, &is_addr_equal);
-        if(err != DOCA_SUCCESS) {
-            fprintf(stderr, "[open rep] could not compare pci addresses: %s\n", doca_error_get_descr(err));
-            continue;
-        }
-
-        if(!is_addr_equal) {
-            continue;
-        }
-
-        err = doca_dev_rep_open(rep_list[i], &result);
-        if(err == DOCA_SUCCESS) {
-            goto cleanup;
-        } else {
-            fprintf(stderr, "[open rep] could not open representor handle: %s\n", doca_error_get_descr(err));
-        }
-    }
-
-    fprintf(stderr, "[open rep] could not find representor matching pci address %s\n", pci_addr);
-
-cleanup:
-    doca_devinfo_rep_destroy_list(rep_list);
-    return result;
-}
-
-struct doca_comch_server *open_server_context(
+struct doca_comch_client *open_client_context(
     struct doca_dev *dev,
-    struct doca_dev_rep *rep,
-    struct server_config *config,
-    struct doca_pe *engine
+    struct client_config *config,
+    struct doca_pe *engine,
+    struct client_state *state
 ) {
-    struct doca_comch_server *server;
+    struct doca_comch_client *client;
     doca_error_t err;
 
-    err = doca_comch_server_create(dev, rep, config->server_name, &server);
+    err = doca_comch_client_create(dev, config->server_name, &client);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not create context: %s\n", doca_error_get_descr(err));
         goto failure;
     }
 
-    err = doca_comch_server_set_max_msg_size(server, config->max_msg_size);
+    err = doca_comch_client_set_max_msg_size(client, config->max_msg_size);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not set max message size: %s\n", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
-    err = doca_comch_server_set_recv_queue_size(server, config->recv_queue_size);
+    err = doca_comch_client_set_recv_queue_size(client, config->recv_queue_size);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not set receiver queue size: %s\n", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
-    err = doca_comch_server_event_connection_status_changed_register(server, connection_event_callback, connection_event_callback);
+    struct doca_ctx *ctx = doca_comch_client_as_ctx(client);
+    union doca_data ctx_user_data = { .ptr = state };
+    state->client = client;
+    err = doca_ctx_set_user_data(ctx, ctx_user_data);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[open context] could not set connection state callbacks: %s\n", doca_error_get_descr(err));
+        fprintf(stderr, "[open context] failed to set ctx user data:%s\n", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
-    err = doca_comch_server_task_send_set_conf(server, send_task_completed_callback, send_task_error_callback, config->num_send_tasks);
+    err = doca_ctx_set_state_changed_cb(ctx, state_changed_callback);
+    if(err != DOCA_SUCCESS) {
+        fprintf(stderr, "[open context] could not set state-changed callback: %s\n", doca_error_get_descr(err));
+        goto failure_cleanup;
+    }
+
+    err = doca_comch_client_task_send_set_conf(client, send_task_completed_callback, send_task_error_callback, config->num_send_tasks);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not set send task callbacks: %s\n", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
-    err = doca_comch_server_event_msg_recv_register(server, msg_recv_callback);
+    err = doca_comch_client_event_msg_recv_register(client, msg_recv_callback);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not set msg_recv callbacks: %s\n", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
-    struct doca_ctx *ctx = doca_comch_server_as_ctx(server);
     err = doca_pe_connect_ctx(engine, ctx);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not connect to progress engine: %s\n", doca_error_get_descr(err));
@@ -235,15 +236,15 @@ struct doca_comch_server *open_server_context(
     }
 
     err = doca_ctx_start(ctx);
-    if(err != DOCA_SUCCESS) {
+    if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
         fprintf(stderr, "[open context] could not start context: %s\n", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
-    return server;
+    return client;
 
 failure_cleanup:
-    doca_comch_server_destroy(server);
+    doca_comch_client_destroy(client);
 failure:
     return NULL;
 }
@@ -278,10 +279,9 @@ failure:
     return NULL;
 }
 
-void serve_ping_pong(
+void client_ping_pong(
     char const *dev_pci,
-    char const *rep_pci,
-    struct server_config *config
+    struct client_config *config
 ) {
     doca_error_t err;
 
@@ -297,22 +297,17 @@ void serve_ping_pong(
         goto cleanup_epoll;
     }
 
-    struct doca_dev *server_dev = open_server_device(dev_pci);
-    if(server_dev == NULL) {
-        fprintf(stderr, "[serve] could not obtain server device\n");
+    struct doca_dev *client_dev = open_client_device(dev_pci);
+    if(client_dev == NULL) {
+        fprintf(stderr, "[serve] could not obtain client device\n");
         goto cleanup_pe;
     }
 
-    struct doca_dev_rep *server_rep = open_server_device_representor(server_dev, rep_pci);
-    if(server_rep == NULL) {
-        fprintf(stderr, "[serve] could not obtain server device representor\n");
+    struct client_state state;
+    struct doca_comch_client *client = open_client_context(client_dev, config, engine, &state);
+    if(client == NULL) {
+        fprintf(stderr, "[serve] could not obtain client context\n");
         goto cleanup_dev;
-    }
-
-    struct doca_comch_server *server = open_server_context(server_dev, server_rep, config, engine);
-    if(server == NULL) {
-        fprintf(stderr, "[serve] could not obtain server context\n");
-        goto cleanup_rep;
     }
     
     struct epoll_event ep_event = { 0, { 0 } };
@@ -321,7 +316,7 @@ void serve_ping_pong(
     for(;;) {
         enum doca_ctx_states ctx_state;
 
-        err = doca_ctx_get_state(doca_comch_server_as_ctx(server), &ctx_state);
+        err = doca_ctx_get_state(doca_comch_client_as_ctx(client), &ctx_state);
         if(err != DOCA_SUCCESS) {
             fprintf(stderr, "[serve] could not obtain context state: %s\n", doca_error_get_descr(err));
             break;
@@ -346,15 +341,13 @@ void serve_ping_pong(
         }
     }
 
-    //double elapsed_us = (state.end.tv_sec - state.start.tv_sec) * 1e6 + (state.end.tv_nsec - state.start.tv_nsec) / 1e3;
-    //printf("%f microseconds\n", elapsed_us);
+    double elapsed_us = (state.end.tv_sec - state.start.tv_sec) * 1e6 + (state.end.tv_nsec - state.start.tv_nsec) / 1e3;
+    printf("%f microseconds\n", elapsed_us);
 
 cleanup_context:
-    doca_comch_server_destroy(server);
-cleanup_rep:
-    doca_dev_rep_close(server_rep);
+    doca_comch_client_destroy(client);
 cleanup_dev:
-    doca_dev_close(server_dev);
+    doca_dev_close(client_dev);
 cleanup_pe:
     doca_pe_destroy(engine);
 cleanup_epoll:
@@ -369,12 +362,12 @@ int main(void) {
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
     doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
-    struct server_config config = {
+    struct client_config config = {
         .server_name = "vss-test",
         .num_send_tasks = 32,
         .max_msg_size = 4080,
         .recv_queue_size = 16
     };
 
-    serve_ping_pong("03:00.0", "81:00.0", &config);
+    client_ping_pong("81:00.0", &config);
 }
