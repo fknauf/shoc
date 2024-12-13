@@ -17,6 +17,13 @@
 #include <stdlib.h>
 #include <time.h>
 
+struct server_config {
+    char const *server_name;
+    uint32_t num_send_tasks;
+    uint32_t max_msg_size;
+    uint32_t recv_queue_size;
+};
+
 void send_pong(struct doca_comch_connection *connection) {
     doca_error_t err;
     struct doca_comch_task_send *send_task;
@@ -44,6 +51,18 @@ failure_task:
     doca_task_free(task);
 failure_connection:
     doca_comch_server_disconnect(server, connection);
+}
+
+void connection_event_callback(
+    struct doca_comch_event_connection_status_changed *event,
+    struct doca_comch_connection *comch_connection,
+    uint8_t change_successful    
+) {
+    // dummy function because there's nothing do do upon connection/disconnection.
+    // We need to register one though, or the context won't start.
+    (void) event;
+    (void) comch_connection;
+    (void) change_successful;
 }
 
 void msg_recv_callback(
@@ -106,7 +125,6 @@ struct doca_dev *open_server_device(char const *pci_addr) {
         }
 
         if(is_addr_equal && doca_comch_cap_server_is_supported(dev_list[i]) == DOCA_SUCCESS) {
-            struct doca_dev *result;
             err = doca_dev_open(dev_list[i], &result);
 
             if(err == DOCA_SUCCESS) {
@@ -167,40 +185,37 @@ cleanup:
 struct doca_comch_server *open_server_context(
     struct doca_dev *dev,
     struct doca_dev_rep *rep,
-    char const *server_name,
-    uint32_t max_tasks,
+    struct server_config *config,
     struct doca_pe *engine
 ) {
     struct doca_comch_server *server;
     doca_error_t err;
 
-    err = doca_comch_server_create(dev, rep, server_name, &server);
+    err = doca_comch_server_create(dev, rep, config->server_name, &server);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not create context: %s\n", doca_error_get_descr(err));
         goto failure;
     }
 
-    //ctx = doca_comch_server_as_ctx(server);
-    //err = doca_ctx_set_state_changed_cb(ctx, state_changed_callback);
-    //if(err != DOCA_SUCCESS) {
-    //    fprintf(stderr, "[open context] could not set state-change callback: %s\n", doca_error_get_descr(err));
-    //    goto failure_cleanup;
-    //}
+    err = doca_comch_server_set_max_msg_size(server, config->max_msg_size);
+    if(err != DOCA_SUCCESS) {
+        fprintf(stderr, "[open context] could not set max message size: %s\n", doca_error_get_descr(err));
+        goto failure_cleanup;
+    }
 
-    //union doca_data ctx_user_data = { .ptr = state };
-    //err = doca_ctx_set_user_data(ctx, ctx_user_data);
-    //if(err != DOCA_SUCCESS) {
-    //    fprintf(stderr, "[open context] could not set context user data: %s\n", doca_error_get_descr(err));
-    //    goto failure_cleanup;
-    //}
+    err = doca_comch_server_set_recv_queue_size(server, config->recv_queue_size);
+    if(err != DOCA_SUCCESS) {
+        fprintf(stderr, "[open context] could not set receiver queue size: %s\n", doca_error_get_descr(err));
+        goto failure_cleanup;
+    }
 
-    //err = doca_comch_server_event_connection_status_changed_register(server, connection_callback, disconnection_callback);
-    //if(err != DOCA_SUCCESS) {
-    //    fprintf(stderr, "[open context] could not set connection state callbacks: %s\n", doca_error_get_descr(err));
-    //    goto failure_cleanup;
-    //}
+    err = doca_comch_server_event_connection_status_changed_register(server, connection_event_callback, connection_event_callback);
+    if(err != DOCA_SUCCESS) {
+        fprintf(stderr, "[open context] could not set connection state callbacks: %s\n", doca_error_get_descr(err));
+        goto failure_cleanup;
+    }
 
-    err = doca_comch_server_task_send_set_conf(server, send_task_completed_callback, send_task_error_callback, max_tasks);
+    err = doca_comch_server_task_send_set_conf(server, send_task_completed_callback, send_task_error_callback, config->num_send_tasks);
     if(err != DOCA_SUCCESS) {
         fprintf(stderr, "[open context] could not set send task callbacks: %s\n", doca_error_get_descr(err));
         goto failure_cleanup;
@@ -265,7 +280,8 @@ failure:
 
 void serve_ping_pong(
     char const *dev_pci,
-    char const *rep_pci
+    char const *rep_pci,
+    struct server_config *config
 ) {
     doca_error_t err;
 
@@ -293,7 +309,7 @@ void serve_ping_pong(
         goto cleanup_dev;
     }
 
-    struct doca_comch_server *server = open_server_context(server_dev, server_rep, "vss-test", 32, engine);
+    struct doca_comch_server *server = open_server_context(server_dev, server_rep, config, engine);
     if(server == NULL) {
         fprintf(stderr, "[serve] could not obtain server context\n");
         goto cleanup_rep;
@@ -351,7 +367,14 @@ int main(void) {
 
     doca_log_backend_create_standard();
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
-    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
+    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_DEBUG);
 
-    serve_ping_pong("03:00.0", "81:00.0");
+    struct server_config config = {
+        .server_name = "vss-test",
+        .num_send_tasks = 32,
+        .max_msg_size = 4080,
+        .recv_queue_size = 16
+    };
+
+    serve_ping_pong("03:00.0", "81:00.0", &config);
 }
