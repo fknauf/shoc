@@ -163,3 +163,14 @@ executable('doca_comch_server', [ 'progs/plain_doca/comch_server.c' ],
 executable('doca_comch_client', [ 'progs/plain_doca/comch_client.c' ],
         dependencies : deps,
         install: false)
+
+executable('doca_comch_data_server', 
+        [
+                'progs/plain_doca/comch_data_server/connection.c',
+                'progs/plain_doca/comch_data_server/main.c',
+                'progs/plain_doca/comch_data_server/memory.c',
+                'progs/plain_doca/comch_data_server/server.c'
+        ],
+        dependencies : deps,
+        install: false
+)
