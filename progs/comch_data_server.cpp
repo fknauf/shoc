@@ -8,32 +8,64 @@
 #include <doca/progress_engine.hpp>
 
 #include <iostream>
+#include <memory>
+#include <ranges>
 #include <string_view>
 #include <vector>
 
-auto dance(
+struct data_descriptor {
+    std::uint32_t block_count;
+    std::uint32_t block_size;
+    std::vector<std::byte> buffer;
+    std::span<std::byte> bytes;
+
+    auto block(std::uint32_t i) const {
+        return bytes.subspan(i * block_size, block_size);
+    }
+
+    data_descriptor(
+        std::uint32_t block_count,
+        std::uint32_t block_size
+    ):
+        block_count { block_count },
+        block_size { block_size },
+        buffer(block_count * block_size + 64)
+    {
+        auto base_ptr = static_cast<void*>(buffer.data());
+        auto space = buffer.size();
+        std::align(64, block_size * block_count, base_ptr, space);
+
+        bytes = std::span { static_cast<std::byte*>(base_ptr), block_size * block_count };
+
+        for(auto i : std::ranges::views::iota(std::uint32_t{}, block_count)) {
+            std::ranges::fill(block(i), static_cast<std::byte>(i));
+        }
+    }
+};
+
+auto send_blocks(
     doca::comch::scoped_server_connection con,
-    doca::device const &dev
+    data_descriptor &data,
+    doca::memory_map &mmap,
+    doca::buffer_inventory &bufinv
 ) -> doca::coro::fiber {
-    auto msg = co_await con->msg_recv();
+    auto send_status = co_await con->send(fmt::format("{} {}", data.block_count, data.block_size));
 
-    if(
-        msg == "give x" &&
-        co_await con->send("ok") == DOCA_SUCCESS
-    ) {
-        auto consumer_id = co_await con->accept_consumer();
+    if(send_status != DOCA_SUCCESS) {
+        doca::logger->error("failed to send data gemoetry");
+        co_return;
+    }
 
-        auto prod = co_await con->create_producer(16);
+    auto consumer_id = co_await con->accept_consumer();
+    auto prod = co_await con->create_producer(16);
 
-        auto memory = std::vector<char>(1024, 'x');
-        auto mmap = doca::memory_map { dev, memory, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
-        auto bufinv = doca::buffer_inventory { 1 };
-        auto buffer = bufinv.buf_get_by_data(mmap, memory);
-
+    for(auto i : std::ranges::views::iota(std::uint32_t{}, data.block_count)) {
+        auto buffer = bufinv.buf_get_by_data(mmap, data.block(i));
         auto status = co_await prod->send(buffer, {}, consumer_id);
 
         if(status != DOCA_SUCCESS) {
-            doca::logger->warn("producer failed to send buffer: {}", doca_error_get_descr(status));
+            doca::logger->error("producer failed to send buffer: {}", doca_error_get_descr(status));
+            co_return;
         }
     }
 }
@@ -41,12 +73,15 @@ auto dance(
 auto serve(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
     auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0");
+    auto data = data_descriptor { 256, 1048576 };
+    auto mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+    auto bufinv = doca::buffer_inventory { 32 };
 
     auto server = co_await engine->create_context<doca::comch::server>("vss-data-test", dev, rep);
 
     for(;;) {
         auto con = co_await server->accept();
-        dance(std::move(con), dev);
+        send_blocks(std::move(con), data, mmap, bufinv);
     }
 }
 
@@ -55,8 +90,6 @@ int main() {
     doca::logger->set_level(spdlog::level::warn);
 
     auto engine = doca::progress_engine{};
-
     serve(&engine);
-
     engine.main_loop();
 }
