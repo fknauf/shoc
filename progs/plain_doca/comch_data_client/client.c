@@ -17,6 +17,18 @@ void client_state_changed_callback(
     (void) next_state;
 }
 
+void client_send_callback(
+    struct doca_comch_task_send *task,
+    union doca_data task_user_data,
+    union doca_data ctx_user_data
+) {
+    // needs to be registered for client to start
+
+    (void) task;
+    (void) task_user_data;
+    (void) ctx_user_data;
+}
+
 void client_msg_recv_callback(
     struct doca_comch_event_msg_recv *event,
     uint8_t *recv_buffer,
@@ -50,12 +62,14 @@ void receive_datastream(struct client_config *config) {
         LOG_ERROR("could not obtain progress engine");
         goto cleanup_epoll;
     }
+    result_buffer.engine = engine;
 
     struct doca_dev *client_dev = open_client_device(config->dev_pci_addr);
     if(client_dev == NULL) {
         LOG_ERROR("could not obtain device");
         goto cleanup_pe;
     }
+    result_buffer.device = client_dev;
 
     struct doca_comch_client *client = open_client_context(engine, client_dev, config, &result_buffer);
     if(client == NULL) {
@@ -197,6 +211,12 @@ struct doca_comch_client *open_client_context(
         goto failure_cleanup;
     }
 
+    err = doca_comch_client_task_send_set_conf(client, client_send_callback, client_send_callback, 1);
+    if(err != DOCA_SUCCESS) {
+        LOG_ERROR("could not register send-task completion handlers: %s", doca_error_get_descr(err));
+        goto failure_cleanup;
+    }
+
     err = doca_pe_connect_ctx(engine, ctx);
     if(err != DOCA_SUCCESS) {
         LOG_ERROR("could not connect to progress engine: %s", doca_error_get_descr(err));
@@ -204,7 +224,7 @@ struct doca_comch_client *open_client_context(
     }
 
     err = doca_ctx_start(ctx);
-    if(err != DOCA_SUCCESS) {
+    if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
         LOG_ERROR("could not start context: %s", doca_error_get_descr(err));
         goto failure_cleanup;
     }

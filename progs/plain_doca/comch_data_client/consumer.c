@@ -160,15 +160,6 @@ struct consumer_state *create_consumer_state(
     struct client_state *client_state,
     struct cache_aligned_storage *storage
 ) {
-    doca_error_t err;
-
-    struct doca_dev *client_device;
-    err = doca_comch_client_get_device(client_state->client, &client_device);
-    if(err != DOCA_SUCCESS) {
-        LOG_ERROR("unable to get device from client");
-        goto failure;
-    }
-
     struct consumer_state *state = calloc(1, sizeof(struct consumer_state));
     if(state == NULL) {
         LOG_ERROR("unable to allocate consumer state");
@@ -176,7 +167,7 @@ struct consumer_state *create_consumer_state(
     }
 
     uint32_t memmap_size = storage->block_count * storage->block_size;
-    struct doca_mmap *memmap = open_memory_map(storage->bytes, memmap_size, client_device, DOCA_ACCESS_FLAG_PCI_READ_WRITE);
+    struct doca_mmap *memmap = open_memory_map(storage->bytes, memmap_size, client_state->device, DOCA_ACCESS_FLAG_PCI_READ_WRITE);
     if(memmap == NULL) {
         LOG_ERROR("unable to open memory map");
         goto failure_state;
@@ -192,6 +183,8 @@ struct consumer_state *create_consumer_state(
     state->client_state->result = storage;
     state->memory_map = memmap;
     state->buf_inv = bufinv;
+
+    return state;
 
 failure_mmap:
     doca_mmap_destroy(memmap);

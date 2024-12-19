@@ -39,6 +39,7 @@ static inline uint8_t *cache_aligned_storage_block(struct cache_aligned_storage 
 
 struct client_state {
     struct doca_comch_client *client;
+    struct doca_dev *device;
     struct doca_pe *engine;
     struct cache_aligned_storage *result;
 
@@ -65,6 +66,7 @@ struct consumer_state *create_consumer_state(
 void destroy_consumer_state(struct consumer_state *state);
 
 void client_state_changed_callback(union doca_data user_data, struct doca_ctx *ctx, enum doca_ctx_states prev_state, enum doca_ctx_states next_state);
+void client_send_callback(struct doca_comch_task_send *task, union doca_data task_user_data, union doca_data ctx_user_data);
 void client_msg_recv_callback(struct doca_comch_event_msg_recv *event, uint8_t *recv_buffer, uint32_t msg_len, struct doca_comch_connection *connection);
 
 void consumer_state_change_callback(union doca_data user_data, struct doca_ctx *ctx, enum doca_ctx_states prev_state, enum doca_ctx_states next_state);

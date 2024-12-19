@@ -72,6 +72,14 @@ auto receive_blocks(doca::progress_engine *engine) -> doca::coro::fiber {
     auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "elapsed time: " << elapsed.count() << " us\n";
+
+    for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
+        if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
+            doca::logger->error("Block {} contains unexpected data", i);
+        }
+    }
+
+    std::cout << "data verified correctness.\n";
 }
 
 int main() {
