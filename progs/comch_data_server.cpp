@@ -72,12 +72,14 @@ auto send_blocks(
 
 auto serve(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
-    auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0");
-    auto data = data_descriptor { 256, 1048576 };
+    auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0", DOCA_DEVINFO_REP_FILTER_NET);
+    auto data = data_descriptor { 256, 2 << 20 };
     auto mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
     auto bufinv = doca::buffer_inventory { 32 };
 
     auto server = co_await engine->create_context<doca::comch::server>("vss-data-test", dev, rep);
+
+    std::cout << "accepting connections.\n";
 
     for(;;) {
         auto con = co_await server->accept();
