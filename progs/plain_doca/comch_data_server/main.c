@@ -1,4 +1,5 @@
 #include "comch_data_server.h"
+#include <doca_log.h>
 #include <stdlib.h>
 
 struct data_descriptor *prepare_data(uint32_t block_count, uint32_t block_size) {
