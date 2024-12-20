@@ -99,7 +99,7 @@ void receive_datastream(struct client_config *config) {
 
         if(nfd == -1) {
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));
-            goto cleanup_context;
+            goto cleanup_storage;
         }
 
         doca_pe_clear_notification(engine, 0);
@@ -113,7 +113,21 @@ void receive_datastream(struct client_config *config) {
     double elapsed_us = (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_nsec - start.tv_nsec) / 1e3;
     printf("%f microseconds\n", elapsed_us);
 
-cleanup_context:
+    for(uint32_t i = 0; i < result_buffer.result->block_count; ++i) {
+        uint8_t *base = cache_aligned_storage_block(result_buffer.result, i);
+
+        for(uint32_t k = 0; k < result_buffer.result->block_size; ++k) {
+            if(base[k] != (uint8_t) i) {
+                LOG_ERROR("Block %" PRIu32 " has invalid data byte %u", i, base[k]);
+                goto cleanup_storage;
+            }
+        }
+    }
+
+    puts("Data verified correct.");
+
+cleanup_storage:
+    free(result_buffer.result);
     doca_comch_client_destroy(client);
 cleanup_dev:
     doca_dev_close(client_dev);
@@ -229,6 +243,7 @@ struct doca_comch_client *open_client_context(
         goto failure_cleanup;
     }
 
+    result_buffer->client = client;
     return client;
 
 failure_cleanup:

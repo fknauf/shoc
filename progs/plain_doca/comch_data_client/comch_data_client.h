@@ -25,7 +25,6 @@ struct client_config {
 struct cache_aligned_storage {
     uint32_t block_count;
     uint32_t block_size;
-    void *memory;
     uint8_t *bytes;
 };
 

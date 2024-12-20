@@ -38,6 +38,8 @@ void receive_next_block(struct consumer_state *state) {
         goto failure_task;
     }
 
+    ++state->offloaded;
+
     return;
 
 failure_task:
@@ -62,6 +64,8 @@ void consumer_state_change_callback(
         clock_gettime(CLOCK_REALTIME, &state->client_state->start);
         receive_next_block(state);
     } else if(next_state == DOCA_CTX_STATE_IDLE) {
+        doca_comch_consumer_destroy(state->consumer);
+        state->consumer = NULL;
         doca_ctx_stop(doca_comch_client_as_ctx(state->client_state->client));
         destroy_consumer_state(state);
     }
@@ -74,6 +78,8 @@ void consumer_recv_completed_callback(
 ) {
     (void) task_user_data;
     (void) ctx_user_data;
+
+    LOG_ERROR("completed");
 
     struct doca_task *task = doca_comch_consumer_task_post_recv_as_task(recv_task);
     struct doca_buf *buf = doca_comch_consumer_task_post_recv_get_buf(recv_task);
@@ -95,6 +101,8 @@ void consumer_recv_error_callback(
     union doca_data task_user_data,
     union doca_data ctx_user_data
 ) {
+    LOG_ERROR("error");
+
     struct doca_task *task = doca_comch_consumer_task_post_recv_as_task(recv_task);
     struct doca_buf *buf = doca_comch_consumer_task_post_recv_get_buf(recv_task);
     struct consumer_state *state = ctx_user_data.ptr;
