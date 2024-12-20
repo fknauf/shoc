@@ -70,36 +70,32 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
 
     auto compress = co_await engine->create_context<doca::compress_context>(dev, parallelism);
 
-    try {
-        auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
-        std::array<doca::compress_awaitable, parallelism> waiters;
+    std::array<doca::compress_awaitable, parallelism> waiters;
 
-        for(auto i : std::ranges::views::iota(0u, batches)) {
-            auto waiter_index = i % parallelism;
-            auto &waiter = waiters[waiter_index];
+    for(auto i : std::ranges::views::iota(0u, batches)) {
+        auto waiter_index = i % parallelism;
+        auto &waiter = waiters[waiter_index];
 
-            if(i >= parallelism) {
-                doca::logger->info("waiting for chunk {}", i - parallelism);
-                co_await waiter;
-            }
-
-            waiter = compress->compress(src_buffers[i], dst_buffers[i]);
-        }
-
-        for(auto &waiter: waiters) {
-            doca::logger->info("waiting for final chunks...");
+        if(i >= parallelism) {
+            doca::logger->info("waiting for chunk {}", i - parallelism);
             co_await waiter;
         }
 
-        auto end = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-        std::cout << "elapsed time: " << elapsed.count() << " us\n";
-        std::cout << "data rate: " << filesize / elapsed.count() * 1e6 / (1 << 30) << " GiB/s\n";
-    } catch(std::exception &e) {
-        doca::logger->error("unexpected error: {}", e.what());
+        waiter = compress->compress(src_buffers[i], dst_buffers[i]);
     }
+
+    for(auto &waiter: waiters) {
+        doca::logger->info("waiting for final chunks...");
+        co_await waiter;
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "elapsed time: " << elapsed.count() << " us\n";
+    std::cout << "data rate: " << filesize / elapsed.count() * 1e6 / (1 << 30) << " GiB/s\n";
 
     co_await compress->stop();
 
