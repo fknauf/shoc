@@ -13,9 +13,7 @@
 #include <thread>
 
 namespace doca {
-    progress_engine::progress_engine(progress_engine_limits limits)
-        : limits_ { std::move(limits) }
-    {
+    progress_engine::progress_engine() {
         doca_pe *pe;
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
@@ -143,33 +141,16 @@ namespace doca {
         engine_->push_waiting_coroutine(waiter, delay_);
     }
 
-    auto progress_engine::submit_task(doca_task *task, coro::error_receptable *reportee) -> void {
-        auto err = doca_task_submit(task);
+    auto progress_engine::submit_task(doca_task *task, coro::error_receptable *reportee, std::uint32_t submit_flags) -> void {
+        doca_error_t err;
+        
+        do {
+            err = doca_task_submit_ex(task, submit_flags);
+        } while(err == DOCA_ERROR_AGAIN);
 
-        if(err == DOCA_ERROR_AGAIN) {
-            delayed_submission(task, reportee);
-        } else if(err != DOCA_SUCCESS) {
+        if(err != DOCA_SUCCESS) {
             doca_task_free(task);
             reportee->set_error(err);
-        }
-    }
-
-    auto progress_engine::delayed_submission(
-        doca_task *task,
-        coro::error_receptable *reportee
-    ) -> doca::coro::fiber {
-        for([[maybe_unused]] auto attempt : std::views::iota(0, limits_.resubmission_attempts)) {
-            co_await timeout(limits_.resubmission_delay);
-
-            auto err = doca_task_submit(task);
-
-            if(err == DOCA_SUCCESS) {
-                break;
-            } else if(err != DOCA_ERROR_AGAIN) {
-                doca_task_free(task);
-                reportee->set_error(err);
-                break;
-            }
         }
     }
 }

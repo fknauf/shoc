@@ -161,7 +161,10 @@ void expired_consumer_callback(
         return;
     }
 
-    doca_ctx_stop(doca_comch_producer_as_ctx(conn_state->producer));
+    if(conn_state->producer != NULL) {
+        doca_ctx_stop(doca_comch_producer_as_ctx(conn_state->producer));
+        conn_state->producer = NULL;
+    }
 }
 
 void msg_recv_callback(

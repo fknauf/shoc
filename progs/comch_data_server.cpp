@@ -49,6 +49,7 @@ auto send_blocks(
     doca::memory_map &mmap,
     doca::buffer_inventory &bufinv
 ) -> doca::coro::fiber {
+    auto prod = co_await con->create_producer(16);
     auto send_status = co_await con->send(fmt::format("{} {}", data.block_count, data.block_size));
 
     if(send_status != DOCA_SUCCESS) {
@@ -57,7 +58,6 @@ auto send_blocks(
     }
 
     auto consumer_id = co_await con->accept_consumer();
-    auto prod = co_await con->create_producer(16);
 
     for(auto i : std::ranges::views::iota(std::uint32_t{}, data.block_count)) {
         auto buffer = bufinv.buf_get_by_data(mmap, data.block(i));
@@ -73,7 +73,7 @@ auto send_blocks(
 auto serve(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
     auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0", DOCA_DEVINFO_REP_FILTER_NET);
-    auto data = data_descriptor { 256, 2 << 20 };
+    auto data = data_descriptor { 256, 1 << 20 };
     auto mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
     auto bufinv = doca::buffer_inventory { 32 };
 

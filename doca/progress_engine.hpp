@@ -60,11 +60,6 @@ namespace doca {
         std::chrono::microseconds delay_;
     };
 
-    struct progress_engine_limits {
-        std::chrono::microseconds resubmission_delay = std::chrono::milliseconds(1);
-        int resubmission_attempts = 5;
-    };
-
     /**
      * RAII wrapper around a doca_pe (progress engine) handle. Manages its lifetime, can wait for
      * events with epoll.
@@ -85,7 +80,7 @@ namespace doca {
         friend class yield_awaitable;
         friend class timeout_awaitable;
 
-        progress_engine(progress_engine_limits limits = {});
+        progress_engine();
         ~progress_engine();
 
         auto stop() -> void;
@@ -133,7 +128,8 @@ namespace doca {
 
         auto submit_task(
             doca_task *task,
-            coro::error_receptable *reportee
+            coro::error_receptable *reportee,
+            std::uint32_t submit_flags = DOCA_TASK_SUBMIT_FLAG_NONE
         ) -> void;
 
     private:
@@ -145,15 +141,9 @@ namespace doca {
         auto push_yielding_coroutine(std::coroutine_handle<> yielder) -> void;
         auto push_waiting_coroutine(std::coroutine_handle<> waiter, std::chrono::microseconds delay) -> void;
 
-        auto delayed_submission(
-            doca_task *task,
-            coro::error_receptable *reportee
-        ) -> coro::fiber;
-
         auto process_trigger(int trigger_fd) -> void;
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
-        progress_engine_limits limits_;
 
         event_counter yield_counter_;
         std::queue<std::coroutine_handle<>> pending_yielders_;
@@ -164,8 +154,9 @@ namespace doca {
 
     namespace detail {
         template<auto AllocInit, auto AsTask, typename AdditionalData, typename... Args>
-        auto status_offload(
+        auto status_offload_ex(
             progress_engine *engine,
+            std::uint32_t submit_flags,
             coro::status_awaitable<AdditionalData> result,
             Args&&... args
         ) {
@@ -184,10 +175,19 @@ namespace doca {
                 receptable->set_error(err);
             } else {
                 auto base_task = AsTask(task);
-                engine->submit_task(base_task, receptable);
+                engine->submit_task(base_task, receptable, submit_flags);
             }
 
             return result;        
+        }
+
+        template<auto AllocInit, auto AsTask, typename AdditionalData, typename... Args>
+        auto status_offload(
+            progress_engine *engine,
+            coro::status_awaitable<AdditionalData> result,
+            Args&&... args
+        ) {
+            return status_offload_ex<AllocInit, AsTask>(engine, DOCA_TASK_SUBMIT_FLAG_NONE, std::move(result), std::forward<Args>(args)...);
         }
 
         template<auto AllocInit, auto AsTask, typename... Args>
