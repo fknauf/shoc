@@ -18,9 +18,10 @@ void producer_send_completed_callback(
     ++conn_state->completed;
     if(conn_state->offloaded < conn_state->server_state->data.block_count) {
         send_next_data_buffer(conn_state);
-    } else {
+    } else if(conn_state->producer != NULL) {
         struct doca_ctx *ctx = doca_comch_producer_as_ctx(conn_state->producer);
         doca_ctx_stop(ctx);
+        conn_state->producer = NULL;
     }
 }
 
@@ -31,7 +32,6 @@ void producer_send_error_callback(
 ) {
     struct connection_state *conn_state = ctx_user_data.ptr;
     struct doca_task *task = doca_comch_producer_task_send_as_task(send_task);
-    struct doca_ctx *ctx = doca_comch_producer_as_ctx(conn_state->producer);
     struct doca_buf *buffer = (struct doca_buf*) doca_comch_producer_task_send_get_buf(send_task);
 
     doca_error_t status = doca_task_get_status(task);
@@ -39,7 +39,12 @@ void producer_send_error_callback(
 
     doca_buf_dec_refcount(buffer, NULL);
     doca_task_free(task);
-    doca_ctx_stop(ctx);
+
+    if(conn_state->producer != NULL) {
+        struct doca_ctx *ctx = doca_comch_producer_as_ctx(conn_state->producer);
+        doca_ctx_stop(ctx);
+        conn_state->producer = NULL;
+    }
 }
 
 struct doca_comch_producer *open_producer(
@@ -232,7 +237,10 @@ doca_error_t send_next_data_buffer(
     union doca_data task_user_data = { .u64 = num };
     doca_task_set_user_data(task, task_user_data);
 
-    err = doca_task_submit(task);
+    do {
+        err = doca_task_submit(task);
+    } while(err == DOCA_ERROR_AGAIN);
+
     if(err != DOCA_SUCCESS) {
         LOG_ERROR("could not submit task: %s", doca_error_get_descr(err));
         goto failure_task;
