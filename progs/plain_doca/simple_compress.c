@@ -321,15 +321,17 @@ failure:
 struct region *compress_buffers(
     void *in,
     void *out,
+    struct region *out_region_buffer,
     size_t block_count,
     size_t block_size
 ) {
     doca_error_t err;
+    struct region *result = NULL;
 
     int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if(epoll_fd == -1) {
         fprintf(stderr, "[compress buffers] could not create epoll file descriptor: %s\n", strerror(errno));
-        return NULL;
+        goto end;
     }
 
     struct doca_pe *engine = open_progress_engine(epoll_fd);
@@ -369,7 +371,6 @@ struct region *compress_buffers(
         goto cleanup_inv;
     }
 
-    struct region *out_region_buffer = calloc(block_count, sizeof(struct region));
     struct compression_state state = {
         .in = in,
         .out = out,
@@ -387,7 +388,7 @@ struct region *compress_buffers(
     struct doca_compress *compress = open_compress_context(compress_dev, engine, &state);
     if(compress == NULL) {
         fprintf(stderr, "[compress buffers] obtain compression context\n");
-        goto cleanup_dev;
+        goto cleanup_inv;
     }
     
     struct epoll_event ep_event = { 0, { 0 } };
@@ -422,7 +423,10 @@ struct region *compress_buffers(
     }
 
     double elapsed_us = (state.end.tv_sec - state.start.tv_sec) * 1e6 + (state.end.tv_nsec - state.start.tv_nsec) / 1e3;
-    printf("%f microseconds\n", elapsed_us);
+    printf("elapsed time: %f us\n", elapsed_us);
+    printf("data rate: %f GiB/s\n", (block_count * block_size / elapsed_us * 1e6 / (1 << 30)));
+
+    result = out_region_buffer;
 
 cleanup_context:
     doca_compress_destroy(compress);
@@ -438,8 +442,13 @@ cleanup_pe:
     doca_pe_destroy(engine);
 cleanup_epoll:
     close(epoll_fd);
+end:
 
-    return out_region_buffer;
+    return result;
+}
+
+uint8_t *cache_align(uint8_t *ptr) {
+    return (uint8_t*)(((uintptr_t) ptr + 64) / 64 * 64);
 }
 
 void compress_file(FILE *in, FILE *out) {
@@ -454,20 +463,24 @@ void compress_file(FILE *in, FILE *out) {
         return;
     }
 
-    uint8_t *indata = malloc(batches * batchsize);
-    uint8_t *outdata = malloc(batches * batchsize);
+    uint8_t *inbuf = malloc(batches * batchsize + 64);
+    uint8_t *outbuf = malloc(batches * batchsize + 64);
+    struct region *region_buffer = calloc(batches, sizeof(struct region));
 
-    if(indata == NULL || outdata == NULL) {
+    if(inbuf == NULL || outbuf == NULL || region_buffer == NULL) {
         fprintf(stderr, "[compress file] could not allocate memory\n");
         goto cleanup;
     }
+
+    uint8_t *indata = cache_align(inbuf);
+    uint8_t *outdata = cache_align(outbuf);
 
     if(fread(indata, batchsize, batches, in) != batches) {
         fprintf(stderr, "[compress file] could not read data from input file\n");
         goto cleanup;
     }
 
-    struct region *out_regions = compress_buffers(indata, outdata, batches, batchsize);
+    struct region *out_regions = compress_buffers(indata, outdata, region_buffer, batches, batchsize);
 
     if(out_regions == NULL) {
         fprintf(stderr, "[compress file] buffer compression failed\n");
@@ -482,10 +495,10 @@ void compress_file(FILE *in, FILE *out) {
         fwrite(out_regions[i].base, 1, out_regions[i].size, out);
     }
 
-    free(out_regions);
 cleanup:
-    free(indata);
-    free(outdata);
+    free(region_buffer);
+    free(inbuf);
+    free(outbuf);
 }
 
 int main(int argc, char *argv[]) {

@@ -15,6 +15,20 @@
 
 #include <doca_log.h>
 
+struct cache_aligned_memory {
+    std::vector<char> storage;
+    std::span<char> data;
+
+    cache_aligned_memory(std::size_t size):
+        storage(size + 64)
+    {
+        auto *base = static_cast<void*>(storage.data());
+        auto space = storage.size();
+        std::align(64, size, base, space);
+        data = std::span { static_cast<char*>(base), size };
+    }
+};
+
 auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream &out) -> doca::coro::fiber {
     std::uint32_t batches;
     std::uint32_t batchsize;
@@ -26,8 +40,10 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     doca::logger->info("compressing {} batches of size {}", batches, batchsize);
 
     auto filesize = batches * batchsize;
-    std::vector<char> src_data(filesize);
-    std::vector<char> dst_data(filesize);
+    auto src_mem = cache_aligned_memory(filesize);
+    auto dst_mem = cache_aligned_memory(filesize);
+    auto src_data = src_mem.data;
+    auto dst_data = dst_mem.data;
 
     in.read(src_data.data(), filesize);
 
@@ -80,6 +96,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
         std::cout << "elapsed time: " << elapsed.count() << " us\n";
+        std::cout << "data rate: " << filesize / elapsed.count() * 1e6 / (1 << 30) << " GiB/s\n";
     } catch(std::exception &e) {
         doca::logger->error("unexpected error: {}", e.what());
     }

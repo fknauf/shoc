@@ -9,13 +9,13 @@
 #include <doca_comch_consumer.h>
 #include <doca_pe.h>
 
-#include <span>
+#include <vector>
 
 namespace doca::comch {
     class consumer;
 
     struct consumer_recv_result {
-        std::span<std::uint8_t const> immediate;
+        std::vector<std::byte> immediate;
         std::uint32_t producer_id = -1;
         doca_error_t status = DOCA_ERROR_EMPTY;
     };
@@ -31,16 +31,12 @@ namespace doca::comch {
         public context
     {
     public:
-        using payload_type = std::span<char>;
-
         consumer(
             context_parent *parent,
             doca_comch_connection *connection,
             memory_map &user_mmap,
             std::uint32_t max_tasks
         );
-
-        ~consumer();
 
         [[nodiscard]]
         auto as_ctx() const noexcept -> doca_ctx* override {
@@ -52,7 +48,7 @@ namespace doca::comch {
          *
          * @return awaitable to co_await a buffer
          */
-        auto post_recv(buffer dest) -> consumer_recv_awaitable;
+        auto post_recv(buffer &dest) -> consumer_recv_awaitable;
 
     private:
         static auto post_recv_task_completion_callback(

@@ -79,7 +79,7 @@ auto receive_blocks(doca::progress_engine *engine) -> doca::coro::fiber {
         }
     }
 
-    std::cout << "data verified correctness.\n";
+    std::cout << "data verified correct.\n";
 }
 
 int main() {

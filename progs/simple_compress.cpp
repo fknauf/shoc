@@ -9,11 +9,26 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <ranges>
 
 #include <fmt/core.h>
 
 #include <doca_log.h>
+
+struct cache_aligned_memory {
+    std::vector<char> storage;
+    std::span<char> data;
+
+    cache_aligned_memory(std::size_t size):
+        storage(size + 64)
+    {
+        auto *base = static_cast<void*>(storage.data());
+        auto space = storage.size();
+        std::align(64, size, base, space);
+        data = std::span { static_cast<char*>(base), size };
+    }
+};
 
 auto compress_file(
     doca::progress_engine *engine,
@@ -30,9 +45,11 @@ auto compress_file(
     doca::logger->info("compressing {} batches of size {}", batches, batchsize);
 
     auto filesize = batches * batchsize;
-    std::vector<char> src_data(filesize);
-    std::vector<char> dst_data(filesize);
-    std::vector<std::span<char>> dst_ranges(batches);
+    auto src_mem = cache_aligned_memory(filesize + 64);
+    auto dst_mem = cache_aligned_memory(filesize + 64);
+    auto src_data = src_mem.data;
+    auto dst_data = dst_mem.data;
+    auto dst_ranges = std::vector<std::span<char>>(batches);
 
     in.read(src_data.data(), filesize);
 
@@ -68,7 +85,8 @@ auto compress_file(
 
     auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    doca::logger->error("elapsed time: {} us", elapsed.count());
+    std::cout << "elapsed time: " << elapsed.count() << "us\n";
+    std::cout << "data rate: " << filesize / elapsed.count() * 1e6 / (1 << 30) << " GiB/s\n";
 
     co_await compress->stop();
 

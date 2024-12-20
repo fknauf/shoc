@@ -29,11 +29,7 @@ namespace doca::comch {
         ));
     }
 
-    consumer::~consumer() {
-        assert(doca_state() == DOCA_CTX_STATE_IDLE);
-    }
-
-    auto consumer::post_recv(buffer dest) -> consumer_recv_awaitable {
+    auto consumer::post_recv(buffer &dest) -> consumer_recv_awaitable {
         doca_comch_consumer_task_post_recv *task;
 
         auto result = consumer_recv_awaitable::create_space();
@@ -58,11 +54,13 @@ namespace doca::comch {
         auto dest = static_cast<consumer_recv_awaitable::payload_type*>(task_user_data.ptr);
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
 
+        auto imm_base = doca_comch_consumer_task_post_recv_get_imm_data(task);
+        auto imm_size = doca_comch_consumer_task_post_recv_get_imm_data_len(task);
+        auto imm_start = reinterpret_cast<std::byte const*>(imm_base);
+        auto imm_end = imm_start + imm_size;
+
         auto result = consumer_recv_result {
-            .immediate = std::span {
-                doca_comch_consumer_task_post_recv_get_imm_data(task),
-                doca_comch_consumer_task_post_recv_get_imm_data_len(task)
-            },
+            .immediate = std::vector(imm_start, imm_end),
             .producer_id = doca_comch_consumer_task_post_recv_get_producer_id(task),
             .status = doca_task_get_status(base_task)
         };
