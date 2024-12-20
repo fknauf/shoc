@@ -10,12 +10,17 @@ void producer_send_completed_callback(
 
     struct connection_state *conn_state = ctx_user_data.ptr;
     struct doca_task *task = doca_comch_producer_task_send_as_task(send_task);
+    struct doca_buf *buffer = (struct doca_buf*) doca_comch_producer_task_send_get_buf(send_task);
 
+    doca_buf_dec_refcount(buffer, NULL);
     doca_task_free(task);
 
     ++conn_state->completed;
     if(conn_state->offloaded < conn_state->server_state->data.block_count) {
         send_next_data_buffer(conn_state);
+    } else {
+        struct doca_ctx *ctx = doca_comch_producer_as_ctx(conn_state->producer);
+        doca_ctx_stop(ctx);
     }
 }
 
@@ -27,10 +32,12 @@ void producer_send_error_callback(
     struct connection_state *conn_state = ctx_user_data.ptr;
     struct doca_task *task = doca_comch_producer_task_send_as_task(send_task);
     struct doca_ctx *ctx = doca_comch_producer_as_ctx(conn_state->producer);
+    struct doca_buf *buffer = (struct doca_buf*) doca_comch_producer_task_send_get_buf(send_task);
 
     doca_error_t status = doca_task_get_status(task);
-    fprintf(stderr, "[%s] error from send task %" PRIu64 ": %s\n", __func__, task_user_data.u64, doca_error_get_descr(status));
+    LOG_ERROR("error from send task %" PRIu64 ": %s", task_user_data.u64, doca_error_get_descr(status));
 
+    doca_buf_dec_refcount(buffer, NULL);
     doca_task_free(task);
     doca_ctx_stop(ctx);
 }
@@ -46,39 +53,39 @@ struct doca_comch_producer *open_producer(
 
     err = doca_comch_producer_create(connection, &producer);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[create producer] unable to create producer subcontext: %s\n", doca_error_get_descr(err));
+        LOG_ERROR("unable to create producer subcontext: %s", doca_error_get_descr(err));
         goto failure;
     }
 
     struct doca_ctx *ctx = doca_comch_producer_as_ctx(producer);
     err = doca_ctx_set_state_changed_cb(ctx, producer_state_change_callback);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[create producer] unable to set state change callback: %s\n", doca_error_get_descr(err));
+        LOG_ERROR("unable to set state change callback: %s", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
     union doca_data ctx_user_data = { .ptr = conn_state };
     err = doca_ctx_set_user_data(ctx, ctx_user_data);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] unable to set producer user data: %s\n", __func__, doca_error_get_descr(err));
+        LOG_ERROR("unable to set producer user data: %s", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
     err = doca_comch_producer_task_send_set_conf(producer, producer_send_completed_callback, producer_send_error_callback, max_send_tasks);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[create producer] unable to set send task callbacks: %s\n", doca_error_get_descr(err));
+        LOG_ERROR("unable to set send task callbacks: %s", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
     err = doca_pe_connect_ctx(engine, ctx);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[create producer] unable to connect producer to progress engine: %s\n", doca_error_get_descr(err));
+        LOG_ERROR("unable to connect producer to progress engine: %s", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
     err = doca_ctx_start(ctx);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[create producer] unable to start producer: %s\n", doca_error_get_descr(err));
+        LOG_ERROR("unable to start producer: %s", doca_error_get_descr(err));
         goto failure_cleanup;
     }
 
@@ -102,20 +109,20 @@ struct connection_state *create_connection_state(
     
     err = doca_ctx_get_user_data(ctx, &ctx_user_data);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] unable to get server user data%s\n", __func__, doca_error_get_descr(err));
+        LOG_ERROR("unable to get server user data%s", doca_error_get_descr(err));
         goto failure;
     }
     server_state = ctx_user_data.ptr;
 
     struct connection_state *state = calloc(1, sizeof(struct connection_state));
     if(state == NULL) {
-        fprintf(stderr, "[%s] unable to allocate memory\n", __func__);
+        LOG_ERROR("unable to allocate memory");
         goto failure;
     }
 
     struct doca_comch_producer *producer = open_producer(connection, state, engine, 8);
     if(producer == NULL) {
-        fprintf(stderr, "[%s] unable to create producer\n", __func__);
+        LOG_ERROR("unable to create producer");
         goto failure_cleanup;
     }
 
@@ -178,14 +185,14 @@ doca_error_t send_data_extents(
     // send including sentinel char
     err = doca_comch_server_task_send_alloc_init(server, connection, buf, len + 1, &send_task);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] could not allocate task: %s\n", __func__, doca_error_get_descr(err));
+        LOG_ERROR("could not allocate task: %s", doca_error_get_descr(err));
         goto failure;
     }
 
     task = doca_comch_task_send_as_task(send_task);
     err = doca_task_submit(task);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] could not submit task: %s\n", __func__, doca_error_get_descr(err));
+        LOG_ERROR("could not submit task: %s", doca_error_get_descr(err));
         goto failure_task;
     }
 
@@ -210,14 +217,14 @@ doca_error_t send_next_data_buffer(
 
     err = doca_buf_inventory_buf_get_by_data(server_state->buf_inv, server_state->memory_map, addr, server_state->data.block_size, &buf);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] could not get source buffer: %s", __func__, doca_error_get_descr(err));
+        LOG_ERROR("could not get source buffer: %s", doca_error_get_descr(err));
         goto failure;
     }
 
     struct doca_comch_producer_task_send *send_task;
     err = doca_comch_producer_task_send_alloc_init(conn_state->producer, buf, NULL, 0, conn_state->remote_consumer_id, &send_task);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] could not allocate task: %s", __func__, doca_error_get_descr(err));
+        LOG_ERROR("could not allocate task: %s", doca_error_get_descr(err));
         goto failure_buf;
     }
 
@@ -227,7 +234,7 @@ doca_error_t send_next_data_buffer(
 
     err = doca_task_submit(task);
     if(err != DOCA_SUCCESS) {
-        fprintf(stderr, "[%s] could not submit task: %s", __func__, doca_error_get_descr(err));
+        LOG_ERROR("could not submit task: %s", doca_error_get_descr(err));
         goto failure_task;
     }
 
