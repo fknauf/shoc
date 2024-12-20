@@ -19,7 +19,7 @@ auto dma_send(doca::progress_engine *engine) -> doca::coro::fiber {
 
     auto client = co_await engine->create_context<doca::comch::client>("dma-test", dev);
 
-    auto mem = std::vector<char>(1024, 'd');
+    auto mem = std::vector<char>(1 << 20);
     auto mmap = doca::memory_map { dev, mem, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
 
     auto export_desc = mmap.export_pci(dev);
@@ -29,7 +29,7 @@ auto dma_send(doca::progress_engine *engine) -> doca::coro::fiber {
 
     auto response = co_await client->msg_recv();
 
-    if(response == "ok") {
+    if(response == "done") {
         doca::logger->info("DMA transfer succeeded");
     } else {
         doca::logger->error("unexpected response message: {}", response);

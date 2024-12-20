@@ -18,9 +18,43 @@
 #include <string_view>
 #include <vector>
 
+struct test_data {
+    std::uint32_t block_count;
+    std::uint32_t block_size;
+    std::vector<std::byte> buffer;
+    std::span<std::byte> bytes;
+    std::vector<std::span<std::byte>> blocks;
+
+    auto block(std::uint32_t i) const {
+        return bytes.subspan(i * block_size, block_size);
+    }
+
+    test_data(
+        std::uint32_t block_count,
+        std::uint32_t block_size
+    ):
+        block_count { block_count },
+        block_size { block_size },
+        buffer(block_count * block_size + 64),
+        blocks(block_count)
+    {
+        auto base_ptr = static_cast<void*>(buffer.data());
+        auto space = buffer.size();
+        std::align(64, block_size * block_count, base_ptr, space);
+
+        bytes = std::span { static_cast<std::byte*>(base_ptr), block_size * block_count };
+
+        for(auto i : std::ranges::views::iota(std::uint32_t{}, block_count)) {
+            blocks[i] = block(i);
+            std::ranges::fill(blocks[i], static_cast<std::byte>(i));
+        }
+    }
+};
+
 auto handle_connection(
     doca::progress_engine *engine,
     doca::device &dev,
+    test_data const &data,
     doca::comch::scoped_server_connection conn
 ) -> doca::coro::fiber {
     auto dma = co_await engine->create_context<doca::dma_context>(dev, 16);
@@ -32,30 +66,33 @@ auto handle_connection(
     auto inv = doca::buffer_inventory { 2 };
     auto remote_buf = inv.buf_get_by_data(remote_mmap, remote_desc.src_range);
 
-    auto local_space = std::vector<char>(remote_buf.memory().size());
-    auto local_mmap = doca::memory_map { dev, local_space };
-    auto local_buf = inv.buf_get_by_addr(local_mmap, local_space);
+    auto local_mmap = doca::memory_map { dev, data.bytes };
 
-    auto status = co_await dma->memcpy(remote_buf, local_buf);
+    auto start = std::chrono::steady_clock::now();
 
-    if(status == DOCA_SUCCESS) {
-        doca::logger->info("dma memcpy succeeded");
+    for(auto b : data.blocks) {
+        auto local_buf = inv.buf_get_by_addr(local_mmap, b);
+        auto status = co_await dma->memcpy(remote_buf, local_buf);
 
-        auto copied_data = std::string_view {
-            local_buf.data().data(),
-            local_buf.data().size()
-        };
-        std::cout << "copied data: " << copied_data << std::endl;
-    } else {
-        doca::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
+        if(status != DOCA_SUCCESS) {
+            doca::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
+            break;
+        }
     }
 
-    [[maybe_unused]] auto ok_status = co_await conn->send("ok");
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "elapsed time: " << elapsed.count() << " us\n";
+    std::cout << "data rate: " << data.bytes.size() * 1e6 / elapsed.count() / (1 << 30) << " GiB/s\n";
+
+    [[maybe_unused]] auto ok_status = co_await conn->send("done");
 }
 
 auto dma_serve(
     doca::progress_engine *engine
 ) -> doca::coro::fiber {
+    auto data = test_data { 256, 1 << 20 };
     auto dev = doca::device::find_by_pci_addr("03:00.0", { doca::device_capability::dma, doca::device_capability::comch_server });
     auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
@@ -63,7 +100,7 @@ auto dma_serve(
 
     for(;;) {
         auto conn = co_await server->accept();
-        handle_connection(engine, dev, std::move(conn));
+        handle_connection(engine, dev, data, std::move(conn));
     }
 }
 
