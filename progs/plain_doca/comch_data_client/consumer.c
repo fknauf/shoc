@@ -79,8 +79,6 @@ void consumer_recv_completed_callback(
     (void) task_user_data;
     (void) ctx_user_data;
 
-    LOG_ERROR("completed");
-
     struct doca_task *task = doca_comch_consumer_task_post_recv_as_task(recv_task);
     struct doca_buf *buf = doca_comch_consumer_task_post_recv_get_buf(recv_task);
     struct consumer_state *state = ctx_user_data.ptr;
@@ -101,8 +99,6 @@ void consumer_recv_error_callback(
     union doca_data task_user_data,
     union doca_data ctx_user_data
 ) {
-    LOG_ERROR("error");
-
     struct doca_task *task = doca_comch_consumer_task_post_recv_as_task(recv_task);
     struct doca_buf *buf = doca_comch_consumer_task_post_recv_get_buf(recv_task);
     struct consumer_state *state = ctx_user_data.ptr;

@@ -71,7 +71,9 @@ auto receive_blocks(doca::progress_engine *engine) -> doca::coro::fiber {
 
     auto end = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "elapsed time: " << elapsed.count() << " us\n";
+    std::cout
+        << "elapsed time: " << elapsed.count() << " us\n"
+        << "data rate: " << (block_count * block_size) * 1e6 / elapsed.count() / (1 << 30) << "GiB/s\n";
 
     for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
         if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {

@@ -111,7 +111,9 @@ void receive_datastream(struct client_config *config) {
     struct timespec start = result_buffer.start;
     struct timespec end = result_buffer.end;
     double elapsed_us = (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_nsec - start.tv_nsec) / 1e3;
-    printf("%f microseconds\n", elapsed_us);
+    uint32_t bytes_read = result_buffer.result->block_count * result_buffer.result->block_size;
+    printf("elapsed time: %f us\n", elapsed_us);
+    printf("data rate: %f GiB/s\n", bytes_read / elapsed_us * 1e6 / (1 << 30));
 
     for(uint32_t i = 0; i < result_buffer.result->block_count; ++i) {
         uint8_t *base = cache_aligned_storage_block(result_buffer.result, i);

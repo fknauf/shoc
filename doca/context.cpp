@@ -52,9 +52,10 @@ namespace doca {
         } else if(next_state == DOCA_CTX_STATE_IDLE ) {
             logger->debug("context stopped");
 
+            auto coro = std::exchange(obj->coro_stop_, nullptr);
+            // may delete obj, so we can't use it after this.
             obj->parent_->signal_stopped_child(obj);
 
-            auto coro = std::exchange(obj->coro_stop_, nullptr);
             if(coro) {
                 coro.resume();
             }
