@@ -15,6 +15,8 @@
 #include <iostream>
 #include <iterator>
 #include <span>
+#include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -23,6 +25,10 @@ struct test_data {
     std::uint32_t block_size;
     std::vector<std::byte> buffer;
     std::span<std::byte> bytes;
+
+    auto block_indices() const {
+        return std::ranges::views::iota(std::uint32_t{}, block_count);
+    }
 
     auto block(std::uint32_t i) const {
         return bytes.subspan(i * block_size, block_size);
@@ -42,64 +48,37 @@ struct test_data {
 
         bytes = std::span { static_cast<std::byte*>(base_ptr), block_size * block_count };
 
-        for(auto i : std::ranges::views::iota(std::uint32_t{}, block_count)) {
+        for(auto i : block_indices()) {
             std::ranges::fill(block(i), static_cast<std::byte>(i));
         }
-    }
-
-    auto block_indices() const {
-        return std::ranges::views::iota(std::uint32_t{}, block_count);
     }
 };
 
 auto handle_connection(
-    doca::progress_engine *engine,
     doca::device &dev,
     test_data const &data,
     doca::comch::scoped_server_connection conn
 ) -> doca::coro::fiber {
-    auto send_status = co_await conn->send(fmt::format("{} {}", data.block_count, data.block_size));
+    auto local_mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
+    auto local_descr = local_mmap.export_pci(dev);
+
+    auto extents_msg = fmt::format("{} {} {}", data.block_count, data.block_size, local_descr.encode());
+    auto send_status = co_await conn->send(extents_msg);
 
     if(send_status != DOCA_SUCCESS) {
         doca::logger->error("unable to send extents: {}", doca_error_get_descr(send_status));
         co_return;
     } else {
-        std::cout << "sent extents " << data.block_count << " x " << data.block_size << std::endl;
+        std::cout << "sent extents \"" << extents_msg << "\"" << std::endl;
     }
 
-    auto dma = co_await engine->create_context<doca::dma_context>(dev, 16);
-    auto desc_msg = co_await conn->msg_recv();
-    auto remote_desc = remote_buffer_descriptor { desc_msg };
+    auto done_msg = co_await conn->msg_recv();
 
-    auto remote_mmap = doca::memory_map { dev, remote_desc.export_desc };
-    auto inv = doca::buffer_inventory { 2 };
-
-    auto local_mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
-
-    auto start = std::chrono::steady_clock::now();
-
-    for(auto i : data.block_indices()) {
-        std::cout << "sending block " << i << std::endl;
-
-        auto local_buf = inv.buf_get_by_addr(local_mmap, data.block(i));
-        auto remote_buf = inv.buf_get_by_data(remote_mmap, remote_desc.src_range.subspan(i * data.block_size, data.block_size));
-        auto status = co_await dma->memcpy(local_buf, remote_buf);
-
-        if(status != DOCA_SUCCESS) {
-            doca::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
-            co_return;
-        } else {
-            std::cout << "send block " << i << std::endl;
-        }
+    if(done_msg == "done") {
+        std::cout << "DMA transfer succeeded" << std::endl;
+    } else {
+        doca::logger->error("unexpected message: {}", done_msg);
     }
-
-    auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    std::cout << "elapsed time: " << elapsed.count() << " us\n";
-    std::cout << "data rate: " << data.bytes.size() * 1e6 / elapsed.count() / (1 << 30) << " GiB/s\n";
-
-    [[maybe_unused]] auto ok_status = co_await conn->send("done");
 }
 
 auto dma_serve(
@@ -115,7 +94,7 @@ auto dma_serve(
 
     for(;;) {
         auto conn = co_await server->accept();
-        handle_connection(engine, dev, data, std::move(conn));
+        handle_connection(dev, data, std::move(conn));
     }
 }
 

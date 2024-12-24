@@ -14,7 +14,7 @@ namespace doca {
     /**
      * Memory map between host and a doca device. May be extended in the future to cover
      * more than one device.
-     * 
+     *
      * This is mainly a RAII class that handles the lifetime of a doca_mmap handle; in addition to that
      * it owns the mapped memory.
      */
@@ -23,13 +23,18 @@ namespace doca {
     public:
         /**
          * Descriptor required to gain access to remotely-exported memory mappings
-         * 
+         *
          * It's a type of its own instead of a std::span<std::byte const> to make the
          * corresponding constructor's purpose more explicit
          */
         struct export_descriptor {
             void const *base_ptr;
             std::size_t length;
+
+            auto encode() const -> std::string;
+            static auto decode(std::string const &encoded) -> export_descriptor;
+
+            friend auto operator>>(std::istream &in, export_descriptor &dest) -> std::istream &;
         };
 
         /**
@@ -67,7 +72,7 @@ namespace doca {
             device dev,
             non_cv_byte_range auto &&range,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
-        ): 
+        ):
             memory_map(std::initializer_list{dev}, std::forward<decltype(range)>(range), permissions)
         {}
 
@@ -95,7 +100,7 @@ namespace doca {
         [[nodiscard]] auto span() const -> std::span<std::byte const> {
             return range_;
         }
-        
+
         [[nodiscard]] auto span() -> std::span<std::byte> {
             return range_;
         }
@@ -111,7 +116,7 @@ namespace doca {
         [[nodiscard]] auto span_as() const {
             return reinterpret_span<OutByte const>(range_);
         }
-        
+
         template<byteish OutByte>
         [[nodiscard]] auto span_as() {
             return reinterpret_span<OutByte>(range_);
