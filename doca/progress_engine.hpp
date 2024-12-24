@@ -128,8 +128,7 @@ namespace doca {
 
         auto submit_task(
             doca_task *task,
-            coro::error_receptable *reportee,
-            std::uint32_t submit_flags = DOCA_TASK_SUBMIT_FLAG_NONE
+            coro::error_receptable *reportee
         ) -> void;
 
     private:
@@ -154,9 +153,8 @@ namespace doca {
 
     namespace detail {
         template<auto AllocInit, auto AsTask, typename AdditionalData, typename... Args>
-        auto status_offload_ex(
+        auto status_offload(
             progress_engine *engine,
-            std::uint32_t submit_flags,
             coro::status_awaitable<AdditionalData> result,
             Args&&... args
         ) {
@@ -175,19 +173,10 @@ namespace doca {
                 receptable->set_error(err);
             } else {
                 auto base_task = AsTask(task);
-                engine->submit_task(base_task, receptable, submit_flags);
+                engine->submit_task(base_task, receptable);
             }
 
-            return result;        
-        }
-
-        template<auto AllocInit, auto AsTask, typename AdditionalData, typename... Args>
-        auto status_offload(
-            progress_engine *engine,
-            coro::status_awaitable<AdditionalData> result,
-            Args&&... args
-        ) {
-            return status_offload_ex<AllocInit, AsTask>(engine, DOCA_TASK_SUBMIT_FLAG_NONE, std::move(result), std::forward<Args>(args)...);
+            return result;
         }
 
         template<auto AllocInit, auto AsTask, typename... Args>

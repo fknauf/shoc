@@ -141,11 +141,11 @@ namespace doca {
         engine_->push_waiting_coroutine(waiter, delay_);
     }
 
-    auto progress_engine::submit_task(doca_task *task, coro::error_receptable *reportee, std::uint32_t submit_flags) -> void {
+    auto progress_engine::submit_task(doca_task *task, coro::error_receptable *reportee) -> void {
         doca_error_t err;
-        
+
         do {
-            err = doca_task_submit_ex(task, submit_flags);
+            err = doca_task_submit(task);
         } while(err == DOCA_ERROR_AGAIN);
 
         if(err != DOCA_SUCCESS) {
