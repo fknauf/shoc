@@ -57,27 +57,4 @@ namespace doca {
             .length = export_len
         };
     }
-
-    auto memory_map::export_descriptor::encode() const -> std::string {
-        return fmt::format("{:08x} {:08x}", reinterpret_cast<std::uintptr_t>(base_ptr), length);
-    }
-
-    auto memory_map::export_descriptor::decode(std::string const &encoded) -> export_descriptor {
-        std::istringstream parser(encoded);
-        export_descriptor dest;
-        if(parser >> dest) {
-            return dest;
-        }
-
-        throw doca_exception(DOCA_ERROR_INVALID_VALUE);
-    }
-
-    auto operator>>(std::istream &in, memory_map::export_descriptor &dest) -> std::istream & {
-        auto oldflags = in.setf(std::ios::hex, std::ios::basefield);
-        std::uintptr_t base_addr;
-        in >> base_addr >> dest.length;
-        in.setf(oldflags);
-        dest.base_ptr = reinterpret_cast<void const*>(base_addr);
-        return in;
-    }
 }

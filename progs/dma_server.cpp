@@ -60,16 +60,20 @@ auto handle_connection(
     doca::comch::scoped_server_connection conn
 ) -> doca::coro::fiber {
     auto local_mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
-    auto local_descr = local_mmap.export_pci(dev);
+    auto export_desc = local_mmap.export_pci(dev);
+    auto remote_export = remote_buffer_descriptor(data.bytes, export_desc);
 
-    auto extents_msg = fmt::format("{} {} {}", data.block_count, data.block_size, local_descr.encode());
+    auto extents_msg = fmt::format("{} {}", data.block_count, data.block_size);
     auto send_status = co_await conn->send(extents_msg);
 
     if(send_status != DOCA_SUCCESS) {
         doca::logger->error("unable to send extents: {}", doca_error_get_descr(send_status));
         co_return;
-    } else {
-        std::cout << "sent extents \"" << extents_msg << "\"" << std::endl;
+    }
+
+    send_status = co_await conn->send(remote_export.format());
+    if(send_status != DOCA_SUCCESS) {
+        doca::logger->error("unable to send mmap export descriptor: {}", doca_error_get_descr(send_status));
     }
 
     auto done_msg = co_await conn->msg_recv();
@@ -99,8 +103,8 @@ auto dma_serve(
 }
 
 auto main() -> int {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    doca::logger->set_level(spdlog::level::debug);
+    //doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    //doca::logger->set_level(spdlog::level::debug);
 
     auto engine = doca::progress_engine{};
 

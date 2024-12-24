@@ -8,11 +8,11 @@
 #include <span>
 
 struct remote_buffer_descriptor {
-    std::span<char const> src_range;
+    std::span<std::byte const> src_range;
     doca::memory_map::export_descriptor export_desc;
 
     remote_buffer_descriptor(
-        std::span<char const> src,
+        std::span<std::byte const> src,
         doca::memory_map::export_descriptor ex
     ):
         src_range { src },
@@ -29,7 +29,7 @@ struct remote_buffer_descriptor {
         std::memcpy(&src_buffer_len, msg.data() + 8, 8);
 
         src_range = std::span {
-            reinterpret_cast<char const*>(src_buffer_addr),
+            reinterpret_cast<std::byte const *>(src_buffer_addr),
             src_buffer_len
         };
 

@@ -30,11 +30,6 @@ namespace doca {
         struct export_descriptor {
             void const *base_ptr;
             std::size_t length;
-
-            auto encode() const -> std::string;
-            static auto decode(std::string const &encoded) -> export_descriptor;
-
-            friend auto operator>>(std::istream &in, export_descriptor &dest) -> std::istream &;
         };
 
         /**
