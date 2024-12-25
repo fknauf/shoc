@@ -1,4 +1,4 @@
-project('doca_sample', [ 'c', 'cpp' ], 
+project('doca_sample', [ 'c', 'cpp' ],
     default_options: ['buildtype=debug', 'cpp_std=c++20', 'warning_level=2'],
     meson_version: '>= 0.61.2'
 )
@@ -164,7 +164,7 @@ executable('doca_comch_client', [ 'progs/plain_doca/comch_client.c' ],
         dependencies : deps,
         install: false)
 
-executable('doca_comch_data_server', 
+executable('doca_comch_data_server',
         [
                 'progs/plain_doca/comch_data_server/connection.c',
                 'progs/plain_doca/comch_data_server/main.c',
@@ -175,12 +175,22 @@ executable('doca_comch_data_server',
         install: false
 )
 
-executable('doca_comch_data_client', 
+executable('doca_comch_data_client',
         [
                 'progs/plain_doca/comch_data_client/client.c',
                 'progs/plain_doca/comch_data_client/consumer.c',
                 'progs/plain_doca/comch_data_client/main.c',
                 'progs/plain_doca/comch_data_client/memory.c'
+        ],
+        dependencies : deps,
+        install: false
+)
+
+executable('doca_dma_server',
+        [
+                'progs/plain_doca/dma_server/main.c',
+                'progs/plain_doca/dma_server/memory.c',
+                'progs/plain_doca/dma_server/server.c'
         ],
         dependencies : deps,
         install: false
