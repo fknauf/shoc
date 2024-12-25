@@ -1,5 +1,3 @@
-#include "dma_common.hpp"
-
 #include <doca/buffer.hpp>
 #include <doca/buffer_inventory.hpp>
 #include <doca/comch/server.hpp>
