@@ -54,6 +54,20 @@ struct test_data {
     }
 };
 
+auto format_extents_message(
+    test_data const &data,
+    doca::memory_map::export_descriptor const &export_desc
+) -> std::string {
+    auto msglen = 8 + export_desc.length;
+    auto msg = std::string(msglen, ' ');
+
+    std::memcpy(msg.data(), &data.block_count, 4);
+    std::memcpy(msg.data() + 4, &data.block_size, 4);
+    std::memcpy(msg.data() + 8, export_desc.base_ptr, export_desc.length);
+
+    return msg;
+}
+
 auto handle_connection(
     doca::device &dev,
     test_data const &data,
@@ -61,19 +75,13 @@ auto handle_connection(
 ) -> doca::coro::fiber {
     auto local_mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
     auto export_desc = local_mmap.export_pci(dev);
-    auto remote_export = remote_buffer_descriptor(data.bytes, export_desc);
 
-    auto extents_msg = fmt::format("{} {}", data.block_count, data.block_size);
+    auto extents_msg = format_extents_message(data, export_desc);
     auto send_status = co_await conn->send(extents_msg);
 
     if(send_status != DOCA_SUCCESS) {
         doca::logger->error("unable to send extents: {}", doca_error_get_descr(send_status));
         co_return;
-    }
-
-    send_status = co_await conn->send(remote_export.format());
-    if(send_status != DOCA_SUCCESS) {
-        doca::logger->error("unable to send mmap export descriptor: {}", doca_error_get_descr(send_status));
     }
 
     auto done_msg = co_await conn->msg_recv();

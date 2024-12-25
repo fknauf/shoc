@@ -17,6 +17,33 @@
 #include <string_view>
 #include <vector>
 
+struct data_extents {
+    std::uint32_t block_count;
+    std::uint32_t block_size;
+    std::vector<char> remote_desc_buffer;
+
+    static auto from_message(std::string const &msg) -> data_extents {
+        if(msg.size() <= 8) {
+            throw doca::doca_exception(DOCA_ERROR_INVALID_VALUE);
+        }
+
+        auto result = data_extents {};
+
+        std::memcpy(&result.block_count, msg.data(), 4);
+        std::memcpy(&result.block_size, msg.data() + 4, 4);
+        result.remote_desc_buffer.assign(msg.begin() + 8, msg.end());
+
+        return result;
+    }
+
+    auto remote_desc() const -> doca::memory_map::export_descriptor {
+        return { .base_ptr = remote_desc_buffer.data(), .length = remote_desc_buffer.size() };
+    }
+
+    auto block_indices() const {
+        return std::ranges::views::iota(std::uint32_t{}, block_count);
+    }
+};
 
 auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr(
@@ -30,36 +57,25 @@ auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
     auto dma = co_await engine->create_context<doca::dma_context>(dev, 1);
     auto client = co_await engine->create_context<doca::comch::client>("dma-test", dev);
     auto extents_msg = co_await client->msg_recv();
+    auto extents = data_extents::from_message(extents_msg);
 
-    auto block_count = std::uint32_t{};
-    auto block_size = std::uint32_t{};
-    auto extents_parser = std::istringstream(extents_msg);
+    std::cout << "got extents " << extents.block_count << " x " << extents.block_size << std::endl;
 
-    extents_parser >> block_count >> block_size;
-    if(!extents_parser) {
-        doca::logger->error("unable to parse extents from message: {}", extents_msg);
-        co_return;
-    }
-
-    std::cout << "got extents " << block_count << " x " << block_size << std::endl;
-
-    auto local_mem = std::vector<std::byte>(block_count * block_size);
+    auto local_mem = std::vector<std::byte>(extents.block_count * extents.block_size);
     auto local_mmap = doca::memory_map { dev, local_mem, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
 
-    auto remote_desc_msg = co_await client->msg_recv();
-    auto remote_desc = remote_buffer_descriptor{ remote_desc_msg };
-    auto remote_mmap = doca::memory_map { dev, remote_desc.export_desc };
+    auto remote_mmap = doca::memory_map { dev, extents.remote_desc() };
     auto remote_mem = remote_mmap.span();
 
     auto inv = doca::buffer_inventory { 2 };
 
     auto start = std::chrono::steady_clock::now();
 
-    for(auto i : std::ranges::views::iota(std::uint32_t{}, block_count)) {
-        auto offset = i * block_size;
-        auto local_block = std::span { local_mem.data() + offset, block_size };
+    for(auto i : extents.block_indices()) {
+        auto offset = i * extents.block_size;
+        auto local_block = std::span { local_mem.data() + offset, extents.block_size };
         auto local_buf = inv.buf_get_by_addr(local_mmap, local_block);
-        auto remote_block = remote_mem.subspan(offset, block_size);
+        auto remote_block = remote_mem.subspan(offset, extents.block_size);
         auto remote_buf = inv.buf_get_by_data(remote_mmap, remote_block);
 
         auto status = co_await dma->memcpy(remote_buf, local_buf);
@@ -80,9 +96,8 @@ auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
 
     co_await client->send("done");
 
-    for(auto i : std::ranges::views::iota(std::uint32_t{}, block_count)) {
-        auto offset = i * block_size;
-        auto local_block = std::span { local_mem.data() + offset, block_size };
+    for(auto i : extents.block_indices()) {
+        auto local_block = std::span { local_mem.data() + i * extents.block_size, extents.block_size };
 
         if(std::ranges::any_of(local_block, [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
             doca::logger->error("Block {} contains unexpected data", i);
