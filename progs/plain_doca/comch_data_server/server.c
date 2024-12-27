@@ -411,7 +411,7 @@ void serve_datastream(
     char const *dev_pci,
     char const *rep_pci,
     struct server_config *config,
-    struct data_descriptor *data    
+    struct data_descriptor *data
 ) {
     doca_error_t err;
 
@@ -444,7 +444,7 @@ void serve_datastream(
         LOG_ERROR("could not obtain server context");
         goto cleanup_rep;
     }
-    
+
     struct epoll_event ep_event = { 0, { 0 } };
     int nfd;
 
@@ -475,9 +475,6 @@ void serve_datastream(
             // do nothing; doca_pe_progress calls event handlers
         }
     }
-
-    //double elapsed_us = (state.end.tv_sec - state.start.tv_sec) * 1e6 + (state.end.tv_nsec - state.start.tv_nsec) / 1e3;
-    //printf("%f microseconds\n", elapsed_us);
 
 cleanup_context:
     doca_comch_server_destroy(server);

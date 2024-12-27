@@ -1,5 +1,5 @@
 project('doca_sample', [ 'c', 'cpp' ],
-    default_options: ['buildtype=debug', 'cpp_std=c++20', 'warning_level=2'],
+    default_options: ['buildtype=debug', 'cpp_std=c++20', 'c_std=c18', 'warning_level=2'],
     meson_version: '>= 0.61.2'
 )
 
@@ -191,6 +191,17 @@ executable('doca_dma_server',
                 'progs/plain_doca/dma_server/main.c',
                 'progs/plain_doca/dma_server/memory.c',
                 'progs/plain_doca/dma_server/server.c'
+        ],
+        dependencies : deps,
+        install: false
+)
+
+executable('doca_dma_client',
+        [
+                'progs/plain_doca/dma_client/comch.c',
+                'progs/plain_doca/dma_client/common.c',
+                'progs/plain_doca/dma_client/dma.c',
+                'progs/plain_doca/dma_client/main.c'
         ],
         dependencies : deps,
         install: false
