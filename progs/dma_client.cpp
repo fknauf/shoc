@@ -43,7 +43,7 @@ struct data_extents {
     }
 };
 
-auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
+auto dma_receive(doca::progress_engine *engine, std::uint32_t parallelism) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr(
         "81:00.0",
         {
@@ -52,7 +52,7 @@ auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
         }
     );
 
-    auto dma = co_await engine->create_context<doca::dma_context>(dev, 1);
+    auto dma = co_await engine->create_context<doca::dma_context>(dev, parallelism + 1);
     auto client = co_await engine->create_context<doca::comch::client>("dma-test", dev);
     auto extents_msg = co_await client->msg_recv();
     auto extents = data_extents::from_message(extents_msg);
@@ -65,24 +65,36 @@ auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
     auto remote_mmap = doca::memory_map { dev, extents.remote_desc() };
     auto remote_mem = remote_mmap.span();
 
-    auto inv = doca::buffer_inventory { 2 };
+    auto inv = doca::buffer_inventory { 1024 };
+
+    auto slots = std::min(parallelism, extents.block_count);
+    std::vector<doca::coro::status_awaitable<>> pending(slots);
 
     auto start = std::chrono::steady_clock::now();
 
-    for(auto i : extents.block_indices()) {
-        auto offset = i * extents.block_size;
-        auto local_block = std::span { local_mem.data() + offset, extents.block_size };
-        auto local_buf = inv.buf_get_by_addr(local_mmap, local_block);
-        auto remote_block = remote_mem.subspan(offset, extents.block_size);
-        auto remote_buf = inv.buf_get_by_data(remote_mmap, remote_block);
+    // parallel offload in one loop: first slots iterations fill pending, after that a pending
+    // task will be awaited before another one is pushed. The last few iterations only await
+    // pending tasks and don't push new ones.
+    for(auto i : std::ranges::views::iota(std::uint32_t{}, extents.block_count + slots)) {
+        auto slot = i % slots;
 
-        auto status = co_await dma->memcpy(remote_buf, local_buf);
+        if(i > slots) {
+            auto status = co_await pending[slot];
 
-        if(status != DOCA_SUCCESS) {
-            doca::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
-            co_return;
-        } else {
-            std::cout << "got block " << i << std::endl;
+            if(status != DOCA_SUCCESS) {
+                doca::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
+                co_return;
+            }
+        }
+
+        if(i < extents.block_count) {
+            auto offset = i * extents.block_size;
+            auto local_block = std::span { local_mem.data() + offset, extents.block_size };
+            auto local_buf = inv.buf_get_by_addr(local_mmap, local_block);
+            auto remote_block = remote_mem.subspan(offset, extents.block_size);
+            auto remote_buf = inv.buf_get_by_data(remote_mmap, remote_block);
+
+            pending[slot] = dma->memcpy(remote_buf, local_buf);
         }
     }
 
@@ -105,13 +117,17 @@ auto dma_receive(doca::progress_engine *engine) -> doca::coro::fiber {
     std::cout << "data verified correct.\n";
 }
 
-auto main() -> int {
+auto main(int argc, char *argv[]) -> int {
     //doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //doca::logger->set_level(spdlog::level::debug);
 
     auto engine = doca::progress_engine{};
 
-    dma_receive(&engine);
+    int parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
+
+    std::cout << "pipeline width " << parallelism << std::endl;
+
+    dma_receive(&engine, parallelism);
 
     engine.main_loop();
 }

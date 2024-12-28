@@ -37,9 +37,11 @@ struct client_config {
     uint32_t num_send_tasks;
     uint32_t max_msg_size;
     uint32_t recv_queue_size;
+    uint32_t parallelism;
 };
 
 struct client_state {
+    uint32_t parallelism;
     struct doca_dev *device;
     struct doca_pe *engine;
     struct doca_comch_client *client;

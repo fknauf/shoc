@@ -76,9 +76,11 @@ void dma_state_changed_callback(
     if(next_state == DOCA_CTX_STATE_RUNNING) {
         clock_gettime(CLOCK_REALTIME, &state->client_state->start);
 
-        if(!fetch_next_block(state)) {
-            LOG_ERROR("failed to fetch first block");
-            doca_ctx_stop(ctx);
+        for(uint32_t i = 0; i < client_state->parallelism; ++i) {
+            if(!fetch_next_block(state)) {
+                LOG_ERROR("failed to fetch block %" PRIu32, i);
+                doca_ctx_stop(ctx);
+            }
         }
     } else if(next_state == DOCA_CTX_STATE_IDLE) {
         destroy_dma_state(state);
@@ -156,7 +158,7 @@ struct doca_dma *open_dma_context(
         goto failure_dma;
     }
 
-    err = doca_dma_task_memcpy_set_conf(dma, dma_memcpy_completed_callback, dma_memcpy_error_callback, 1);
+    err = doca_dma_task_memcpy_set_conf(dma, dma_memcpy_completed_callback, dma_memcpy_error_callback, client_state->parallelism);
     if(err != DOCA_SUCCESS) {
         LOG_ERROR("unable to configure memcpy event handlers: %s", doca_error_get_descr(err));
         goto failure_dma;
@@ -240,9 +242,9 @@ struct dma_state *attach_dma_state(
         goto failure_state;
     }
 
-    err = doca_buf_inventory_create(2, &dma_state->buf_inv);
-    if(err != DOCA_SUCCESS) {
-        LOG_ERROR("could not create buffer inventory: %s", doca_error_get_descr(err));
+    dma_state->buf_inv = open_buffer_inventory(client_state->parallelism * 2);
+    if(dma_state->buf_inv == NULL) {
+        LOG_ERROR("could not create buffer inventory");
         goto failure_state;
     }
 

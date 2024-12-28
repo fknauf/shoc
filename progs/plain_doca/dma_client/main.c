@@ -2,7 +2,7 @@
 
 void receive_dma(struct client_config *config) {
     doca_error_t err;
-    struct client_state result_buffer;
+    struct client_state result_buffer = { .parallelism = config->parallelism };
 
     int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if(epoll_fd == -1) {
@@ -93,7 +93,7 @@ cleanup_epoll:
 end:
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
     struct doca_log_backend *sdk_log;
 
     doca_log_backend_create_standard();
@@ -105,7 +105,8 @@ int main(void) {
         .server_name = "dma-test",
         .num_send_tasks = 32,
         .max_msg_size = 4080,
-        .recv_queue_size = 16
+        .recv_queue_size = 16,
+        .parallelism = argc < 2 ? 1 : atoi(argv[1])
     };
 
     receive_dma(&config);
