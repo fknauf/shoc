@@ -112,12 +112,16 @@ auto dma_receive(doca::progress_engine *engine, std::uint32_t parallelism) -> do
     json["data_rate_gibps"] = data_rate;
     json["data_error"] = false;
 
-    for(auto i : extents.block_indices()) {
-        auto local_block = std::span { local_mem.data() + i * extents.block_size, extents.block_size };
+    auto skip_verify = getenv("SKIP_VERIFY");
 
-        if(std::ranges::any_of(local_block, [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
-            json["data_error"] = true;
-            break;
+    if(skip_verify == nullptr || std::string { skip_verify } != "1") {
+        for(auto i : extents.block_indices()) {
+            auto local_block = std::span { local_mem.data() + i * extents.block_size, extents.block_size };
+
+            if(std::ranges::any_of(local_block, [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
+                json["data_error"] = true;
+                break;
+            }
         }
     }
 

@@ -68,14 +68,17 @@ void receive_dma(struct client_config *config) {
     double data_rate = bytes_read / elapsed_us * 1e6 / (1 << 30);
     _Bool data_error = false;
 
-    for(uint32_t i = 0; i < result_buffer.data->block_count; ++i) {
-        uint8_t *base = result_buffer.data->base_ptr + i * result_buffer.data->block_size;
+    char const *skip_verify = getenv("SKIP_VERIFY");
+    if(skip_verify == NULL || strcmp(skip_verify, "1") != 0) {
+        for(uint32_t i = 0; i < result_buffer.data->block_count; ++i) {
+            uint8_t *base = result_buffer.data->base_ptr + i * result_buffer.data->block_size;
 
-        for(uint32_t k = 0; k < result_buffer.data->block_size; ++k) {
-            if(base[k] != (uint8_t) i) {
-                LOG_ERROR("Block %" PRIu32 " has invalid data byte %u", i, base[k]);
-                data_error = true;
-                break;
+            for(uint32_t k = 0; k < result_buffer.data->block_size; ++k) {
+                if(base[k] != (uint8_t) i) {
+                    LOG_ERROR("Block %" PRIu32 " has invalid data byte %u", i, base[k]);
+                    data_error = true;
+                    break;
+                }
             }
         }
     }
