@@ -7,6 +7,8 @@
 #include <doca/memory_map.hpp>
 #include <doca/progress_engine.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <iostream>
 #include <sstream>
 #include <string_view>
@@ -70,23 +72,29 @@ auto receive_blocks(doca::progress_engine *engine) -> doca::coro::fiber {
     }
 
     auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout
-        << "elapsed time: " << elapsed.count() << " us\n"
-        << "data rate: " << (block_count * block_size) * 1e6 / elapsed.count() / (1 << 30) << "GiB/s\n";
+    auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    auto data_rate = block_count * block_size * 1e9 / elapsed_ns.count() / (1 << 30);
+
+    auto json = nlohmann::json{};
+
+    json["elapsed_us"] = elapsed_ns.count() / 1e3;
+    json["data_rate_gibps"] = data_rate;
+    json["data_error"] = false;
 
     for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
         if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
             doca::logger->error("Block {} contains unexpected data", i);
+            json["data_error"] = true;
+            break;
         }
     }
 
-    std::cout << "data verified correct.\n";
+    std::cout << json.dump(4) << std::endl;
 }
 
 int main() {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    doca::logger->set_level(spdlog::level::warn);
+    //doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    //doca::logger->set_level(spdlog::level::warn);
 
     auto engine = doca::progress_engine{};
 

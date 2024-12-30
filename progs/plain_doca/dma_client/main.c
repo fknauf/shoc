@@ -65,8 +65,8 @@ void receive_dma(struct client_config *config) {
     struct timespec end = result_buffer.end;
     double elapsed_us = (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_nsec - start.tv_nsec) / 1e3;
     uint32_t bytes_read = result_buffer.data->block_count * result_buffer.data->block_size;
-    printf("elapsed time: %f us\n", elapsed_us);
-    printf("data rate: %f GiB/s\n", bytes_read / elapsed_us * 1e6 / (1 << 30));
+    double data_rate = bytes_read / elapsed_us * 1e6 / (1 << 30);
+    _Bool data_error = false;
 
     for(uint32_t i = 0; i < result_buffer.data->block_count; ++i) {
         uint8_t *base = result_buffer.data->base_ptr + i * result_buffer.data->block_size;
@@ -74,12 +74,22 @@ void receive_dma(struct client_config *config) {
         for(uint32_t k = 0; k < result_buffer.data->block_size; ++k) {
             if(base[k] != (uint8_t) i) {
                 LOG_ERROR("Block %" PRIu32 " has invalid data byte %u", i, base[k]);
-                goto cleanup_storage;
+                data_error = true;
+                break;
             }
         }
     }
 
-    puts("Data verified correct.");
+    printf(
+        "{\n"
+        "  \"data_error\": %s,\n"
+        "  \"data_rate_gibps\": %f,\n"
+        "  \"elapsed_us\": %f\n"
+        "}\n",
+        data_error ? "true" : "false",
+        data_rate,
+        elapsed_us
+    );
 
 cleanup_storage:
     free(result_buffer.data);

@@ -5,20 +5,19 @@ project('doca_sample', [ 'c', 'cpp' ],
 
 SAMPLE_NAME = 'doca-cpp-eventbased'
 
-# Comment this line to restore warnings of experimental DOCA features
 add_project_arguments('-D DOCA_ALLOW_EXPERIMENTAL_API', language: ['c', 'cpp'])
-# add_project_arguments('-std=c++20', language: ['cpp'])
+# for clock_gettime in plain-doca benchmarks
+add_project_arguments('-D _POSIX_C_SOURCE=200809L', language: ['c'])
 add_project_arguments('-fcoroutines', language: ['cpp'])
 
-
 deps = [
-        dependency('doca-aes-gcm'),
-        dependency('doca-common'),
-        dependency('doca-compress'),
-        dependency('doca-comch'),
-        dependency('doca-dma'),
-        dependency('doca-rdma'),
-        dependency('spdlog')
+    dependency('doca-aes-gcm'),
+    dependency('doca-common'),
+    dependency('doca-compress'),
+    dependency('doca-comch'),
+    dependency('doca-dma'),
+    dependency('doca-rdma'),
+    dependency('spdlog')
 ]
 
 common_srcs = [

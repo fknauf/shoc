@@ -7,6 +7,7 @@
 #include <doca/progress_engine.hpp>
 
 #include <spdlog/fmt/bin_to_hex.h>
+#include <nlohmann/json.hpp>
 
 #include <iostream>
 #include <ranges>
@@ -57,7 +58,7 @@ auto dma_receive(doca::progress_engine *engine, std::uint32_t parallelism) -> do
     auto extents_msg = co_await client->msg_recv();
     auto extents = data_extents::from_message(extents_msg);
 
-    std::cout << "got extents " << extents.block_count << " x " << extents.block_size << std::endl;
+    doca::logger->debug("got extents {} x {}", extents.block_count, extents.block_size);
 
     auto local_mem = std::vector<std::byte>(extents.block_count * extents.block_size);
     auto local_mmap = doca::memory_map { dev, local_mem, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
@@ -99,22 +100,28 @@ auto dma_receive(doca::progress_engine *engine, std::uint32_t parallelism) -> do
     }
 
     auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    std::cout << "elapsed time: " << elapsed.count() << " us\n";
-    std::cout << "data rate: " << local_mem.size() * 1e6 / elapsed.count() / (1 << 30) << " GiB/s\n";
 
     co_await client->send("done");
+
+    auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    auto data_rate = local_mem.size() * 1e9 / elapsed_ns.count() / (1 << 30);
+
+    auto json = nlohmann::json{};
+
+    json["elapsed_us"] = elapsed_ns.count() / 1e3;
+    json["data_rate_gibps"] = data_rate;
+    json["data_error"] = false;
 
     for(auto i : extents.block_indices()) {
         auto local_block = std::span { local_mem.data() + i * extents.block_size, extents.block_size };
 
         if(std::ranges::any_of(local_block, [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
-            doca::logger->error("Block {} contains unexpected data", i);
+            json["data_error"] = true;
+            break;
         }
     }
 
-    std::cout << "data verified correct.\n";
+    std::cout << json.dump(4) << std::endl;
 }
 
 auto main(int argc, char *argv[]) -> int {
@@ -124,8 +131,6 @@ auto main(int argc, char *argv[]) -> int {
     auto engine = doca::progress_engine{};
 
     int parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
-
-    std::cout << "pipeline width " << parallelism << std::endl;
 
     dma_receive(&engine, parallelism);
 

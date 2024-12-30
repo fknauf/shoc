@@ -8,6 +8,8 @@
 #include <doca_mmap.h>
 #include <doca_pe.h>
 
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>

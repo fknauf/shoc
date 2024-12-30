@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
     auto out = std::ofstream { filename };
 
-    auto alphabet = 
+    auto alphabet =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
         "0123456789"
@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
 
     out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
     out.write(reinterpret_cast<char const*>(&batchsize), sizeof batchsize);
-    
+
     for([[maybe_unused]] auto i : std::views::iota(0u, batches)) {
         for(auto &c : buf) {
             c = alphabet[dist(rng)];

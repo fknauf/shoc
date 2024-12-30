@@ -13,6 +13,7 @@
 #include <ranges>
 
 #include <fmt/core.h>
+#include <nlohmann/json.hpp>
 
 #include <doca_log.h>
 
@@ -42,7 +43,7 @@ auto compress_file(
     in.read(reinterpret_cast<char *>(&batches), sizeof batches);
     in.read(reinterpret_cast<char *>(&batchsize), sizeof batchsize);
 
-    doca::logger->info("compressing {} batches of size {}", batches, batchsize);
+    doca::logger->debug("compressing {} batches of size {}", batches, batchsize);
 
     auto filesize = batches * batchsize;
     auto src_mem = cache_aligned_memory(filesize + 64);
@@ -53,15 +54,10 @@ auto compress_file(
 
     in.read(src_data.data(), filesize);
 
-    out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
-    out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
-
     auto dev = doca::device::find_by_capabilities(doca::device_capability::compress_deflate);
     auto mmap_src = doca::memory_map { dev, src_data };
     auto mmap_dst = doca::memory_map { dev, dst_data };
     auto buf_inv = doca::buffer_inventory { 2 };
-
-    doca::logger->debug("engine = {}", static_cast<void*>(engine));
 
     auto compress = co_await engine->create_context<doca::compress_context>(dev, 16);
 
@@ -84,44 +80,49 @@ auto compress_file(
     }
 
     auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "elapsed time: " << elapsed.count() << "us\n";
-    std::cout << "data rate: " << filesize / elapsed.count() * 1e6 / (1 << 30) << " GiB/s\n";
 
     co_await compress->stop();
 
-    for(auto &data : dst_ranges) {
-        std::uint32_t size = data.size();
+    auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    auto data_rate = filesize * 1e9 / elapsed_ns.count() / (1 << 30);
 
-        out.write(reinterpret_cast<char const*>(&size), sizeof size);
-        out.write(data.data(), data.size());
+    auto json = nlohmann::json{};
+    json["elapsed_us"] = elapsed_ns.count() / 1e3;
+    json["data_rate_gibps"] = data_rate;
+
+    std::cout << json.dump(4) << std::endl;
+
+    if(out) {
+        out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
+        out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
+
+        for(auto &data : dst_ranges) {
+            std::uint32_t size = data.size();
+
+            out.write(reinterpret_cast<char const*>(&size), sizeof size);
+            out.write(data.data(), data.size());
+        }
+
+        co_return;
     }
-
-    co_return;
 }
 
 auto main(int argc, char *argv[]) -> int try {
     doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     doca::logger->set_level(spdlog::level::warn);
 
-    if(argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
+    if(argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " INFILE [OUTFILE]\n";
         return -1;
     }
 
-    auto in  = std::ifstream(argv[1], std::ios::binary);
-    auto out = std::ofstream(argv[2], std::ios::binary);
+    auto in = std::ifstream(argv[1], std::ios::binary);
+    auto out = argc < 3 ? std::ofstream{} : std::ofstream(argv[2], std::ios::binary);
     auto engine = doca::progress_engine {};
-
-    doca::logger->debug("starting compress_file");
 
     compress_file(&engine, in, out);
 
-    doca::logger->debug("spawned coroutine, starting main loop");
-
     engine.main_loop();
-
-    doca::logger->debug("main loop finished.");
 } catch(doca::doca_exception &ex) {
     doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

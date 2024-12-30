@@ -6,8 +6,6 @@ _Bool fetch_next_block(struct dma_state *state) {
     uint32_t num = state->offloaded;
     size_t offset = num * state->client_state->data->block_size;
 
-    printf("offloading block %" PRIu32 "\n", num);
-
     struct doca_buf *src;
     err = doca_buf_inventory_buf_get_by_data(
         state->buf_inv,

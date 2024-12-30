@@ -12,6 +12,7 @@
 #include <ranges>
 
 #include <fmt/core.h>
+#include <nlohmann/json.hpp>
 
 #include <doca_log.h>
 
@@ -46,9 +47,6 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     auto dst_data = dst_mem.data;
 
     in.read(src_data.data(), filesize);
-
-    out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
-    out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
 
     auto dev = doca::device::find_by_capabilities(doca::device_capability::compress_deflate);
     auto mmap_src = doca::memory_map { dev, src_data };
@@ -92,19 +90,29 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     }
 
     auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    std::cout << "elapsed time: " << elapsed.count() << " us\n";
-    std::cout << "data rate: " << filesize / elapsed.count() * 1e6 / (1 << 30) << " GiB/s\n";
 
     co_await compress->stop();
 
-    for(auto &buf : dst_buffers) {
-        auto data = buf.data();
-        std::uint32_t size = data.size();
+    auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    auto data_rate = filesize * 1e9 / elapsed_ns.count() / (1 << 30);
 
-        out.write(reinterpret_cast<char const*>(&size), sizeof size);
-        out.write(data.data(), data.size());
+    auto json = nlohmann::json{};
+    json["elapsed_us"] = elapsed_ns.count() / 1e3;
+    json["data_rate_gibps"] = data_rate;
+
+    std::cout << json.dump(4) << std::endl;
+
+    if(out) {
+        out.write(reinterpret_cast<char const *>(&batches), sizeof batches);
+        out.write(reinterpret_cast<char const *>(&batchsize), sizeof batchsize);
+
+        for(auto &buf : dst_buffers) {
+            auto data = buf.data();
+            std::uint32_t size = data.size();
+
+            out.write(reinterpret_cast<char const*>(&size), sizeof size);
+            out.write(data.data(), data.size());
+        }
     }
 }
 
@@ -112,13 +120,13 @@ auto main(int argc, char *argv[]) -> int try {
     doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     doca::logger->set_level(spdlog::level::warn);
 
-    if(argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " INFILE OUTFILE\n";
+    if(argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " INFILE [OUTFILE]\n";
         return -1;
     }
 
     auto in  = std::ifstream(argv[1], std::ios::binary);
-    auto out = std::ofstream(argv[2], std::ios::binary);
+    auto out = argc < 2 ? std::ofstream{} : std::ofstream(argv[2], std::ios::binary);
 
     auto engine = doca::progress_engine{};
 

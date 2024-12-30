@@ -3,3 +3,6 @@ debug
 release
 asan
 .vscode
+bench
+json
+results

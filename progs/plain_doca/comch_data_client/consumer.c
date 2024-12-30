@@ -1,7 +1,5 @@
 #include "comch_data_client.h"
 
-#include <inttypes.h>
-
 void receive_next_block(struct consumer_state *state) {
     struct client_state *client_state = state->client_state;
     struct cache_aligned_storage *storage = client_state->result;

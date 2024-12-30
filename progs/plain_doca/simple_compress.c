@@ -130,7 +130,7 @@ void compress_completed_callback(
     doca_buf_dec_refcount(buf_out, NULL);
     doca_task_free(doca_compress_task_compress_deflate_as_task(compress_task));
 
-    if(state->offloaded < state->block_count) { 
+    if(state->offloaded < state->block_count) {
         offload_next(state);
     } else if(state->completed == state->block_count) {
         clock_gettime(CLOCK_REALTIME, &state->end);
@@ -390,7 +390,7 @@ struct region *compress_buffers(
         fprintf(stderr, "[compress buffers] obtain compression context\n");
         goto cleanup_inv;
     }
-    
+
     struct epoll_event ep_event = { 0, { 0 } };
     int nfd;
 
@@ -423,8 +423,16 @@ struct region *compress_buffers(
     }
 
     double elapsed_us = (state.end.tv_sec - state.start.tv_sec) * 1e6 + (state.end.tv_nsec - state.start.tv_nsec) / 1e3;
-    printf("elapsed time: %f us\n", elapsed_us);
-    printf("data rate: %f GiB/s\n", (block_count * block_size / elapsed_us * 1e6 / (1 << 30)));
+    double data_rate = block_count * block_size / elapsed_us * 1e6 / (1 << 30);
+
+    printf(
+        "{\n"
+        "  \"data_rate_gibps\": %f,\n"
+        "  \"elapsed_us\": %f\n"
+        "}\n",
+        data_rate,
+        elapsed_us
+    );
 
     result = out_region_buffer;
 
@@ -487,12 +495,14 @@ void compress_file(FILE *in, FILE *out) {
         goto cleanup;
     }
 
-    fwrite(&batches, sizeof batches, 1, out);
-    fwrite(&batchsize, sizeof batchsize, 1, out);
+    if(out != NULL) {
+        fwrite(&batches, sizeof batches, 1, out);
+        fwrite(&batchsize, sizeof batchsize, 1, out);
 
-    for(uint32_t i = 0; i < batches; ++i) {
-        fwrite(&out_regions[i].size, sizeof out_regions[i].size, 1, out);
-        fwrite(out_regions[i].base, 1, out_regions[i].size, out);
+        for(uint32_t i = 0; i < batches; ++i) {
+            fwrite(&out_regions[i].size, sizeof out_regions[i].size, 1, out);
+            fwrite(out_regions[i].base, 1, out_regions[i].size, out);
+        }
     }
 
 cleanup:
@@ -508,7 +518,7 @@ int main(int argc, char *argv[]) {
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
     doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
-    if(argc < 3) {
+    if(argc < 2) {
         fprintf(stderr, "Usage: %s INFILE OUTFILE\n", argv[0]);
         return -1;
     }
@@ -519,15 +529,20 @@ int main(int argc, char *argv[]) {
         goto end;
     }
 
-    FILE *out = fopen(argv[2], "wb");    
-    if(out == NULL) {
-        fprintf(stderr, "[main] failed to open %s: %s\n", argv[2], strerror(errno));
-        goto cleanup_in;
+    FILE *out = NULL;
+    if(argc >= 3) {
+        out = fopen(argv[2], "wb");
+        if(out == NULL) {
+            fprintf(stderr, "[main] failed to open %s: %s\n", argv[2], strerror(errno));
+            goto cleanup_in;
+        }
     }
 
     compress_file(in, out);
 
-    fclose(out);
+    if(out != NULL) {
+        fclose(out);
+    }
 cleanup_in:
     fclose(in);
 end:
