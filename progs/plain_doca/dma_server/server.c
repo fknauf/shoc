@@ -141,13 +141,15 @@ void disconnection_callback(
 }
 
 void send_task_completed_callback(
-    struct doca_comch_task_send *task,
+    struct doca_comch_task_send *send_task,
     union doca_data task_user_data,
     union doca_data ctx_user_data
 ) {
-    (void) task;
     (void) task_user_data;
     (void) ctx_user_data;
+
+    struct doca_task *task = doca_comch_task_send_as_task(send_task);
+    doca_task_free(task);
 }
 
 void send_task_error_callback(
@@ -159,6 +161,7 @@ void send_task_error_callback(
 
     struct doca_task *task = doca_comch_task_send_as_task(send_task);
     doca_error_t status = doca_task_get_status(task);
+    doca_task_free(task);
 
     LOG_ERROR("failed to send message: %s", doca_error_get_descr(status));
 
@@ -184,9 +187,6 @@ void msg_recv_callback(
         LOG_ERROR("message received before we even started?");
         return;
     }
-
-    struct connection_state *connstate = conn_user_data.ptr;
-    destroy_connection_state(connstate, false);
 }
 
 struct extents_msg *create_extents_msg(
