@@ -65,6 +65,11 @@ gawk '
         }
 
         for(i = 1; i <= num_fields; ++i) {
+            $i = avgs[i]
+        }
+        print
+
+        for(i = 1; i <= num_fields; ++i) {
             $i = medians[i]
         }
         print

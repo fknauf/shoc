@@ -142,7 +142,7 @@ void new_consumer_callback(
 
     conn_state->remote_consumer_id = id;
 
-    clock_gettime(CLOCK_REALTIME, &conn_state->start);
+    clock_gettime(CLOCK_MONOTONIC, &conn_state->start);
     send_next_data_buffer(conn_state);
 }
 
@@ -463,7 +463,7 @@ void serve_datastream(
         }
 
         doca_pe_request_notification(engine);
-        nfd = epoll_wait(epoll_fd, &ep_event, 1, 100);
+        nfd = epoll_wait(epoll_fd, &ep_event, 1, -1);
 
         if(nfd == -1) {
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));

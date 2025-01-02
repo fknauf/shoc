@@ -76,7 +76,7 @@ void state_changed_callback(
 
     if(next_state == DOCA_CTX_STATE_RUNNING) {
         struct client_state *state = (struct client_state *) user_data.ptr;
-        clock_gettime(CLOCK_REALTIME, &state->start);
+        clock_gettime(CLOCK_MONOTONIC, &state->start);
         send_ping(state->client);
     }
 }
@@ -100,7 +100,7 @@ void msg_recv_callback(
     }
 
     struct client_state *state = (struct client_state*) ctx_user_data.ptr;
-    clock_gettime(CLOCK_REALTIME, &state->end);
+    clock_gettime(CLOCK_MONOTONIC, &state->end);
 
     fwrite(recv_buffer, 1, msg_len, stdout);
     puts("");

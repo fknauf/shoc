@@ -295,7 +295,7 @@ void serve_dma(struct server_config *server_config, struct cache_aligned_data *d
         }
 
         doca_pe_request_notification(engine);
-        nfd = epoll_wait(epoll_fd, &ep_event, 1, 100);
+        nfd = epoll_wait(epoll_fd, &ep_event, 1, -1);
 
         if(nfd == -1) {
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));

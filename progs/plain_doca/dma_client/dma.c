@@ -72,7 +72,7 @@ void dma_state_changed_callback(
     struct client_state *client_state = state->client_state;
 
     if(next_state == DOCA_CTX_STATE_RUNNING) {
-        clock_gettime(CLOCK_REALTIME, &state->client_state->start);
+        clock_gettime(CLOCK_MONOTONIC, &state->client_state->start);
 
         for(uint32_t i = 0; i < client_state->parallelism; ++i) {
             if(!fetch_next_block(state)) {
@@ -105,7 +105,7 @@ void dma_memcpy_completed_callback(
     ++state->completed;
 
     if(state->completed == state->client_state->data->block_count) {
-        clock_gettime(CLOCK_REALTIME, &state->client_state->end);
+        clock_gettime(CLOCK_MONOTONIC, &state->client_state->end);
         send_done_message(state->client_state);
         doca_ctx_stop(doca_dma_as_ctx(state->dma));
     } else if(state->offloaded < state->client_state->data->block_count) {

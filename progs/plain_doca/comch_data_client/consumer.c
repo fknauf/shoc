@@ -59,7 +59,7 @@ void consumer_state_change_callback(
     struct consumer_state *state = user_data.ptr;
 
     if(next_state == DOCA_CTX_STATE_RUNNING) {
-        clock_gettime(CLOCK_REALTIME, &state->client_state->start);
+        clock_gettime(CLOCK_MONOTONIC, &state->client_state->start);
         receive_next_block(state);
     } else if(next_state == DOCA_CTX_STATE_IDLE) {
         doca_comch_consumer_destroy(state->consumer);
@@ -87,7 +87,7 @@ void consumer_recv_completed_callback(
 
     ++state->completed;
     if(state->completed == state->client_state->result->block_count) {
-        clock_gettime(CLOCK_REALTIME, &state->client_state->end);
+        clock_gettime(CLOCK_MONOTONIC, &state->client_state->end);
         doca_ctx_stop(doca_comch_consumer_as_ctx(state->consumer));
     }
 }

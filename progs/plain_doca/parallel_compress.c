@@ -105,7 +105,7 @@ void compress_state_changed_callback(
 
     if(next_state == DOCA_CTX_STATE_RUNNING) {
         struct compression_state *state = (struct compression_state *) user_data.ptr;
-        clock_gettime(CLOCK_REALTIME, &state->start);
+        clock_gettime(CLOCK_MONOTONIC, &state->start);
 
         for(uint32_t i = 0; i < PARALLEL_OFFLOADS && i < state->block_count; ++i) {
             offload_next(state);
@@ -140,7 +140,7 @@ void compress_completed_callback(
     if(state->offloaded < state->block_count) {
         offload_next(state);
     } else if(state->completed == state->block_count) {
-        clock_gettime(CLOCK_REALTIME, &state->end);
+        clock_gettime(CLOCK_MONOTONIC, &state->end);
         doca_ctx_stop(doca_compress_as_ctx(state->compress));
     }
 }

@@ -94,7 +94,7 @@ void receive_datastream(struct client_config *config) {
         }
 
         doca_pe_request_notification(engine);
-        nfd = epoll_wait(epoll_fd, &ep_event, 1, 100);
+        nfd = epoll_wait(epoll_fd, &ep_event, 1, -1);
 
         if(nfd == -1) {
             LOG_ERROR("epoll_wait failed: %s", strerror(errno));
