@@ -180,6 +180,8 @@ void msg_recv_callback(
     if(msg_len != 4 || memcmp(recv_buffer, "done", 4) != 0) {
         LOG_ERROR("unexpected message");
         return;
+    } else {
+        puts("DMA transfer successful");
     }
 
     union doca_data conn_user_data = doca_comch_connection_get_user_data(connection);

@@ -165,7 +165,7 @@ namespace doca::comch {
     /**
      * Scope wrapper for server connections (for automatic disconnection through RAII)
      *
-     * Extremely similar to scoped_context
+     * Extremely similar to unique_scoped_context
      */
     class scoped_server_connection {
     public:

@@ -202,29 +202,29 @@ namespace doca {
      * Scoped context wrapper for automatic cleanup. Modelled after std::unique_ptr
      * with more limited functionality.
      *
-     * Note that the referenced context object will survive the destructor of scoped_context
+     * Note that the referenced context object will survive the destructor of unique_scoped_context
      * unless it has been stopped before. The purpose of this wrapper is not to prevent a
      * memory leak on the context but to prevent it from never being stopped.
      */
     template<std::derived_from<context> ConcreteContext>
-    class scoped_context {
+    class unique_scoped_context {
     public:
-        ~scoped_context() {
+        ~unique_scoped_context() {
             clear();
         }
 
-        scoped_context() = default;
-        scoped_context(std::shared_ptr<ConcreteContext> ctx):
-            ctx_ { ctx }
+        unique_scoped_context() = default;
+        unique_scoped_context(std::shared_ptr<ConcreteContext> ctx):
+            ctx_ { std::move(ctx) }
         {}
 
-        scoped_context(scoped_context const &) = delete;
-        scoped_context(scoped_context &&other):
+        unique_scoped_context(unique_scoped_context const &) = delete;
+        unique_scoped_context(unique_scoped_context &&other):
             ctx_ { std::exchange(other.ctx_, nullptr) }
         { }
 
-        scoped_context &operator=(scoped_context const &) = delete;
-        scoped_context &operator=(scoped_context &&other) {
+        unique_scoped_context &operator=(unique_scoped_context const &) = delete;
+        unique_scoped_context &operator=(unique_scoped_context &&other) {
             clear();
             other.ctx_ = std::exchange(other.ctx_, nullptr);
             return *this;
@@ -254,6 +254,29 @@ namespace doca {
         std::shared_ptr<ConcreteContext> ctx_ = nullptr;
     };
 
+    template<std::derived_from<context> ConcreteContext>
+    class shared_scoped_context {
+    public:
+        shared_scoped_context(std::shared_ptr<ConcreteContext> ctx):
+            ctx_ { std::make_shared<unique_scoped_context<ConcreteContext>>(std::move(ctx)) }
+        {}
+
+        auto get() const noexcept {
+            return ctx_->get();
+        }
+
+        auto operator->() const noexcept {
+            return get();
+        }
+
+        auto &operator*() const noexcept {
+            return *get();
+        }
+
+    private:
+        std::shared_ptr<unique_scoped_context<ConcreteContext>> ctx_;
+    };
+
     /**
      * Awaitable for context creation. Generally fulfils the same purpose as context_state_awaitable
      * but will return a scoped wrapper around the new context.
@@ -266,7 +289,7 @@ namespace doca {
         {}
 
         auto await_ready() const noexcept { return start_awaitable_.await_ready(); }
-        auto await_resume() const noexcept { return scoped_context { ctx_ }; }
+        auto await_resume() const noexcept { return shared_scoped_context { ctx_ }; }
         auto await_suspend(std::coroutine_handle<> handle) noexcept {
             start_awaitable_.await_suspend(handle);
         }
