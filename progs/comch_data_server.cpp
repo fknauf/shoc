@@ -70,9 +70,13 @@ auto send_blocks(
     }
 }
 
-auto serve(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr("03:00.0", doca::device_capability::comch_server);
-    auto rep = doca::device_representor::find_by_pci_addr(dev, "81:00.0", DOCA_DEVINFO_REP_FILTER_NET);
+auto serve(
+    doca::progress_engine *engine,
+    char const *dev_pci,
+    char const *rep_pci
+) -> doca::coro::fiber {
+    auto dev = doca::device::find_by_pci_addr(dev_pci, doca::device_capability::comch_server);
+    auto rep = doca::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
     auto data = data_descriptor { 256, 1 << 20 };
     auto mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
     auto bufinv = doca::buffer_inventory { 32 };
@@ -91,7 +95,14 @@ int main() {
     //doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     //doca::logger->set_level(spdlog::level::warn);
 
+    auto env_dev = std::getenv("DOCA_DEV_PCI");
+    auto env_rep = std::getenv("DOCA_DEV_REP_PCI");
+
     auto engine = doca::progress_engine{};
-    serve(&engine);
+    serve(
+        &engine,
+        env_dev ? env_dev : "03:00.0",
+        env_rep ? env_rep : "81:00.0"
+    );
     engine.main_loop();
 }

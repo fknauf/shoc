@@ -408,8 +408,6 @@ failure:
 }
 
 void serve_datastream(
-    char const *dev_pci,
-    char const *rep_pci,
     struct server_config *config,
     struct data_descriptor *data
 ) {
@@ -427,13 +425,13 @@ void serve_datastream(
         goto cleanup_epoll;
     }
 
-    struct doca_dev *server_dev = open_server_device(dev_pci);
+    struct doca_dev *server_dev = open_server_device(config->dev_pci);
     if(server_dev == NULL) {
         LOG_ERROR("could not obtain server device");
         goto cleanup_pe;
     }
 
-    struct doca_dev_rep *server_rep = open_server_device_representor(server_dev, rep_pci);
+    struct doca_dev_rep *server_rep = open_server_device_representor(server_dev, config->rep_pci);
     if(server_rep == NULL) {
         LOG_ERROR("could not obtain server device representor");
         goto cleanup_dev;

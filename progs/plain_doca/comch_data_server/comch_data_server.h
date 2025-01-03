@@ -24,6 +24,8 @@
 #define LOG_ERROR(fmt, ...) fprintf(stderr, "[%s] " fmt "\n", __func__ __VA_OPT__(,) __VA_ARGS__)
 
 struct server_config {
+    char const *dev_pci;
+    char const *rep_pci;
     char const *server_name;
     uint32_t num_send_tasks;
     uint32_t max_msg_size;
@@ -99,4 +101,4 @@ struct doca_dev_rep *open_server_device_representor(struct doca_dev *server_dev,
 struct doca_comch_server *open_server_context(struct doca_pe *engine, struct doca_dev *dev, struct doca_dev_rep *rep, struct server_config *config, struct data_descriptor *data);
 struct doca_comch_producer *open_producer(struct doca_comch_connection *connection, struct connection_state *conn_state, struct doca_pe *engine, uint32_t max_send_tasks);
 
-void serve_datastream(char const *dev_pci, char const *rep_pci, struct server_config *config, struct data_descriptor *data);
+void serve_datastream(struct server_config *config, struct data_descriptor *data);

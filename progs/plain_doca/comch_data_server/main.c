@@ -35,7 +35,12 @@ int main(void) {
     doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
     doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
+    char const *env_dev = getenv("DOCA_DEV_PCI");
+    char const *env_rep = getenv("DOCA_DEV_REP_PCI");
+
     struct server_config config = {
+        .dev_pci = env_dev ? env_dev : "03:00.0",
+        .rep_pci = env_rep ? env_rep : "81:00.0",
         .server_name = "vss-data-test",
         .num_send_tasks = 32,
         .max_msg_size = 4080,
@@ -46,7 +51,7 @@ int main(void) {
     struct data_descriptor *data = prepare_data(256, 1048576);
 
     if(data != NULL) {
-        serve_datastream("03:00.0", "81:00.0", &config, data);
+        serve_datastream(&config, data);
         free(data);
     }
 }

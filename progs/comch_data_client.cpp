@@ -38,8 +38,11 @@ struct cache_aligned_storage {
     std::vector<std::span<std::byte>> blocks;
 };
 
-auto receive_blocks(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_client);
+auto receive_blocks(
+    doca::progress_engine *engine,
+    char const *pci_addr
+) -> doca::coro::fiber {
+    auto dev = doca::device::find_by_pci_addr(pci_addr, doca::device_capability::comch_client);
 
     auto client = co_await engine->create_context<doca::comch::client>("vss-data-test", dev);
     auto geometry_message = co_await client->msg_recv();
@@ -96,8 +99,13 @@ int main() {
     //doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     //doca::logger->set_level(spdlog::level::warn);
 
+    auto env_dev = std::getenv("DOCA_DEV_PCI");
+    
     auto engine = doca::progress_engine{};
 
-    receive_blocks(&engine);
+    receive_blocks(
+        &engine,
+        env_dev ? env_dev : "81:00.0"
+    );
     engine.main_loop();
 }
