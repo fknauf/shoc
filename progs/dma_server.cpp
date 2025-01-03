@@ -92,11 +92,13 @@ auto handle_connection(
 }
 
 auto dma_serve(
-    doca::progress_engine *engine
+    doca::progress_engine *engine,
+    char const *dev_pci,
+    char const *rep_pci
 ) -> doca::coro::fiber {
     auto data = test_data { 256, 1 << 20 };
-    auto dev = doca::device::find_by_pci_addr("03:00.0", { doca::device_capability::dma, doca::device_capability::comch_server });
-    auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
+    auto dev = doca::device::find_by_pci_addr(dev_pci, { doca::device_capability::dma, doca::device_capability::comch_server });
+    auto rep = doca::device_representor::find_by_pci_addr ( dev, rep_pci );
 
     auto server = co_await engine->create_context<doca::comch::server>("dma-test", dev, rep);
 
@@ -114,7 +116,14 @@ auto main() -> int {
 
     auto engine = doca::progress_engine{};
 
-    dma_serve(&engine);
+    auto env_dev = std::getenv("DOCA_DEV_PCI");
+    auto env_rep = std::getenv("DOCA_DEV_REP_PCI");
+
+    dma_serve(
+        &engine,
+        env_dev ? env_dev : "03:00.0",
+        env_rep ? env_rep : "81:00.0"
+    );
 
     engine.main_loop();
 }

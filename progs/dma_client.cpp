@@ -44,16 +44,19 @@ struct data_extents {
     }
 };
 
-auto dma_receive(doca::progress_engine *engine, std::uint32_t parallelism) -> doca::coro::fiber {
+auto dma_receive(
+    doca::progress_engine *engine,
+    char const *pci_addr,
+    std::uint32_t parallelism
+) -> doca::coro::fiber {
     auto dev = doca::device::find_by_pci_addr(
-        "81:00.0",
+        pci_addr,
         {
             doca::device_capability::comch_client,
             doca::device_capability::dma
         }
     );
 
-    auto dma = co_await engine->create_context<doca::dma_context>(dev, parallelism + 1);
     auto client = co_await engine->create_context<doca::comch::client>("dma-test", dev);
     auto extents_msg = co_await client->msg_recv();
     auto extents = data_extents::from_message(extents_msg);
@@ -69,7 +72,8 @@ auto dma_receive(doca::progress_engine *engine, std::uint32_t parallelism) -> do
     auto inv = doca::buffer_inventory { 1024 };
 
     auto slots = std::min(parallelism, extents.block_count);
-    std::vector<doca::coro::status_awaitable<>> pending(slots);
+    auto dma = co_await engine->create_context<doca::dma_context>(dev, slots);
+    auto pending = std::vector<doca::coro::status_awaitable<>>(slots);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -134,9 +138,14 @@ auto main(int argc, char *argv[]) -> int {
 
     auto engine = doca::progress_engine{};
 
-    int parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
+    std::uint32_t parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
+    auto env_pci = std::getenv("DOCA_DEV_PCI");
 
-    dma_receive(&engine, parallelism);
+    dma_receive(
+        &engine,
+        env_pci ? env_pci : "81:00.0",
+        parallelism
+    );
 
     engine.main_loop();
 }
