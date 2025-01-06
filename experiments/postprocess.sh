@@ -3,7 +3,6 @@
 EXPERIMENT="$1"
 DIR="results/${EXPERIMENT}"
 DATARATES="${DIR}/datarates.tsv"
-STATS="${DIR}/stats.tsv"
 
 echo $'seq\tdoca_seq\tpar\tdoca_par' > "${DATARATES}"
 
@@ -18,19 +17,16 @@ for i in $(seq 100); do
     >> "${DATARATES}"
 done
 
-gawk '
+gawk -v experiment="$EXPERIMENT" '
     BEGIN {
-        OFS = "\t"
-        ORS = "\n"
+        OFS = " & "
+        ORS = " \\\\\n"
     }
     NR == 1 {
-        header = $0
         for(i = 1; i <= NF; ++i) {
             keys[i] = $i
         }
         num_fields = NF
-        $1 = $1
-        print
     }
     NR > 1 {
         for(i = 1; i <= NF; ++i) {
@@ -62,21 +58,47 @@ gawk '
             }
 
             stddevs[i] = sqrt(errsqsum / (count - 1))
+            sem[i] = stddevs[i] / sqrt(count)
         }
 
-        for(i = 1; i <= num_fields; ++i) {
-            $i = avgs[i]
+        label["dma"] = "DMA"
+        label["comch"] = "Comch"
+        label["compression"] = "Deflate"
+
+        $1 = "    " label[experiment] " seq."
+        $2 = sprintf("%.3f", avgs[1])
+        #$3 = sprintf("%.2e", sem[1])
+        $3 = sprintf("%.3f-%.3f", avgs[1] - 2.57583 * sem[1], avgs[1] + 2.57583 * sem[1])
+        $4 = sprintf("%.3f", avgs[2])
+        #$5 = sprintf("%.2e", sem[2])
+        $5 = sprintf("%.3f-%.3f", avgs[2] - 2.57583 * sem[2], avgs[2] + 2.57583 * sem[2])
+        $6 = sprintf("%.3f\\%%", (1 - avgs[1] / avgs[2]) * 100)
+
+        if(avgs[1] > avgs[2]) {
+            $2 = "\\textbf{" $2 "}"
+        } else {
+            $4 = "\\textbf{" $4 "}"
         }
         print
 
-        for(i = 1; i <= num_fields; ++i) {
-            $i = medians[i]
+        if(experiment == "comch") {
+            exit
         }
-        print
 
-        for(i = 1; i <= num_fields; ++i) {
-            $i = stddevs[i]
+        $1 = "    " label[experiment] " par."
+        $2 = sprintf("%.3f", avgs[3])
+        #$3 = sprintf("%.2e", sem[3])
+        $3 = sprintf("%.3f-%.3f", avgs[3] - 2.57583 * sem[3], avgs[3] + 2.57583 * sem[3])
+        $4 = sprintf("%.3f", avgs[4])
+        #$5 = sprintf("%.2e", sem[4])
+        $5 = sprintf("%.3f-%.3f", avgs[4] - 2.57583 * sem[4], avgs[4] + 2.57583 * sem[4])
+        $6 = sprintf("%.3f\\%%", (1 - avgs[3] / avgs[4]) * 100)
+
+        if(avgs[3] > avgs[4]) {
+            $2 = "\\textbf{" $2 "}"
+        } else {
+            $4 = "\\textbf{" $4 "}"
         }
         print
     }
-' "${DATARATES}" > "${STATS}"
+' "${DATARATES}"

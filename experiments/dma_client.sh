@@ -1,8 +1,8 @@
 #!/bin/bash
 
-read -p $'Start dma_server on the DPU and press Return\n' -n 1 -s
-
 mkdir -p results/dma
+
+read -p $'Start dma_server on the DPU and press Return\n' -n 1 -s
 
 for i in $(seq 1 100); do
     echo $i
