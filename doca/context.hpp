@@ -80,6 +80,7 @@ namespace doca {
     public:
         friend class context_state_awaitable;
 
+    protected:
         /**
          * @param parent parent to signal when this context is stopped
          */
@@ -90,6 +91,7 @@ namespace doca {
         context &operator=(context const &) = delete;
         context &operator=(context &&) = delete;
 
+    public:
         /**
          * For internal use.
          */

@@ -144,13 +144,13 @@ namespace doca::comch {
         message_queues_.disconnect();
         remote_consumer_queues_.disconnect();
 
+        auto waiting_coro = std::exchange(coro_disconnect_, nullptr);
+
         // tell our server we're disconnected so it'll remove us from its connection registry.
+        // this may delete us.
         ctx_->signal_disconnect(handle_);
 
-        // if someone is co_awaiting disconnect, resume.
-        auto waiting_coro = coro_disconnect_;
         if(waiting_coro) {
-            coro_disconnect_ = nullptr;
             waiting_coro.resume();
         }
     }
