@@ -11,7 +11,7 @@ if ! [ -e "$FILE" ]; then
     bench/generate_testdata "$FILE" 256 1048576
 fi
 
-for i in $(seq 1 100); do
+for i in $(seq 1 1000); do
     echo $i
     bench/simple_compress        "$FILE" > results/compression/seq_${i}.json
     bench/parallel_compress      "$FILE" > results/compression/par_${i}.json

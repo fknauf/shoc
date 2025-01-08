@@ -72,7 +72,7 @@ auto dma_receive(
     auto inv = doca::buffer_inventory { 1024 };
 
     auto slots = std::min(parallelism, extents.block_count);
-    auto dma = co_await engine->create_context<doca::dma_context>(dev, slots);
+    auto dma = co_await engine->create_context<doca::dma_context>(dev, slots + 1);
     auto pending = std::vector<doca::coro::status_awaitable<>>(slots);
 
     auto start = std::chrono::steady_clock::now();
