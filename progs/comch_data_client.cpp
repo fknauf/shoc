@@ -1,11 +1,11 @@
-#include <doca/buffer.hpp>
-#include <doca/buffer_inventory.hpp>
-#include <doca/comch/client.hpp>
-#include <doca/comch/consumer.hpp>
-#include <doca/coro/fiber.hpp>
-#include <doca/logger.hpp>
-#include <doca/memory_map.hpp>
-#include <doca/progress_engine.hpp>
+#include <shoc/buffer.hpp>
+#include <shoc/buffer_inventory.hpp>
+#include <shoc/comch/client.hpp>
+#include <shoc/comch/consumer.hpp>
+#include <shoc/coro/fiber.hpp>
+#include <shoc/logger.hpp>
+#include <shoc/memory_map.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -39,12 +39,12 @@ struct cache_aligned_storage {
 };
 
 auto receive_blocks(
-    doca::progress_engine *engine,
+    shoc::progress_engine *engine,
     char const *pci_addr
-) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr(pci_addr, doca::device_capability::comch_client);
+) -> shoc::coro::fiber {
+    auto dev = shoc::device::find_by_pci_addr(pci_addr, shoc::device_capability::comch_client);
 
-    auto client = co_await engine->create_context<doca::comch::client>("vss-data-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("vss-data-test", dev);
     auto geometry_message = co_await client->msg_recv();
 
     std::uint32_t block_count, block_size;
@@ -52,13 +52,13 @@ auto receive_blocks(
     geometry_parser >> block_count >> block_size;
 
     if(!geometry_parser) {
-        doca::logger->error("could not parse geometry from message {}", geometry_message);
+        shoc::logger->error("could not parse geometry from message {}", geometry_message);
         co_return;
     }
 
     auto memory = cache_aligned_storage { block_count, block_size };
-    auto mmap = doca::memory_map { dev, memory.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
-    auto bufinv = doca::buffer_inventory { 1 };
+    auto mmap = shoc::memory_map { dev, memory.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+    auto bufinv = shoc::buffer_inventory { 1 };
 
     auto consumer = co_await client->create_consumer(mmap, 16);
 
@@ -69,7 +69,7 @@ auto receive_blocks(
         auto result = co_await consumer->post_recv(buffer);
 
         if(result.status != DOCA_SUCCESS) {
-            doca::logger->error("post_recv failed with error: {}", doca_error_get_descr(result.status));
+            shoc::logger->error("post_recv failed with error: {}", doca_error_get_descr(result.status));
             co_return;
         }
     }
@@ -86,7 +86,7 @@ auto receive_blocks(
 
     for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
         if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
-            doca::logger->error("Block {} contains unexpected data", i);
+            shoc::logger->error("Block {} contains unexpected data", i);
             json["data_error"] = true;
             break;
         }
@@ -96,12 +96,12 @@ auto receive_blocks(
 }
 
 int main() {
-    //doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    //doca::logger->set_level(spdlog::level::warn);
+    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    //shoc::logger->set_level(spdlog::level::warn);
 
     auto env_dev = std::getenv("DOCA_DEV_PCI");
     
-    auto engine = doca::progress_engine{};
+    auto engine = shoc::progress_engine{};
 
     receive_blocks(
         &engine,

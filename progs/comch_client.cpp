@@ -1,23 +1,23 @@
-#include "doca/comch/client.hpp"
-#include "doca/coro/fiber.hpp"
-#include "doca/logger.hpp"
-#include "doca/progress_engine.hpp"
+#include "shoc/comch/client.hpp"
+#include "shoc/coro/fiber.hpp"
+#include "shoc/logger.hpp"
+#include "shoc/progress_engine.hpp"
 
 #include <iostream>
 
-auto ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
+auto ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
     // get device from PCIe address
-    auto dev = doca::device::find_by_pci_addr("81:00.0", doca::device_capability::comch_client);
+    auto dev = shoc::device::find_by_pci_addr("81:00.0", shoc::device_capability::comch_client);
 
     // wait for connection to server, that is: create the context and ask the SDK to start
     // it, then suspend. The coroutine will be resumed by the state-changed handler when
     // the client context switches to DOCA_CTX_STATE_RUNNING.
-    auto client = co_await engine->create_context<doca::comch::client>("vss-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("vss-test", dev);
     // send ping, wait for status result
     auto status = co_await client->send("ping");
 
     if(status != DOCA_SUCCESS) {
-        doca::logger->error("could not send ping: = {}", doca_error_get_descr(status));
+        shoc::logger->error("could not send ping: = {}", doca_error_get_descr(status));
         co_return;
     }
 
@@ -30,10 +30,10 @@ auto ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
 }
 
 int main() {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    doca::logger->set_level(spdlog::level::info);
+    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    shoc::logger->set_level(spdlog::level::info);
 
-    auto engine = doca::progress_engine {};
+    auto engine = shoc::progress_engine {};
 
     // spawn coroutine. It will run up to the first co_await, then control returns to main.
     ping_pong(&engine);

@@ -1,11 +1,11 @@
-#include <doca/buffer.hpp>
-#include <doca/buffer_inventory.hpp>
-#include <doca/comch/producer.hpp>
-#include <doca/comch/server.hpp>
-#include <doca/coro/fiber.hpp>
-#include <doca/logger.hpp>
-#include <doca/memory_map.hpp>
-#include <doca/progress_engine.hpp>
+#include <shoc/buffer.hpp>
+#include <shoc/buffer_inventory.hpp>
+#include <shoc/comch/producer.hpp>
+#include <shoc/comch/server.hpp>
+#include <shoc/coro/fiber.hpp>
+#include <shoc/logger.hpp>
+#include <shoc/memory_map.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <iostream>
 #include <memory>
@@ -44,16 +44,16 @@ struct data_descriptor {
 };
 
 auto send_blocks(
-    doca::comch::scoped_server_connection con,
+    shoc::comch::scoped_server_connection con,
     data_descriptor &data,
-    doca::memory_map &mmap,
-    doca::buffer_inventory &bufinv
-) -> doca::coro::fiber {
+    shoc::memory_map &mmap,
+    shoc::buffer_inventory &bufinv
+) -> shoc::coro::fiber {
     auto prod = co_await con->create_producer(16);
     auto send_status = co_await con->send(fmt::format("{} {}", data.block_count, data.block_size));
 
     if(send_status != DOCA_SUCCESS) {
-        doca::logger->error("failed to send data gemoetry");
+        shoc::logger->error("failed to send data gemoetry");
         co_return;
     }
 
@@ -64,24 +64,24 @@ auto send_blocks(
         auto status = co_await prod->send(buffer, {}, consumer_id);
 
         if(status != DOCA_SUCCESS) {
-            doca::logger->error("producer failed to send buffer: {}", doca_error_get_descr(status));
+            shoc::logger->error("producer failed to send buffer: {}", doca_error_get_descr(status));
             co_return;
         }
     }
 }
 
 auto serve(
-    doca::progress_engine *engine,
+    shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr(dev_pci, doca::device_capability::comch_server);
-    auto rep = doca::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
+) -> shoc::coro::fiber {
+    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
+    auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
     auto data = data_descriptor { 256, 1 << 20 };
-    auto mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
-    auto bufinv = doca::buffer_inventory { 32 };
+    auto mmap = shoc::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+    auto bufinv = shoc::buffer_inventory { 32 };
 
-    auto server = co_await engine->create_context<doca::comch::server>("vss-data-test", dev, rep);
+    auto server = co_await engine->create_context<shoc::comch::server>("vss-data-test", dev, rep);
 
     std::cout << "accepting connections.\n";
 
@@ -92,13 +92,13 @@ auto serve(
 }
 
 int main() {
-    //doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    //doca::logger->set_level(spdlog::level::warn);
+    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    //shoc::logger->set_level(spdlog::level::warn);
 
     auto env_dev = std::getenv("DOCA_DEV_PCI");
     auto env_rep = std::getenv("DOCA_DEV_REP_PCI");
 
-    auto engine = doca::progress_engine{};
+    auto engine = shoc::progress_engine{};
     serve(
         &engine,
         env_dev ? env_dev : "03:00.0",

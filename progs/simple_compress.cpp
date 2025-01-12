@@ -1,9 +1,9 @@
-#include "doca/buffer_inventory.hpp"
-#include "doca/compress.hpp"
-#include "doca/coro/fiber.hpp"
-#include "doca/logger.hpp"
-#include "doca/memory_map.hpp"
-#include "doca/progress_engine.hpp"
+#include "shoc/buffer_inventory.hpp"
+#include "shoc/compress.hpp"
+#include "shoc/coro/fiber.hpp"
+#include "shoc/logger.hpp"
+#include "shoc/memory_map.hpp"
+#include "shoc/progress_engine.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -32,10 +32,10 @@ struct cache_aligned_memory {
 };
 
 auto compress_file(
-    doca::progress_engine *engine,
+    shoc::progress_engine *engine,
     std::istream &in,
     std::ostream &out
-) -> doca::coro::fiber
+) -> shoc::coro::fiber
 {
     std::uint32_t batches;
     std::uint32_t batchsize;
@@ -43,7 +43,7 @@ auto compress_file(
     in.read(reinterpret_cast<char *>(&batches), sizeof batches);
     in.read(reinterpret_cast<char *>(&batchsize), sizeof batchsize);
 
-    doca::logger->debug("compressing {} batches of size {}", batches, batchsize);
+    shoc::logger->debug("compressing {} batches of size {}", batches, batchsize);
 
     auto filesize = batches * batchsize;
     auto src_mem = cache_aligned_memory(filesize + 64);
@@ -54,12 +54,12 @@ auto compress_file(
 
     in.read(src_data.data(), filesize);
 
-    auto dev = doca::device::find_by_capabilities(doca::device_capability::compress_deflate);
-    auto mmap_src = doca::memory_map { dev, src_data };
-    auto mmap_dst = doca::memory_map { dev, dst_data };
-    auto buf_inv = doca::buffer_inventory { 2 };
+    auto dev = shoc::device::find_by_capabilities(shoc::device_capability::compress_deflate);
+    auto mmap_src = shoc::memory_map { dev, src_data };
+    auto mmap_dst = shoc::memory_map { dev, dst_data };
+    auto buf_inv = shoc::buffer_inventory { 2 };
 
-    auto compress = co_await engine->create_context<doca::compress_context>(dev, 16);
+    auto compress = co_await engine->create_context<shoc::compress_context>(dev, 16);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -68,12 +68,12 @@ auto compress_file(
         auto src = buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize);
         auto dst = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize);
 
-        doca::logger->debug("compressing chunk {}...", i);
+        shoc::logger->debug("compressing chunk {}...", i);
 
-        auto checksums = doca::compress_checksums{};
+        auto checksums = shoc::compress_checksums{};
         auto status = co_await compress->compress(src, dst, &checksums);
 
-        doca::logger->debug("compress_chunk complete: {}, status = {}, crc = {}, adler = {}",
+        shoc::logger->debug("compress_chunk complete: {}, status = {}, crc = {}, adler = {}",
                             i, status, checksums.crc, checksums.adler);
 
         dst_ranges[i] = dst.data();
@@ -108,8 +108,8 @@ auto compress_file(
 }
 
 auto main(int argc, char *argv[]) -> int try {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    doca::logger->set_level(spdlog::level::warn);
+    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    shoc::logger->set_level(spdlog::level::warn);
 
     if(argc < 2) {
         std::cerr << "Usage: " << argv[0] << " INFILE [OUTFILE]\n";
@@ -118,11 +118,11 @@ auto main(int argc, char *argv[]) -> int try {
 
     auto in = std::ifstream(argv[1], std::ios::binary);
     auto out = argc < 3 ? std::ofstream{} : std::ofstream(argv[2], std::ios::binary);
-    auto engine = doca::progress_engine {};
+    auto engine = shoc::progress_engine {};
 
     compress_file(&engine, in, out);
 
     engine.main_loop();
-} catch(doca::doca_exception &ex) {
-    doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
+} catch(shoc::doca_exception &ex) {
+    shoc::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

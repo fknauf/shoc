@@ -1,10 +1,10 @@
-#include <doca/buffer.hpp>
-#include <doca/buffer_inventory.hpp>
-#include <doca/comch/server.hpp>
-#include <doca/coro/fiber.hpp>
-#include <doca/dma.hpp>
-#include <doca/memory_map.hpp>
-#include <doca/progress_engine.hpp>
+#include <shoc/buffer.hpp>
+#include <shoc/buffer_inventory.hpp>
+#include <shoc/comch/server.hpp>
+#include <shoc/coro/fiber.hpp>
+#include <shoc/dma.hpp>
+#include <shoc/memory_map.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <spdlog/fmt/bin_to_hex.h>
 
@@ -54,7 +54,7 @@ struct test_data {
 
 auto format_extents_message(
     test_data const &data,
-    doca::memory_map::export_descriptor const &export_desc
+    shoc::memory_map::export_descriptor const &export_desc
 ) -> std::string {
     auto msglen = 8 + export_desc.length;
     auto msg = std::string(msglen, ' ');
@@ -67,18 +67,18 @@ auto format_extents_message(
 }
 
 auto handle_connection(
-    doca::device &dev,
+    shoc::device &dev,
     test_data const &data,
-    doca::comch::scoped_server_connection conn
-) -> doca::coro::fiber {
-    auto local_mmap = doca::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
+    shoc::comch::scoped_server_connection conn
+) -> shoc::coro::fiber {
+    auto local_mmap = shoc::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
     auto export_desc = local_mmap.export_pci(dev);
 
     auto extents_msg = format_extents_message(data, export_desc);
     auto send_status = co_await conn->send(extents_msg);
 
     if(send_status != DOCA_SUCCESS) {
-        doca::logger->error("unable to send extents: {}", doca_error_get_descr(send_status));
+        shoc::logger->error("unable to send extents: {}", doca_error_get_descr(send_status));
         co_return;
     }
 
@@ -87,20 +87,20 @@ auto handle_connection(
     if(done_msg == "done") {
         std::cout << "DMA transfer succeeded" << std::endl;
     } else {
-        doca::logger->error("unexpected message: {}", done_msg);
+        shoc::logger->error("unexpected message: {}", done_msg);
     }
 }
 
 auto dma_serve(
-    doca::progress_engine *engine,
+    shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> doca::coro::fiber {
+) -> shoc::coro::fiber {
     auto data = test_data { 256, 1 << 20 };
-    auto dev = doca::device::find_by_pci_addr(dev_pci, { doca::device_capability::dma, doca::device_capability::comch_server });
-    auto rep = doca::device_representor::find_by_pci_addr ( dev, rep_pci );
+    auto dev = shoc::device::find_by_pci_addr(dev_pci, { shoc::device_capability::dma, shoc::device_capability::comch_server });
+    auto rep = shoc::device_representor::find_by_pci_addr ( dev, rep_pci );
 
-    auto server = co_await engine->create_context<doca::comch::server>("dma-test", dev, rep);
+    auto server = co_await engine->create_context<shoc::comch::server>("dma-test", dev, rep);
 
     std::cout << "accepting connections\n";
 
@@ -111,10 +111,10 @@ auto dma_serve(
 }
 
 auto main() -> int {
-    //doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    //doca::logger->set_level(spdlog::level::debug);
+    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    //shoc::logger->set_level(spdlog::level::debug);
 
-    auto engine = doca::progress_engine{};
+    auto engine = shoc::progress_engine{};
 
     auto env_dev = std::getenv("DOCA_DEV_PCI");
     auto env_rep = std::getenv("DOCA_DEV_REP_PCI");

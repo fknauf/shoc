@@ -37,25 +37,25 @@ split across the following callbacks:
 By contrast the coroutines-based model allows us to keep the whole logic in a single place:
 
 ```c++
-#include "doca/comch/client.hpp"
-#include "doca/coro/fiber.hpp"
-#include "doca/logger.hpp"
-#include "doca/progress_engine.hpp"
+#include "shoc/comch/client.hpp"
+#include "shoc/coro/fiber.hpp"
+#include "shoc/logger.hpp"
+#include "shoc/progress_engine.hpp"
 
 #include <iostream>
 
-auto ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::comch::comch_device { "81:00.0" };
+auto ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
+    auto dev = shoc::comch::comch_device { "81:00.0" };
 
     // wait for connection to server, that is: create the context and ask the SDK to start
     // it, then suspend. The coroutine will be resumed by the state-changed handler when
     // the client context switches to DOCA_CTX_STATE_RUNNING.
-    auto client = co_await engine->create_context<doca::comch::client>("vss-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("vss-test", dev);
     // send message, wait for status result
     auto status = co_await client->send("ping");
 
     if(status != DOCA_SUCCESS) {
-        doca::logger->error("could not send ping: = {}", doca_error_get_descr(status));
+        shoc::logger->error("could not send ping: = {}", doca_error_get_descr(status));
         co_return;
     }
 
@@ -68,7 +68,7 @@ auto ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
 }
 
 int main() {
-    auto engine = doca::progress_engine {};
+    auto engine = shoc::progress_engine {};
 
     // spawn coroutine. It will run up to the first co_await, then control returns to main.
     ping_pong(&engine);
@@ -85,31 +85,31 @@ different connections it has accepted. In the coroutines-based model it's as sim
 spawning a new coroutine:
 
 ```c++
-#include "doca/comch/server.hpp"
-#include "doca/coro/fiber.hpp"
-#include "doca/progress_engine.hpp"
+#include "shoc/comch/server.hpp"
+#include "shoc/coro/fiber.hpp"
+#include "shoc/progress_engine.hpp"
 
 #include <iostream>
 #include <string_view>
 
-auto ping_pong(doca::comch::scoped_server_connection con) -> doca::coro::fiber {
+auto ping_pong(shoc::comch::scoped_server_connection con) -> shoc::coro::fiber {
     auto msg = co_await con->msg_recv();
     std::cout << msg << std::endl;
     auto status = co_await con->send("pong");
 
     if(status != DOCA_SUCCESS) {
-        doca::logger->error("failed to send response:", doca_error_get_descr(status));
+        shoc::logger->error("failed to send response:", doca_error_get_descr(status));
     }
 
     // connection cleaned up through RAII when the fiber ends. Again, 
     // co_await con->disconnect(); is possible when required.
 }
 
-auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
-    auto dev = doca::comch::comch_device { "03:00.0" };
-    auto rep = doca::device_representor::find_by_pci_addr ( dev, "81:00.0" );
+auto serve_ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
+    auto dev = shoc::comch::comch_device { "03:00.0" };
+    auto rep = shoc::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
-    auto server = co_await engine->create_context<doca::comch::server>("vss-test", dev, rep);
+    auto server = co_await engine->create_context<shoc::comch::server>("vss-test", dev, rep);
 
     for(;;) {
         // accept client connection
@@ -122,7 +122,7 @@ auto serve_ping_pong(doca::progress_engine *engine) -> doca::coro::fiber {
 }
 
 int main() {
-    auto engine = doca::progress_engine{};
+    auto engine = shoc::progress_engine{};
     serve_ping_pong(&engine);
 
     engine.main_loop();

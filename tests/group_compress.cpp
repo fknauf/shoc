@@ -1,10 +1,10 @@
-#include <doca/buffer.hpp>
-#include <doca/buffer_inventory.hpp>
-#include <doca/compress.hpp>
-#include <doca/coro/fiber.hpp>
-#include <doca/device.hpp>
-#include <doca/memory_map.hpp>
-#include <doca/progress_engine.hpp>
+#include <shoc/buffer.hpp>
+#include <shoc/buffer_inventory.hpp>
+#include <shoc/compress.hpp>
+#include <shoc/coro/fiber.hpp>
+#include <shoc/device.hpp>
+#include <shoc/memory_map.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <gtest/gtest.h>
 
@@ -23,34 +23,34 @@
 #define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_compress, single_shot) {
-    auto engine = doca::progress_engine {};
+    auto engine = shoc::progress_engine {};
     auto report = std::string { "fiber not started" };
 
     [](
-        doca::progress_engine *engine,
+        shoc::progress_engine *engine,
         std::string *report
-    ) -> doca::coro::fiber {
+    ) -> shoc::coro::fiber {
         try {
             *report = "";
 
-            auto dev = doca::device::find_by_capabilities(doca::device_capability::compress_deflate);
+            auto dev = shoc::device::find_by_capabilities(shoc::device_capability::compress_deflate);
 
-            auto buf_inv = doca::buffer_inventory { 3 };
+            auto buf_inv = shoc::buffer_inventory { 3 };
 
             auto src_data = std::string { "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua." };
-            auto src_mmap = doca::memory_map { dev, src_data };
+            auto src_mmap = shoc::memory_map { dev, src_data };
             auto src_buf = buf_inv.buf_get_by_data(src_mmap, src_data);
         
             auto dst_data = std::vector<char>(4096);
-            auto dst_mmap = doca::memory_map { dev, dst_data };
+            auto dst_mmap = shoc::memory_map { dev, dst_data };
             auto dst_mid = dst_data.begin() + 2048;
 
             auto compressed_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_data.begin(), dst_mid });
             auto decompressed_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_mid, dst_data.end() });
 
-            auto ctx = co_await engine->create_context<doca::compress_context>(dev, 1);
+            auto ctx = co_await engine->create_context<shoc::compress_context>(dev, 1);
 
-            auto checksums = doca::compress_checksums {};
+            auto checksums = shoc::compress_checksums {};
             auto compress_status = co_await ctx->compress(src_buf, compressed_buf, &checksums);
 
             CO_ASSERT_EQ(DOCA_SUCCESS, compress_status, std::string { "compression failed: " } + doca_error_get_descr(compress_status));

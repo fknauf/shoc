@@ -1,10 +1,10 @@
-#include <doca/buffer.hpp>
-#include <doca/buffer_inventory.hpp>
-#include <doca/comch/client.hpp>
-#include <doca/coro/fiber.hpp>
-#include <doca/dma.hpp>
-#include <doca/memory_map.hpp>
-#include <doca/progress_engine.hpp>
+#include <shoc/buffer.hpp>
+#include <shoc/buffer_inventory.hpp>
+#include <shoc/comch/client.hpp>
+#include <shoc/coro/fiber.hpp>
+#include <shoc/dma.hpp>
+#include <shoc/memory_map.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <spdlog/fmt/bin_to_hex.h>
 #include <nlohmann/json.hpp>
@@ -23,7 +23,7 @@ struct data_extents {
 
     static auto from_message(std::string const &msg) -> data_extents {
         if(msg.size() <= 8) {
-            throw doca::doca_exception(DOCA_ERROR_INVALID_VALUE);
+            throw shoc::doca_exception(DOCA_ERROR_INVALID_VALUE);
         }
 
         auto result = data_extents {};
@@ -35,7 +35,7 @@ struct data_extents {
         return result;
     }
 
-    auto remote_desc() const -> doca::memory_map::export_descriptor {
+    auto remote_desc() const -> shoc::memory_map::export_descriptor {
         return { .base_ptr = remote_desc_buffer.data(), .length = remote_desc_buffer.size() };
     }
 
@@ -45,35 +45,35 @@ struct data_extents {
 };
 
 auto dma_receive(
-    doca::progress_engine *engine,
+    shoc::progress_engine *engine,
     char const *pci_addr,
     std::uint32_t parallelism
-) -> doca::coro::fiber {
-    auto dev = doca::device::find_by_pci_addr(
+) -> shoc::coro::fiber {
+    auto dev = shoc::device::find_by_pci_addr(
         pci_addr,
         {
-            doca::device_capability::comch_client,
-            doca::device_capability::dma
+            shoc::device_capability::comch_client,
+            shoc::device_capability::dma
         }
     );
 
-    auto client = co_await engine->create_context<doca::comch::client>("dma-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("dma-test", dev);
     auto extents_msg = co_await client->msg_recv();
     auto extents = data_extents::from_message(extents_msg);
 
-    doca::logger->debug("got extents {} x {}", extents.block_count, extents.block_size);
+    shoc::logger->debug("got extents {} x {}", extents.block_count, extents.block_size);
 
     auto local_mem = std::vector<std::byte>(extents.block_count * extents.block_size);
-    auto local_mmap = doca::memory_map { dev, local_mem, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+    auto local_mmap = shoc::memory_map { dev, local_mem, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
 
-    auto remote_mmap = doca::memory_map { dev, extents.remote_desc() };
+    auto remote_mmap = shoc::memory_map { dev, extents.remote_desc() };
     auto remote_mem = remote_mmap.span();
 
-    auto inv = doca::buffer_inventory { 1024 };
+    auto inv = shoc::buffer_inventory { 1024 };
 
     auto slots = std::min(parallelism, extents.block_count);
-    auto dma = co_await engine->create_context<doca::dma_context>(dev, slots + 1);
-    auto pending = std::vector<doca::coro::status_awaitable<>>(slots);
+    auto dma = co_await engine->create_context<shoc::dma_context>(dev, slots + 1);
+    auto pending = std::vector<shoc::coro::status_awaitable<>>(slots);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -87,7 +87,7 @@ auto dma_receive(
             auto status = co_await pending[slot];
 
             if(status != DOCA_SUCCESS) {
-                doca::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
+                shoc::logger->error("dma memcpy failed: {}", doca_error_get_descr(status));
                 co_return;
             }
         }
@@ -133,10 +133,10 @@ auto dma_receive(
 }
 
 auto main(int argc, char *argv[]) -> int {
-    //doca::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    //doca::logger->set_level(spdlog::level::debug);
+    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    //shoc::logger->set_level(spdlog::level::debug);
 
-    auto engine = doca::progress_engine{};
+    auto engine = shoc::progress_engine{};
 
     std::uint32_t parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
     auto env_pci = std::getenv("DOCA_DEV_PCI");

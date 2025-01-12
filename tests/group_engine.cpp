@@ -1,4 +1,4 @@
-#include <doca/progress_engine.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
@@ -48,17 +48,17 @@ namespace {
     } while(false)
 
 TEST(docapp_engine, yielding) {
-    auto engine = doca::progress_engine {};
+    auto engine = shoc::progress_engine {};
     auto report1 = std::string { "not started" };
     auto report2 = std::string { "not started" };
 
     fiber_counters counters[2];
 
     [](
-        doca::progress_engine *engine,
+        shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> doca::coro::fiber {
+    ) -> shoc::coro::fiber {
         try {
             *report = "";
 
@@ -85,10 +85,10 @@ TEST(docapp_engine, yielding) {
     );
 
     [](
-        doca::progress_engine *engine,
+        shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> doca::coro::fiber {
+    ) -> shoc::coro::fiber {
         try {
             *report = "";
 
@@ -129,17 +129,17 @@ TEST(docapp_engine, yielding) {
 TEST(docapp_engine, timeouts) {
     using namespace std::chrono_literals;
 
-    auto engine = doca::progress_engine {};
+    auto engine = shoc::progress_engine {};
     auto report1 = std::string { "not started" };
     auto report2 = std::string { "not started" };
 
     fiber_counters counters[2];
 
     [](
-        doca::progress_engine *engine,
+        shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> doca::coro::fiber {
+    ) -> shoc::coro::fiber {
         try {
             *report = "";
 
@@ -174,10 +174,10 @@ TEST(docapp_engine, timeouts) {
     );
 
     [](
-        doca::progress_engine *engine,
+        shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> doca::coro::fiber {
+    ) -> shoc::coro::fiber {
         try {
             *report = "";
             counters[1].inc_yields();

@@ -1,9 +1,9 @@
-#include "doca/buffer_inventory.hpp"
-#include "doca/compress.hpp"
-#include "doca/coro/fiber.hpp"
-#include "doca/logger.hpp"
-#include "doca/memory_map.hpp"
-#include "doca/progress_engine.hpp"
+#include "shoc/buffer_inventory.hpp"
+#include "shoc/compress.hpp"
+#include "shoc/coro/fiber.hpp"
+#include "shoc/logger.hpp"
+#include "shoc/memory_map.hpp"
+#include "shoc/progress_engine.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -30,7 +30,7 @@ struct cache_aligned_memory {
     }
 };
 
-auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream &out) -> doca::coro::fiber {
+auto compress_file(shoc::progress_engine *engine, std::istream &in, std::ostream &out) -> shoc::coro::fiber {
     std::uint32_t batches;
     std::uint32_t batchsize;
     std::uint32_t const parallelism = 4;
@@ -38,7 +38,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     in.read(reinterpret_cast<char *>(&batches), sizeof batches);
     in.read(reinterpret_cast<char *>(&batchsize), sizeof batchsize);
 
-    doca::logger->info("compressing {} batches of size {}", batches, batchsize);
+    shoc::logger->info("compressing {} batches of size {}", batches, batchsize);
 
     auto filesize = batches * batchsize;
     auto src_mem = cache_aligned_memory(filesize);
@@ -48,13 +48,13 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
 
     in.read(src_data.data(), filesize);
 
-    auto dev = doca::device::find_by_capabilities(doca::device_capability::compress_deflate);
-    auto mmap_src = doca::memory_map { dev, src_data };
-    auto mmap_dst = doca::memory_map { dev, dst_data };
-    auto buf_inv = doca::buffer_inventory { batches * 2 };
+    auto dev = shoc::device::find_by_capabilities(shoc::device_capability::compress_deflate);
+    auto mmap_src = shoc::memory_map { dev, src_data };
+    auto mmap_dst = shoc::memory_map { dev, dst_data };
+    auto buf_inv = shoc::buffer_inventory { batches * 2 };
 
-    auto src_buffers = std::vector<doca::buffer>{};
-    auto dst_buffers = std::vector<doca::buffer>{};
+    auto src_buffers = std::vector<shoc::buffer>{};
+    auto dst_buffers = std::vector<shoc::buffer>{};
 
     src_buffers.reserve(batches);
     dst_buffers.reserve(batches);
@@ -66,18 +66,18 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
         dst_buffers.push_back(buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize));
     }
 
-    auto compress = co_await engine->create_context<doca::compress_context>(dev, parallelism);
+    auto compress = co_await engine->create_context<shoc::compress_context>(dev, parallelism);
 
     auto start = std::chrono::steady_clock::now();
 
-    std::array<doca::compress_awaitable, parallelism> waiters;
+    std::array<shoc::compress_awaitable, parallelism> waiters;
 
     for(auto i : std::ranges::views::iota(0u, batches)) {
         auto waiter_index = i % parallelism;
         auto &waiter = waiters[waiter_index];
 
         if(i >= parallelism) {
-            doca::logger->info("waiting for chunk {}", i - parallelism);
+            shoc::logger->info("waiting for chunk {}", i - parallelism);
             co_await waiter;
         }
 
@@ -85,7 +85,7 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
     }
 
     for(auto &waiter: waiters) {
-        doca::logger->info("waiting for final chunks...");
+        shoc::logger->info("waiting for final chunks...");
         co_await waiter;
     }
 
@@ -117,8 +117,8 @@ auto compress_file(doca::progress_engine *engine, std::istream &in, std::ostream
 }
 
 auto main(int argc, char *argv[]) -> int try {
-    doca::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    doca::logger->set_level(spdlog::level::warn);
+    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
+    shoc::logger->set_level(spdlog::level::warn);
 
     if(argc < 2) {
         std::cerr << "Usage: " << argv[0] << " INFILE [OUTFILE]\n";
@@ -128,11 +128,11 @@ auto main(int argc, char *argv[]) -> int try {
     auto in  = std::ifstream(argv[1], std::ios::binary);
     auto out = argc < 2 ? std::ofstream{} : std::ofstream(argv[2], std::ios::binary);
 
-    auto engine = doca::progress_engine{};
+    auto engine = shoc::progress_engine{};
 
     compress_file(&engine, in, out);
 
     engine.main_loop();
-} catch(doca::doca_exception &ex) {
-    doca::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
+} catch(shoc::doca_exception &ex) {
+    shoc::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

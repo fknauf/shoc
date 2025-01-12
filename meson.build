@@ -21,25 +21,25 @@ deps = [
 ]
 
 common_srcs = [
-    'doca/aes_gcm.cpp',
-    'doca/buffer.cpp',
-    'doca/buffer_inventory.cpp',
-    'doca/buffer_pool.cpp',
-    'doca/comch/client.cpp',
-    'doca/comch/consumer.cpp',
-    'doca/comch/producer.cpp',
-    'doca/comch/server.cpp',
-    'doca/compress.cpp',
-    'doca/context.cpp',
-    'doca/device.cpp',
-    'doca/dma.cpp',
-    'doca/epoll_handle.cpp',
-    'doca/event_sources.cpp',
-    'doca/logger.cpp',
-    'doca/memory_map.cpp',
-    'doca/progress_engine.cpp',
-    'doca/rdma.cpp',
-    'doca/sync_event.cpp'
+    'shoc/aes_gcm.cpp',
+    'shoc/buffer.cpp',
+    'shoc/buffer_inventory.cpp',
+    'shoc/buffer_pool.cpp',
+    'shoc/comch/client.cpp',
+    'shoc/comch/consumer.cpp',
+    'shoc/comch/producer.cpp',
+    'shoc/comch/server.cpp',
+    'shoc/compress.cpp',
+    'shoc/context.cpp',
+    'shoc/device.cpp',
+    'shoc/dma.cpp',
+    'shoc/epoll_handle.cpp',
+    'shoc/event_sources.cpp',
+    'shoc/logger.cpp',
+    'shoc/memory_map.cpp',
+    'shoc/progress_engine.cpp',
+    'shoc/rdma.cpp',
+    'shoc/sync_event.cpp'
 ]
 
 inc_dirs  = [
@@ -131,7 +131,7 @@ executable('sync_event_remote_pci', [ 'progs/sync_event_remote_pci.cpp' ],
 executable('generate_testdata', [ 'tools/generate_testdata.cpp' ],
         install: false)
 
-executable('test-docapp',
+executable('test-shoc',
         [
                 'tests/coro/group_task.cpp',
                 'tests/coro/group_value_awaitable.cpp',
