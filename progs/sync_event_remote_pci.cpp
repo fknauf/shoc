@@ -24,7 +24,7 @@ auto sync_event_remote(
     );
     auto rep = shoc::device_representor::find_by_pci_addr(dev, "81:00.0");
 
-    auto server = co_await engine->create_context<shoc::comch::server>("vss-sync-event-test", dev, rep);
+    auto server = co_await engine->create_context<shoc::comch::server>("shoc-sync-event-test", dev, rep);
     auto conn = co_await server->accept();
     msg = co_await conn->msg_recv();
 #else
@@ -36,7 +36,7 @@ auto sync_event_remote(
         }
     );
 
-    auto client = co_await engine->create_context<shoc::comch::client>("vss-sync-event-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("shoc-sync-event-test", dev);
     msg = co_await client->msg_recv();
 #endif
 

@@ -363,7 +363,7 @@ int main(void) {
     doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
 
     struct client_config config = {
-        .server_name = "vss-test",
+        .server_name = "shoc-test",
         .num_send_tasks = 32,
         .max_msg_size = 4080,
         .recv_queue_size = 16

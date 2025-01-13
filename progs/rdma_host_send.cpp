@@ -15,7 +15,7 @@ auto rdma_exchange_connection_details(
     std::span<std::byte const> local_conn_details
 ) -> shoc::coro::eager_task<std::string> {
     auto dev = shoc::device::find_by_pci_addr("81:00.0", shoc::device_capability::comch_client);
-    auto client = co_await engine->create_context<shoc::comch::client>("vss-rdma-oob-send-receive-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("shoc-rdma-oob-send-receive-test", dev);
     
     auto err = co_await client->send(local_conn_details);
 

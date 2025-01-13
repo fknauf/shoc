@@ -12,7 +12,7 @@ int main(void) {
 
     struct client_config config = {
         .dev_pci_addr = env_dev ? env_dev : "81:00.0",
-        .server_name = "vss-data-test",
+        .server_name = "shoc-data-test",
         .num_send_tasks = 32,
         .max_msg_size = 4080,
         .recv_queue_size = 16

@@ -50,7 +50,7 @@ auto ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
     // wait for connection to server, that is: create the context and ask the SDK to start
     // it, then suspend. The coroutine will be resumed by the state-changed handler when
     // the client context switches to DOCA_CTX_STATE_RUNNING.
-    auto client = co_await engine->create_context<shoc::comch::client>("vss-test", dev);
+    auto client = co_await engine->create_context<shoc::comch::client>("shoc-test", dev);
     // send message, wait for status result
     auto status = co_await client->send("ping");
 
@@ -109,7 +109,7 @@ auto serve_ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
     auto dev = shoc::comch::comch_device { "03:00.0" };
     auto rep = shoc::device_representor::find_by_pci_addr ( dev, "81:00.0" );
 
-    auto server = co_await engine->create_context<shoc::comch::server>("vss-test", dev, rep);
+    auto server = co_await engine->create_context<shoc::comch::server>("shoc-test", dev, rep);
 
     for(;;) {
         // accept client connection
