@@ -1,8 +1,84 @@
-# Coroutine-Based C++ Toolkit for Bluefield DPUs
+# Simple Hardware-Offloading Coroutines (SHOC) for Bluefield DPUs
 
-This repo contains a C++ toolkit for easy development on Bluefield DPUs using C++20 coroutines.
+This repo contains a SHOC implementation for Bluefield DPUs, a C++ toolkit for simpler DOCA development built around C++20 coroutines.
+It is supplementary to the corresponding short paper submission to USENIX ATC 2025.
 
 This README assumes familiarity (at least in broad strokes) with the core concepts of the DOCA SDK.
+
+## Reproduction of Experimental Results
+
+The experiments from the short paper can be reproduced on a system with a Bluefield-2 DPU. The exact measured
+data rates depend on the setup.
+
+To reproduce the experiments, this repository must be built on both host and DPU, since some experiments
+involve DPU-side server processes. On both sides, spin up a DOCA base image as desribed
+[here](https://docs.nvidia.com/doca/sdk/nvidia+doca+developer+guide/index.html). Use versions 2.9.1-devel and
+2.9.1-devel-host, respectively.
+
+On the DPU side, go to the source directory and run:
+
+```
+  bash build.sh
+  export DOCA_DEV_PCI=<dpu-side-pci-address>
+  export DOCA_DEV_REP_PCI=<host-side-pci-address>
+```
+
+On the host side
+
+```
+  bash build.sh
+  export DOCA_DEV_PCI=<host-side-pci-address>
+  bash experiments/compression.sh
+  bash experiments/comch.sh
+  bash experiments/dma_client.sh
+```
+
+The comch and dma experiments will prompt you to start appropriate server processes on the DPU before they start their
+trial runs.
+
+Afterwards, per-trial results are in the `results` subdirectory. A summary can be generated with
+
+```
+  bash experiments/postprocess.sh compression
+  bash experiments/postprocess.sh comch
+  bash experiments/postprocess.sh dma
+```
+
+The columns of the summary correspond to table 1 in the short paper.
+
+## Notes about reproduction on Bluefield-3
+
+We got access to a BF-3 card only shortly before submission of the paper, so all experimental results in the paper
+were obtained on a Bluefield-2. SHOC is not limited to BF-2, but we ran into some compatibility issues with the experiments:
+
+1. Deflate compression is no longer available on Bluefield-3, so the compression experiment does not work there.
+
+2. The comch experiment client side triggers a bug in DOCA 2.9: the consumer's start event is lost on BF-3
+when the `epoll`-based waiting mechanism is used. This can be worked around in SHOC by replacing the `wait` method in
+`shoc/progress_engine.cpp` with
+
+```c++
+auto progress_engine::wait([[maybe_unused]] int timeout_ms) -> void {
+    return epoll_.wait(0);
+}
+```
+
+and in plain DOCA by removing from function `receive_datastream` in `progs/plain_doca/comch_data_client/client.c` the calls
+to `doca_request_notification` and `doca_clear_notification` and setting the epoll timeout to 0:
+
+```c
+    // doca_pe_request_notification(engine);
+    nfd = epoll_wait(epoll_fd, &ep_event, 1, 0);
+
+    ...
+    // doca_pe_clear_notification(engine, 0);
+```
+
+However, this will cause the client to busy-wait and likely skew the experimental results.
+
+3. The DMA experiment works out of the box, but 4 parallel tasks are not enough to saturate a Bluefield-3. To run the experiment
+at saturation, amend `experiments/dma_client.sh` to start `bench/dma_client` and `bench/doca_dma_client` with a number greater than
+4 as parameter for the parallel case. In our setup, 32 was enough.
 
 ## Motivation and Motivating Example
 
