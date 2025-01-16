@@ -205,3 +205,6 @@ executable('doca_dma_client',
         dependencies : deps,
         install: false
 )
+
+executable('bug-comch-consumer-start-lost-server', [ 'bug-reports/comch-consumer-start-lost/server.c' ], dependencies: deps, install: false)
+executable('bug-comch-consumer-start-lost-client', [ 'bug-reports/comch-consumer-start-lost/client.c' ], dependencies: deps, install: false)
