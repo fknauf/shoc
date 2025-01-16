@@ -125,7 +125,9 @@ struct doca_dev *open_client_device(char const *pci_addr) {
 }
 
 int main(void) {
-    struct doca_dev *dev = open_client_device("e1:00.0");
+    char const *dev_pci = getenv("DOCA_DEV");
+
+    struct doca_dev *dev = open_client_device(dev_pci ? dev_pci : "e1:00.0");
 
     struct doca_pe *pe;
     ASSERT_SUCCESS(doca_pe_create(&pe));
