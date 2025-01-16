@@ -6,6 +6,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 
@@ -133,8 +134,11 @@ struct doca_dev_rep *open_server_device_representor(struct doca_dev *server_dev,
 }
 
 int main(void) {
-    struct doca_dev *dev = open_server_device("03:00.0");
-    struct doca_dev_rep *rep = open_server_device_representor(dev, "e1:00.0");
+    char const *dev_pci = getenv("DOCA_DEV");
+    char const *rep_pci = getenv("DOCA_REP");
+
+    struct doca_dev *dev = open_server_device(dev_pci ? dev_pci : "03:00.0");
+    struct doca_dev_rep *rep = open_server_device_representor(dev, rep_pci ? rep_pci: "e1:00.0");
 
     struct doca_pe *pe;
     ASSERT_SUCCESS(doca_pe_create(&pe));
