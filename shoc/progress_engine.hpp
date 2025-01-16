@@ -60,6 +60,12 @@ namespace shoc {
         std::chrono::microseconds delay_;
     };
 
+    struct progress_engine_config {
+        std::uint32_t immediate_submission_attempts = 16;
+        std::uint32_t resubmission_attempts = 16;
+        std::chrono::microseconds resubmission_interval = std::chrono::milliseconds(1);
+    };
+
     /**
      * RAII wrapper around a doca_pe (progress engine) handle. Manages its lifetime, can wait for
      * events with epoll.
@@ -80,7 +86,7 @@ namespace shoc {
         friend class yield_awaitable;
         friend class timeout_awaitable;
 
-        progress_engine();
+        progress_engine(progress_engine_config cfg = {});
         ~progress_engine();
 
         auto stop() -> void;
@@ -141,8 +147,15 @@ namespace shoc {
         auto push_waiting_coroutine(std::coroutine_handle<> waiter, std::chrono::microseconds delay) -> void;
 
         auto process_trigger(int trigger_fd) -> void;
+        auto delayed_resubmission(
+            doca_task *task,
+            coro::error_receptable *reportee,
+            std::uint32_t attempts,
+            std::chrono::microseconds delay
+        ) -> coro::fiber;
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
+        progress_engine_config cfg_;
 
         event_counter yield_counter_;
         std::queue<std::coroutine_handle<>> pending_yielders_;

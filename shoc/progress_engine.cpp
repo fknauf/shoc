@@ -13,7 +13,9 @@
 #include <thread>
 
 namespace shoc {
-    progress_engine::progress_engine() {
+    progress_engine::progress_engine(progress_engine_config cfg):
+        cfg_ { std::move(cfg) }
+    {
         doca_pe *pe;
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
@@ -141,12 +143,39 @@ namespace shoc {
         engine_->push_waiting_coroutine(waiter, delay_);
     }
 
-    auto progress_engine::submit_task(doca_task *task, coro::error_receptable *reportee) -> void {
+    auto progress_engine::submit_task(
+        doca_task *task,
+        coro::error_receptable *reportee
+    ) -> void {
         doca_error_t err;
+        std::uint32_t attempts = 0;
 
         do {
             err = doca_task_submit(task);
-        } while(err == DOCA_ERROR_AGAIN);
+            ++attempts;
+        } while(err == DOCA_ERROR_AGAIN && attempts <= cfg_.immediate_submission_attempts);
+        
+        if(err == DOCA_ERROR_AGAIN) {
+            delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval);
+        } else if(err != DOCA_SUCCESS) {
+            doca_task_free(task);
+            reportee->set_error(err);
+        }
+    }
+
+    auto progress_engine::delayed_resubmission(
+        doca_task *task,
+        coro::error_receptable *reportee,
+        std::uint32_t attempts,
+        std::chrono::microseconds interval
+    ) -> coro::fiber {
+        doca_error_t err;
+
+        do {
+            co_await timeout(interval);
+            err = doca_task_submit(task);
+            --attempts;
+        } while(err == DOCA_ERROR_AGAIN && attempts > 0);
 
         if(err != DOCA_SUCCESS) {
             doca_task_free(task);
