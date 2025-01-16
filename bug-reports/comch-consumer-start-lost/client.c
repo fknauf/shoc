@@ -11,9 +11,20 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+#define ASSERT_SUCCESS(expr) do { \
+    doca_error_t err = (expr); \
+    if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) { \
+        printf("Error in %s, line %d: %s\n", __func__, __LINE__, doca_error_get_name(err)); \
+        fflush(stdout); \
+        exit(-3); \
+    } \
+} while(0)
+
+
 struct client_state {
     struct doca_comch_client *client;
     struct doca_comch_consumer *consumer;
+    struct doca_pe *engine;
     struct doca_mmap *memmap;
     void *buffer;
     uint32_t buflen;
@@ -31,11 +42,14 @@ void consumer_state_change_callback(
     printf("consumer state change %d -> %d\n", prev_state, next_state);
 
     if(next_state == DOCA_CTX_STATE_RUNNING) {
-        doca_ctx_stop(ctx);
+        ASSERT_SUCCESS(doca_ctx_stop(ctx));
     } else if(next_state == DOCA_CTX_STATE_IDLE) {
         struct client_state *state = user_data.ptr;
+        ASSERT_SUCCESS(doca_comch_consumer_destroy(state->consumer));
+
         struct doca_ctx *client_ctx = doca_comch_client_as_ctx(state->client);
-        doca_ctx_stop(client_ctx);
+        // this fails too even though the consumer is already gone, but it's not the main problem.
+        ASSERT_SUCCESS(doca_ctx_stop(client_ctx));
     }
 }
 
@@ -45,7 +59,6 @@ void client_state_change_callback(
     enum doca_ctx_states prev_state,
     enum doca_ctx_states next_state
 ) {
-    (void) prev_state;
     (void) ctx;
 
     printf("client state change %d -> %d\n", prev_state, next_state);
@@ -53,16 +66,17 @@ void client_state_change_callback(
     if(next_state == DOCA_CTX_STATE_RUNNING) {
         struct client_state *state = user_data.ptr;
         struct doca_comch_connection *connection;
-        doca_comch_client_get_connection(state->client, &connection);
+        ASSERT_SUCCESS(doca_comch_client_get_connection(state->client, &connection));
 
         struct doca_comch_consumer *consumer;
-        doca_comch_consumer_create(connection, state->memmap, &consumer);
+        ASSERT_SUCCESS(doca_comch_consumer_create(connection, state->memmap, &consumer));
         
         struct doca_ctx *consumer_ctx = doca_comch_consumer_as_ctx(consumer);
-        doca_ctx_set_state_changed_cb(consumer_ctx, consumer_state_change_callback);
+        ASSERT_SUCCESS(doca_ctx_set_state_changed_cb(consumer_ctx, consumer_state_change_callback));
         union doca_data consumer_user_data = { .ptr = state };
-        doca_ctx_set_user_data(consumer_ctx, consumer_user_data);
-        doca_ctx_start(consumer_ctx);
+        ASSERT_SUCCESS(doca_ctx_set_user_data(consumer_ctx, consumer_user_data));
+        ASSERT_SUCCESS(doca_pe_connect_ctx(state->engine, consumer_ctx));
+        ASSERT_SUCCESS(doca_ctx_start(consumer_ctx));
     }
 }
 
@@ -77,20 +91,32 @@ void send_task_completed_callback(
     doca_task_free(doca_comch_task_send_as_task(task));
 }
 
+void msg_recv_callback(
+    struct doca_comch_event_msg_recv *event,
+    uint8_t *recv_buffer,
+    uint32_t msg_len,
+    struct doca_comch_connection *connection
+) {
+    (void) event;
+    (void) recv_buffer;
+    (void) msg_len;
+    (void) connection;
+}
+
 struct doca_dev *open_client_device(char const *pci_addr) {
     struct doca_dev *result = NULL;
     struct doca_devinfo **dev_list;
     uint32_t nb_devs;
 
-    doca_devinfo_create_list(&dev_list, &nb_devs);
+    ASSERT_SUCCESS(doca_devinfo_create_list(&dev_list, &nb_devs));
 
     for(uint32_t i = 0; i < nb_devs; ++i) {
         uint8_t is_addr_equal = 0;
 
-        doca_devinfo_is_equal_pci_addr(dev_list[i], pci_addr, &is_addr_equal);
+        ASSERT_SUCCESS(doca_devinfo_is_equal_pci_addr(dev_list[i], pci_addr, &is_addr_equal));
 
         if(is_addr_equal && doca_comch_cap_client_is_supported(dev_list[i]) == DOCA_SUCCESS) {
-            doca_dev_open(dev_list[i], &result);
+            ASSERT_SUCCESS(doca_dev_open(dev_list[i], &result));
             return result;
         }
     }
@@ -102,53 +128,58 @@ int main(void) {
     struct doca_dev *dev = open_client_device("e1:00.0");
 
     struct doca_pe *pe;
-    doca_pe_create(&pe);
+    ASSERT_SUCCESS(doca_pe_create(&pe));
 
     doca_event_handle_t event_handle;
-    doca_pe_get_notification_handle(pe, &event_handle);
+    ASSERT_SUCCESS(doca_pe_get_notification_handle(pe, &event_handle));
 
     int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     struct epoll_event events_in = { EPOLLIN, { .fd = event_handle }};
     epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_handle, &events_in);
 
     struct doca_comch_client *client;
-    doca_comch_client_create(dev, "consumer-start-bug", &client);
-    doca_comch_client_set_max_msg_size(client, 4080);
-    doca_comch_client_set_recv_queue_size(client, 16);
-    doca_comch_client_task_send_set_conf(client, send_task_completed_callback, send_task_completed_callback, 16);
+    ASSERT_SUCCESS(doca_comch_client_create(dev, "consumer-start-bug", &client));
+    ASSERT_SUCCESS(doca_comch_client_set_max_msg_size(client, 4080));
+    ASSERT_SUCCESS(doca_comch_client_set_recv_queue_size(client, 16));
+    ASSERT_SUCCESS(doca_comch_client_task_send_set_conf(client, send_task_completed_callback, send_task_completed_callback, 16));
+    ASSERT_SUCCESS(doca_comch_client_event_msg_recv_register(client, msg_recv_callback));
 
     struct doca_ctx *client_ctx = doca_comch_client_as_ctx(client);
-    doca_ctx_set_state_changed_cb(client_ctx, client_state_change_callback);
+    ASSERT_SUCCESS(doca_ctx_set_state_changed_cb(client_ctx, client_state_change_callback));
 
     struct client_state *state = calloc(1, sizeof(struct client_state));
     state->client = client;
+    state->engine = pe;
     state->buffer = calloc(1024, 1);
     state->buflen = 1024;
-    doca_mmap_create(&state->memmap);
-    doca_mmap_set_memrange(state->memmap, state->buffer, state->buflen);
-    doca_mmap_set_permissions(state->memmap, DOCA_ACCESS_FLAG_PCI_READ_WRITE);
-    doca_mmap_add_dev(state->memmap, dev);
-    doca_mmap_start(state->memmap);
+    ASSERT_SUCCESS(doca_mmap_create(&state->memmap));
+    ASSERT_SUCCESS(doca_mmap_set_memrange(state->memmap, state->buffer, state->buflen));
+    ASSERT_SUCCESS(doca_mmap_set_permissions(state->memmap, DOCA_ACCESS_FLAG_PCI_READ_WRITE));
+    ASSERT_SUCCESS(doca_mmap_add_dev(state->memmap, dev));
+    ASSERT_SUCCESS(doca_mmap_start(state->memmap));
 
     union doca_data client_user_data = { .ptr = state };
-    doca_ctx_set_user_data(client_ctx, client_user_data);
-    doca_pe_connect_ctx(pe, client_ctx);
-    doca_ctx_start(client_ctx);
+    ASSERT_SUCCESS(doca_ctx_set_user_data(client_ctx, client_user_data));
+    ASSERT_SUCCESS(doca_pe_connect_ctx(pe, client_ctx));
+    ASSERT_SUCCESS(doca_ctx_start(client_ctx));
 
     for(;;) {
+        // comment out this line to make the sample work.
+        // When notifications are requested, the consumer start event is lost on BF-3 (but not BF-2)
+        ASSERT_SUCCESS(doca_pe_request_notification(pe));
+        
+        struct epoll_event ep_event = { 0, { 0 } };
+        epoll_wait(epoll_fd, &ep_event, 1, 100);
+        ASSERT_SUCCESS(doca_pe_clear_notification(pe, 0));
+        while(doca_pe_progress(pe) > 0) {
+            // do nothing
+        }
+
         enum doca_ctx_states client_state;
-        doca_ctx_get_state(client_ctx, &client_state);
+        ASSERT_SUCCESS(doca_ctx_get_state(client_ctx, &client_state));
 
         if(client_state == DOCA_CTX_STATE_IDLE) {
             break;
-        }
-
-        doca_pe_request_notification(pe);
-        struct epoll_event ep_event = { 0, { 0 } };
-        epoll_wait(epoll_fd, &ep_event, 1, -1);
-        doca_pe_clear_notification(pe, 0);
-        while(doca_pe_progress(pe) > 0) {
-            // do nothing
         }
     }
 
