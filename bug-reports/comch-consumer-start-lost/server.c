@@ -1,6 +1,7 @@
 #include <doca_comch.h>
 #include <doca_ctx.h>
 #include <doca_dev.h>
+#include <doca_log.h>
 #include <doca_pe.h>
 
 #include <inttypes.h>
@@ -36,14 +37,32 @@ void server_state_change_callback(
     }
 }
 
-void connection_callback(
+void connected_callback(
     struct doca_comch_event_connection_status_changed *event,
     struct doca_comch_connection *connection,
     uint8_t change_successful
 ) {
     (void) event;
-    (void) connection;
-    (void) change_successful;
+
+    printf("new client connected: %p, %" PRIu8 "\n", connection, change_successful);
+
+    if(change_successful) {
+        struct doca_comch_server *server = doca_comch_server_get_server_ctx(connection);
+        struct doca_comch_task_send *task;
+
+        ASSERT_SUCCESS(doca_comch_server_task_send_alloc_init(server, connection, "hello", 5, &task));
+        ASSERT_SUCCESS(doca_task_submit(doca_comch_task_send_as_task(task)));
+    }
+}
+
+void disconnected_callback(
+    struct doca_comch_event_connection_status_changed *event,
+    struct doca_comch_connection *connection,
+    uint8_t change_successful
+) {
+    (void) event;
+
+    printf("client disconnected: %p, %" PRIu8 "\n", connection, change_successful);
 }
 
 void send_task_completed_callback(
@@ -64,9 +83,11 @@ void msg_recv_callback(
     struct doca_comch_connection *connection
 ) {
     (void) event;
-    (void) recv_buffer;
-    (void) msg_len;
     (void) connection;
+
+    printf("received message: ");
+    fwrite(recv_buffer, 1, msg_len, stdout);
+    puts("");
 }
 
 void new_consumer_callback(
@@ -134,6 +155,12 @@ struct doca_dev_rep *open_server_device_representor(struct doca_dev *server_dev,
 }
 
 int main(void) {
+    struct doca_log_backend *sdk_log;
+
+    doca_log_backend_create_standard();
+    doca_log_backend_create_with_file_sdk(stdout, &sdk_log);
+    doca_log_backend_set_sdk_level(sdk_log, DOCA_LOG_LEVEL_WARNING);
+
     char const *dev_pci = getenv("DOCA_DEV");
     char const *rep_pci = getenv("DOCA_REP");
 
@@ -156,7 +183,7 @@ int main(void) {
     ASSERT_SUCCESS(doca_comch_server_set_recv_queue_size(server, 16));
     ASSERT_SUCCESS(doca_comch_server_task_send_set_conf(server, send_task_completed_callback, send_task_completed_callback, 16));
     ASSERT_SUCCESS(doca_comch_server_event_msg_recv_register(server, msg_recv_callback));
-    ASSERT_SUCCESS(doca_comch_server_event_connection_status_changed_register(server, connection_callback, connection_callback));
+    ASSERT_SUCCESS(doca_comch_server_event_connection_status_changed_register(server, connected_callback, disconnected_callback));
     ASSERT_SUCCESS(doca_comch_server_event_consumer_register(server, new_consumer_callback, expired_consumer_callback));
 
     struct doca_ctx *server_ctx = doca_comch_server_as_ctx(server);
