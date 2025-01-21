@@ -122,7 +122,7 @@ namespace shoc::comch {
         }
     }
 
-    auto server_connection::signal_stopped_child(context *stopped_child) -> void {
+    auto server_connection::signal_stopped_child(context_base *stopped_child) -> void {
         active_children_.remove_stopped_context(stopped_child);
         if(state_ == connection_state::DISCONNECTING) {
             disconnect_if_able();
@@ -166,53 +166,48 @@ namespace shoc::comch {
         device_representor rep,
         server_limits const &limits
     ):
-        context { parent },
+        context {
+            parent,
+            context::create_doca_handle<doca_comch_server_create>(
+                dev.handle(),
+                rep.handle(),
+                server_name.c_str()
+            )
+        },
         dev_ { std::move(dev) },
         rep_ { std::move(rep) }
     {
         enforce(dev_.has_capability(device_capability::comch_server), DOCA_ERROR_NOT_SUPPORTED);
-
         open_connections_.max_load_factor(0.75);
 
-        doca_comch_server *doca_server;
-
-        enforce_success(doca_comch_server_create(dev_.handle(), rep_.handle(), server_name.c_str(), &doca_server));
-        handle_.reset(doca_server);
-
-        context::init_state_changed_callback();
-
         enforce_success(doca_comch_server_task_send_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_comch_task_send_as_task>,
             &plain_status_callback<doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_server_event_msg_recv_register(
-            handle_.get(),
+            handle(),
             &server::msg_recv_callback
         ));
         enforce_success(doca_comch_server_event_connection_status_changed_register(
-            handle_.get(),
+            handle(),
             &server::connection_callback,
             &server::disconnection_callback
         ));
         enforce_success(doca_comch_server_event_consumer_register(
-            handle_.get(),
+            handle(),
             &server::new_consumer_callback,
             &server::expired_consumer_callback
         ));
         enforce_success(doca_comch_server_set_max_msg_size(
-            handle_.get(),
+            handle(),
             limits.max_msg_size
         ));
         enforce_success(doca_comch_server_set_recv_queue_size(
-            handle_.get(),
+            handle(),
             limits.recv_queue_size
         ));
-    }
-
-    server::~server() {
-        assert(doca_state() == DOCA_CTX_STATE_IDLE);
     }
 
     auto server::stop() -> context_state_awaitable {
@@ -241,7 +236,7 @@ namespace shoc::comch {
             auto err = doca_ctx_stop(as_ctx());
 
             if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
-                logger->error("unable to stop comch server {}: {}", static_cast<void*>(handle_.get()), doca_error_get_descr(err));
+                logger->error("unable to stop comch server {}: {}", static_cast<void*>(handle()), doca_error_get_descr(err));
             }
         }
     }
@@ -253,7 +248,7 @@ namespace shoc::comch {
 
         if(count_erased == 0) {
             logger->error("comch server {} got disconnect signal for unknown connection {}",
-                static_cast<void*>(handle_.get()), static_cast<void*>(con));
+                static_cast<void*>(handle()), static_cast<void*>(con));
         }
 
         if(stop_requested_) {
@@ -380,7 +375,7 @@ namespace shoc::comch {
             return nullptr;
         }
 
-        auto base_context = static_cast<context*>(user_data.ptr);
+        auto base_context = static_cast<context_base*>(user_data.ptr);
         return static_cast<server*>(base_context);
     }
 

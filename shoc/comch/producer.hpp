@@ -19,7 +19,11 @@ namespace shoc::comch {
      * Used to send buffers to a consumer on the other side of a connection
      */
     class producer:
-        public context
+        public context<
+            doca_comch_producer,
+            doca_comch_producer_destroy,
+            doca_comch_producer_as_ctx
+        >
     {
     public:
         producer(
@@ -27,13 +31,6 @@ namespace shoc::comch {
             doca_comch_connection *connection,
             std::uint32_t max_tasks
         );
-
-        ~producer();
-
-        [[nodiscard]]
-        auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_comch_producer_as_ctx(handle_.get());
-        }
 
         /**
          * Send a data buffer to a specific consumer
@@ -48,14 +45,5 @@ namespace shoc::comch {
             std::span<std::uint8_t> immediate_data,
             std::uint32_t consumer_id
         ) -> coro::status_awaitable<>;
-
-    protected:
-        auto state_changed(
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void override;
-
-    private:
-        unique_handle<doca_comch_producer, doca_comch_producer_destroy> handle_;
     };
 }

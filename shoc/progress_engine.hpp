@@ -97,7 +97,7 @@ namespace shoc {
         [[nodiscard]] auto handle() const { return handle_.get(); }
         [[nodiscard]] auto inflight_tasks() const -> std::size_t;
 
-        template<std::derived_from<context> Context, typename... Args>
+        template<std::derived_from<context_base> Context, typename... Args>
         auto create_context(Args&&... args) {
             logger->trace("pe create_context this = {}", static_cast<void*>(this));
             return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
@@ -114,8 +114,8 @@ namespace shoc {
          */
         auto main_loop_while(std::function<bool()> condition) -> void;
 
-        auto connect(context *ctx) -> void;
-        auto signal_stopped_child(context *ctx) -> void override;
+        auto connect(context_base *ctx) -> void;
+        auto signal_stopped_child(context_base *ctx) -> void override;
 
         [[nodiscard]]
         auto engine() -> progress_engine* override {
@@ -161,7 +161,7 @@ namespace shoc {
         std::queue<std::coroutine_handle<>> pending_yielders_;
         std::unordered_map<int, detail::coro_timeout> timeout_waiters_;
         epoll_handle epoll_;
-        dependent_contexts<context> connected_contexts_;
+        dependent_contexts<context_base> connected_contexts_;
     };
 
     namespace detail {

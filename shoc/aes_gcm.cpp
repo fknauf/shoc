@@ -41,19 +41,12 @@ namespace shoc {
         device dev,
         std::uint32_t num_tasks
     ):
-        context { parent },
+        context {
+            parent,
+            context::create_doca_handle<doca_aes_gcm_create>(dev.handle())
+        },
         dev_ { std::move(dev) }
     {
-        doca_aes_gcm *raw_handle;
-
-        enforce_success(doca_aes_gcm_create(
-            dev_.handle(),
-            &raw_handle
-        ));
-        handle_.reset(raw_handle);
-
-        init_state_changed_callback();
-
         enforce_success(doca_aes_gcm_task_encrypt_set_conf(
             handle(),
             plain_status_callback<doca_aes_gcm_task_encrypt_as_task>,

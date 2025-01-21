@@ -14,18 +14,16 @@ namespace shoc {
         device dev,
         std::uint32_t max_tasks
     ):
-        context { parent },
+        context {
+            parent,
+            context::create_doca_handle<doca_dma_create>(dev.handle())
+        },
         dev_ { std::move(dev) }
     {
         enforce(dev_.has_capability(device_capability::dma), DOCA_ERROR_NOT_SUPPORTED);
 
-        doca_dma *raw_handle;
-        enforce_success(doca_dma_create(dev_.handle(), &raw_handle));
-        handle_.reset(raw_handle);
-
-        init_state_changed_callback();
         enforce_success(doca_dma_task_memcpy_set_conf(
-            handle_.get(),
+            handle(),
             plain_status_callback<doca_dma_task_memcpy_as_task>,
             plain_status_callback<doca_dma_task_memcpy_as_task>,
             max_tasks
@@ -41,7 +39,7 @@ namespace shoc {
             doca_dma_task_memcpy_as_task
         >(
             engine(),
-            handle_.get(),
+            handle(),
             src.handle(),
             dest.handle()
         );

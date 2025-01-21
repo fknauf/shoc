@@ -13,35 +13,31 @@ namespace shoc::comch {
         device dev,
         client_limits const &limits
     ):
-        context { parent },
+        context {
+            parent,
+            context::create_doca_handle<doca_comch_client_create>(dev.handle(), server_name.c_str())
+        },
         dev_ { std::move(dev) }
     {
         enforce(dev_.has_capability(device_capability::comch_client), DOCA_ERROR_NOT_SUPPORTED);
 
-        doca_comch_client *doca_client;
-
-        enforce_success(doca_comch_client_create(dev_.handle(), server_name.c_str(), &doca_client));
-        handle_.reset(doca_client);
-
-        context::init_state_changed_callback();
-
         enforce_success(doca_comch_client_task_send_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_comch_task_send_as_task>,
             &plain_status_callback<doca_comch_task_send_as_task>,
             limits.num_send_tasks
         ));
         enforce_success(doca_comch_client_event_msg_recv_register(
-            handle_.get(),
+            handle(),
             &client::msg_recv_callback
         ));
         enforce_success(doca_comch_client_event_consumer_register(
-            handle_.get(),
+            handle(),
             &client::new_consumer_callback,
             &client::expired_consumer_callback
         ));
-        enforce_success(doca_comch_client_set_max_msg_size(handle_.get(), limits.max_msg_size));
-        enforce_success(doca_comch_client_set_recv_queue_size(handle_.get(), limits.recv_queue_size));
+        enforce_success(doca_comch_client_set_max_msg_size(handle(), limits.max_msg_size));
+        enforce_success(doca_comch_client_set_recv_queue_size(handle(), limits.recv_queue_size));
     }
 
     client::~client() {
@@ -50,13 +46,9 @@ namespace shoc::comch {
         }
     }
 
-    auto client::as_ctx() const noexcept -> doca_ctx* {
-        return doca_comch_client_as_ctx(handle_.get());
-    }
-
     auto client::connection_handle() const -> doca_comch_connection* {
         doca_comch_connection *result;
-        enforce_success(doca_comch_client_get_connection(handle_.get(), &result));
+        enforce_success(doca_comch_client_get_connection(handle(), &result));
         return result;
     }
 
@@ -71,7 +63,7 @@ namespace shoc::comch {
         return context_state_awaitable { shared_from_this(), DOCA_CTX_STATE_IDLE };
     }
 
-    auto client::signal_stopped_child(context *stopped_child) -> void {
+    auto client::signal_stopped_child(context_base *stopped_child) -> void {
         active_children_.remove_stopped_context(stopped_child);
         if(state_ == connection_state::DISCONNECTING) {
             disconnect_if_able();
@@ -115,8 +107,8 @@ namespace shoc::comch {
 
         doca_data task_user_data = { .ptr = receptable };
 
-        enforce_success(doca_comch_client_get_connection(handle_.get(), &connection));
-        enforce_success(doca_comch_client_task_send_alloc_init(handle_.get(), connection, message.data(), message.size(), &task));
+        enforce_success(doca_comch_client_get_connection(handle(), &connection));
+        enforce_success(doca_comch_client_task_send_alloc_init(handle(), connection, message.data(), message.size(), &task));
         doca_task_set_user_data(doca_comch_task_send_as_task(task), task_user_data);
 
         auto base_task = doca_comch_task_send_as_task(task);
@@ -167,7 +159,7 @@ namespace shoc::comch {
             return nullptr;
         }
 
-        auto base_context = static_cast<context*>(user_data.ptr);
+        auto base_context = static_cast<context_base*>(user_data.ptr);
         return static_cast<client*>(base_context);
     }
 

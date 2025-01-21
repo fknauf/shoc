@@ -29,7 +29,11 @@ namespace shoc::comch {
      * are likewise associated with that connection.
      */
     class client:
-        public context
+        public context<
+            doca_comch_client,
+            doca_comch_client_destroy,
+            doca_comch_client_as_ctx
+        >
     {
     public:
         client(
@@ -40,8 +44,6 @@ namespace shoc::comch {
         );
 
         ~client();
-
-        [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx* override;
 
         /**
          * Send message to the server we're connected to
@@ -124,14 +126,12 @@ namespace shoc::comch {
         static auto resolve(doca_comch_connection*) -> client*;
         static auto resolve(doca_comch_client*) -> client*;
         auto connection_handle() const -> doca_comch_connection*;
-        auto signal_stopped_child(context *child) -> void override;
+        auto signal_stopped_child(context_base *child) -> void override;
         auto disconnect_if_able() -> void;
 
         // dev remembered here to extend its lifetime until after
-        // the context handle is destroyed.
+        // the context_base handle is destroyed.
         device dev_;
-
-        unique_handle<doca_comch_client, doca_comch_client_destroy> handle_;
         connection_state state_ = connection_state::DISCONNECTED;
 
         accepter_queues<message> message_queues_;

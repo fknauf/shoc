@@ -28,7 +28,11 @@ namespace shoc {
     >;
 
     class sync_event:
-        public context
+        public context<
+            doca_sync_event,
+            doca_sync_event_destroy,
+            doca_sync_event_as_ctx
+        >
     {
     public:
         using location_pci = sync_event_location_pci;
@@ -50,12 +54,8 @@ namespace shoc {
             std::ranges::range auto &&subscribers,
             std::uint32_t max_tasks
         ):
-            context { parent }
+            context { parent, context::create_doca_handle<doca_sync_event_create>() }
         {
-            doca_sync_event *event;
-            enforce_success(doca_sync_event_create(&event));
-            handle_.reset(event);
-
             init_callbacks(max_tasks);
 
             for(auto &pub : publishers) {
@@ -73,14 +73,6 @@ namespace shoc {
             std::span<std::byte const> export_data,
             std::uint32_t max_tasks
         );
-
-        [[nodiscard]]
-        auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_sync_event_as_ctx(handle_.get());
-        }
-
-        [[nodiscard]]
-        auto handle() const noexcept { return handle_.get(); }
 
         [[nodiscard]]
         auto export_to_remote_pci(device const &dev) const -> std::span<std::byte const>;
@@ -120,7 +112,6 @@ namespace shoc {
 
         // to extend lifetime of the referenced DOCA devices
         std::vector<device> referenced_devices_;
-        unique_handle<doca_sync_event, doca_sync_event_destroy> handle_;
     };
 
     class sync_event_remote_net {

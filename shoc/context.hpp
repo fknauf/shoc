@@ -3,6 +3,7 @@
 #include "coro/task.hpp"
 #include "error.hpp"
 #include "logger.hpp"
+#include "unique_handle.hpp"
 
 #include <doca_ctx.h>
 
@@ -15,7 +16,7 @@
 #include <vector>
 
 namespace shoc {
-    class context;
+    class context_base;
     class progress_engine;
 
     /**
@@ -28,7 +29,7 @@ namespace shoc {
         /**
          * Called by the stopping child when a child is stopped
          */
-        virtual auto signal_stopped_child(context *stopped_child) -> void = 0;
+        virtual auto signal_stopped_child(context_base *stopped_child) -> void = 0;
 
         /**
          * handle to the common progress engine, so parent and child run on the same engine.
@@ -45,7 +46,7 @@ namespace shoc {
      */
     class [[nodiscard]] context_state_awaitable {
     public:
-        context_state_awaitable(std::shared_ptr<context> ctx, doca_ctx_states desired_state):
+        context_state_awaitable(std::shared_ptr<context_base> ctx, doca_ctx_states desired_state):
             ctx_(std::move(ctx)), desired_state_(desired_state)
         {
             logger->trace("context_state_awaitable ctx = {}, desired_state = {}", static_cast<void*>(ctx_.get()), desired_state_);
@@ -57,7 +58,7 @@ namespace shoc {
         auto await_suspend(std::coroutine_handle<> caller) noexcept -> void;
 
     private:
-        std::shared_ptr<context> ctx_;
+        std::shared_ptr<context_base> ctx_;
         doca_ctx_states desired_state_;
     };
 
@@ -73,24 +74,10 @@ namespace shoc {
      *
      * Always constructed in a std::shared_ptr so context_state_awaitable can own it.
      */
-    class context:
+    class context_base:
         public context_parent,
-        public std::enable_shared_from_this<context>
+        public std::enable_shared_from_this<context_base>
     {
-    public:
-        friend class context_state_awaitable;
-
-    protected:
-        /**
-         * @param parent parent to signal when this context is stopped
-         */
-        context(context_parent *parent);
-
-        context(context const &) = delete;
-        context(context&&) = delete;
-        context &operator=(context const &) = delete;
-        context &operator=(context &&) = delete;
-
     public:
         /**
          * For internal use.
@@ -128,14 +115,14 @@ namespace shoc {
         /**
          * Called by child contexts to signal that they have been stopped.
          */
-        auto signal_stopped_child([[maybe_unused]] context *stopped_child) -> void override {}
+        auto signal_stopped_child([[maybe_unused]] context_base *stopped_child) -> void override {}
 
         /**
          * @return the progress engine that handles the events for this context
          */
         [[nodiscard]]
         auto engine() -> progress_engine* override {
-            return static_cast<context const*>(this)->engine();
+            return static_cast<context_base const*>(this)->engine();
         }
 
         [[nodiscard]]
@@ -150,17 +137,20 @@ namespace shoc {
         auto inflight_tasks() const -> std::size_t;
 
     protected:
+        /**
+         * @param parent parent to signal when this context is stopped
+         */
+        context_base(context_parent *parent);
+
+        context_base(context_base const &) = delete;
+        context_base(context_base&&) = delete;
+        context_base &operator=(context_base const &) = delete;
+        context_base &operator=(context_base &&) = delete;
+
         [[nodiscard]]
         virtual auto preparing_stop() const noexcept -> bool {
             return false;
         }
-
-        /**
-         * Called by child classes in the constructor to set the state-change callback and context user data
-         *
-         * This is necessary because each of them has a different way of creating the DOCA SDK context handle.
-         */
-        auto init_state_changed_callback() -> void;
 
         /**
          * Overridable state-changed handler. This is called from the state-change callback after the current state
@@ -173,24 +163,11 @@ namespace shoc {
         ) -> void {
         }
 
-    private:
-        template<std::derived_from<context> BaseContext>
-        friend class dependent_contexts;
-
-        /**
-         * state-change callback for the SDK
-         */
-        static auto state_changed_callback(
-            doca_data user_data,
-            doca_ctx *ctx,
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void;
-
-        /**
-         * Connects this context to engine()
-         */
         auto connect_to_engine() -> void;
+
+        template<std::derived_from<context_base> BaseContext>
+        friend class dependent_contexts;
+        friend class context_state_awaitable;
 
         context_parent *parent_ = nullptr;
         doca_ctx_states current_state_ = DOCA_CTX_STATE_IDLE;
@@ -198,6 +175,92 @@ namespace shoc {
         // coroutines waiting for start/stop state changes
         std::coroutine_handle<> coro_start_;
         std::coroutine_handle<> coro_stop_;
+    };
+
+    template<
+        typename DocaHandle,
+        auto HandleDestroy,
+        auto HandleAsCtx
+    >
+    class context:
+        public context_base
+    {
+    public:
+        [[nodiscard]]
+        auto handle() const noexcept {
+            return handle_.get();
+        }
+
+        [[nodiscard]]
+        auto as_ctx() const noexcept -> doca_ctx* override {
+            return HandleAsCtx(handle());
+        }
+
+    protected:
+        context(
+            context_parent *parent,
+            DocaHandle *raw_handle
+        ):
+            context_base { parent },
+            handle_ { raw_handle }
+        {
+            auto ctx = HandleAsCtx(handle_.get());
+            doca_data ctx_user_data = { .ptr = this };
+            enforce_success(doca_ctx_set_user_data(ctx, ctx_user_data));
+            enforce_success(doca_ctx_set_state_changed_cb(ctx, &context::state_changed_callback));
+
+            connect_to_engine();
+        }
+
+        template<auto HandleCreate, typename... Args>
+        static auto create_doca_handle(Args&&... args) {
+            DocaHandle *raw_handle;
+            enforce_success(HandleCreate(std::forward<Args>(args)..., &raw_handle));
+            return raw_handle;
+        }
+
+        static auto state_changed_callback(
+            doca_data user_data,
+            [[maybe_unused]] doca_ctx *ctx,
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void {
+            auto obj = static_cast<context*>(user_data.ptr);
+            assert(obj != nullptr);
+
+            obj->current_state_ = next_state;
+
+            try {
+                obj->state_changed(prev_state, next_state);
+            } catch(std::exception &e) {
+                logger->error("state change event handler finished with error: {}", e.what());
+            } catch(...) {
+                logger->error("state change event handler finished with unknown error");
+            }
+
+            if(next_state == DOCA_CTX_STATE_RUNNING) {
+                logger->debug("context started");
+
+                auto coro = std::exchange(obj->coro_start_, nullptr);
+                if(coro) {
+                    coro.resume();
+                }
+            } else if(next_state == DOCA_CTX_STATE_IDLE) {
+                logger->debug("context stopped");
+
+                auto coro = std::exchange(obj->coro_stop_, nullptr);
+                obj->handle_.reset(nullptr);
+                // may delete obj if coro is nullptr and there's no coroutine holding on to
+                // this context anymore, so we can't use it after this.
+                obj->parent_->signal_stopped_child(obj);
+
+                if(coro) {
+                    coro.resume();
+                }
+            }
+        }
+
+        unique_handle<DocaHandle, HandleDestroy> handle_;
     };
 
     /**
@@ -208,7 +271,7 @@ namespace shoc {
      * unless it has been stopped before. The purpose of this wrapper is not to prevent a
      * memory leak on the context but to prevent it from never being stopped.
      */
-    template<std::derived_from<context> ConcreteContext>
+    template<std::derived_from<context_base> ConcreteContext>
     class unique_scoped_context {
     public:
         ~unique_scoped_context() {
@@ -246,7 +309,7 @@ namespace shoc {
 
     private:
         auto clear() -> void {
-            if(ctx_ != nullptr) {
+            if(ctx_ != nullptr && ctx_->handle() != nullptr) {
                 logger->trace("auto-stopping ctx {}", static_cast<void*>(get()));
                 static_cast<void>(ctx_->stop());
                 ctx_ = nullptr;
@@ -256,7 +319,7 @@ namespace shoc {
         std::shared_ptr<ConcreteContext> ctx_ = nullptr;
     };
 
-    template<std::derived_from<context> ConcreteContext>
+    template<std::derived_from<context_base> ConcreteContext>
     class shared_scoped_context {
     public:
         shared_scoped_context(std::shared_ptr<ConcreteContext> ctx):
@@ -283,7 +346,7 @@ namespace shoc {
      * Awaitable for context creation. Generally fulfils the same purpose as context_state_awaitable
      * but will return a scoped wrapper around the new context.
      */
-    template<std::derived_from<context> ConcreteContext>
+    template<std::derived_from<context_base> ConcreteContext>
     class create_context_awaitable {
     public:
         create_context_awaitable(std::shared_ptr<ConcreteContext> ctx, context_state_awaitable start_awaitable):
@@ -304,7 +367,7 @@ namespace shoc {
     /**
      * active-children registry for context parents.
      */
-    template<std::derived_from<context> BaseContext = context>
+    template<std::derived_from<context_base> BaseContext = context_base>
     class dependent_contexts {
     public:
         dependent_contexts() {
@@ -333,7 +396,6 @@ namespace shoc {
             logger->trace("dependent_contexts::create_context, parent = {}", static_cast<void*>(parent));
 
             auto new_context = std::make_shared<ConcreteContext>(parent, std::forward<Args>(args)...);
-            new_context->connect_to_engine();
 
             auto start_awaitable = new_context->start();
             active_contexts_[new_context.get()] = new_context;

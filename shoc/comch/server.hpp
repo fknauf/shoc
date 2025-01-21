@@ -138,7 +138,7 @@ namespace shoc::comch {
          */
         auto accept_consumer() -> id_awaitable;
 
-        auto signal_stopped_child(context *stopped_child) -> void override;
+        auto signal_stopped_child(context_base *stopped_child) -> void override;
 
         [[nodiscard]]
         auto engine() -> progress_engine* override;
@@ -214,7 +214,11 @@ namespace shoc::comch {
      * Server context. Main function is to accept server connections.
      */
     class server:
-        public context
+        public context<
+            doca_comch_server,
+            doca_comch_server_destroy,
+            doca_comch_server_as_ctx
+        >
     {
     public:
         friend class server_connection;
@@ -226,16 +230,6 @@ namespace shoc::comch {
             device_representor rep,
             server_limits const &limits = {}
         );
-
-        ~server();
-
-        [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_comch_server_as_ctx(handle_.get());
-        }
-
-        auto handle() const noexcept {
-            return handle_.get();
-        }
 
         auto stop() -> context_state_awaitable override;
 
@@ -310,8 +304,6 @@ namespace shoc::comch {
 
         device dev_;
         device_representor rep_;
-
-        unique_handle<doca_comch_server, doca_comch_server_destroy> handle_;
 
         accepter_queues<
             std::shared_ptr<server_connection>,

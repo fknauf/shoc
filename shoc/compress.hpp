@@ -57,7 +57,11 @@ namespace shoc {
      * Context for compression tasks.
      */
     class compress_context:
-        public context
+        public context<
+            doca_compress,
+            doca_compress_destroy,
+            doca_compress_as_ctx
+        >
     {
     public:
         /**
@@ -106,10 +110,6 @@ namespace shoc {
             return submit_task<doca_compress_task_decompress_deflate>(src, dest, checksums);
         }
 
-        [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx * override;
-
-        // auto stop() -> void override;
-
     private:
         template<typename TaskType>
         auto submit_task(
@@ -123,7 +123,7 @@ namespace shoc {
             >(
                 engine(),
                 compress_awaitable::create_space(checksums),
-                handle_.get(),
+                handle(),
                 src.handle(),
                 dest.handle()
             );
@@ -152,6 +152,5 @@ namespace shoc {
         }
 
         device dev_;
-        unique_handle<doca_compress, doca_compress_destroy> handle_;
     };
 }

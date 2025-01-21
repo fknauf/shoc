@@ -28,7 +28,11 @@ namespace shoc::comch {
      * This class is made to receive data buffers from a producer on the other side of a connection.
      */
     class consumer:
-        public context
+        public context<
+            doca_comch_consumer,
+            doca_comch_consumer_destroy,
+            doca_comch_consumer_as_ctx
+        >
     {
     public:
         consumer(
@@ -38,11 +42,6 @@ namespace shoc::comch {
             std::uint32_t max_tasks
         );
 
-        [[nodiscard]]
-        auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_comch_consumer_as_ctx(handle_.get());
-        }
-
         /**
          * Receive/wait for a data buffer
          *
@@ -50,19 +49,11 @@ namespace shoc::comch {
          */
         auto post_recv(buffer &dest) -> consumer_recv_awaitable;
 
-    protected:
-        auto state_changed(
-            doca_ctx_states prev_state,
-            doca_ctx_states next_state
-        ) -> void override;
-
     private:
         static auto post_recv_task_completion_callback(
             doca_comch_consumer_task_post_recv *task,
             doca_data task_user_data,
             doca_data ctx_user_data
         ) -> void;
-
-        unique_handle<doca_comch_consumer, doca_comch_consumer_destroy> handle_;
     };
 }

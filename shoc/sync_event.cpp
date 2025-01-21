@@ -10,18 +10,16 @@ namespace shoc {
         std::span<std::byte const> export_data,
         std::uint32_t max_tasks
     ):
-        context { parent },
+        context { 
+            parent,
+            context::create_doca_handle<doca_sync_event_create_from_export>(
+                dev.handle(),
+                reinterpret_cast<std::uint8_t const*>(export_data.data()),
+                export_data.size()
+            )
+        },
         referenced_devices_ { dev }
     {
-        doca_sync_event *event;
-        enforce_success(doca_sync_event_create_from_export(
-            dev.handle(),
-            reinterpret_cast<std::uint8_t const*>(export_data.data()),
-            export_data.size(),
-            &event
-        ));
-        handle_.reset(event);
-
         init_callbacks(max_tasks);
     }
 
@@ -31,12 +29,11 @@ namespace shoc {
         sync_event_subscriber_location subscriber,
         std::uint32_t max_tasks
     ):
-        context { parent }
+        context {
+            parent,
+            context::create_doca_handle<doca_sync_event_create>()
+        }
     {
-        doca_sync_event *event;
-        enforce_success(doca_sync_event_create(&event));
-        handle_.reset(event);
-
         init_callbacks(max_tasks);
         init_add_publisher(publisher);
         init_add_subscriber(subscriber);
@@ -46,14 +43,14 @@ namespace shoc {
         enforce_success(std::visit(
             overload {
                 [this](sync_event_location_pci) -> doca_error_t {
-                    return doca_sync_event_add_publisher_location_remote_pci(handle_.get());
+                    return doca_sync_event_add_publisher_location_remote_pci(handle());
                 },
                 [this](sync_event_location_remote_net) -> doca_error_t {
-                    return doca_sync_event_add_publisher_location_remote_net(handle_.get());
+                    return doca_sync_event_add_publisher_location_remote_net(handle());
                 },
                 [this](device const &dev) -> doca_error_t {
                     referenced_devices_.push_back(dev);
-                    return doca_sync_event_add_publisher_location_cpu(handle_.get(), dev.handle());
+                    return doca_sync_event_add_publisher_location_cpu(handle(), dev.handle());
                 }
             },
             pub
@@ -64,11 +61,11 @@ namespace shoc {
         enforce_success(std::visit(
             overload {
                 [this](sync_event_location_pci) -> doca_error_t {
-                    return doca_sync_event_add_subscriber_location_remote_pci(handle_.get());
+                    return doca_sync_event_add_subscriber_location_remote_pci(handle());
                 },
                 [this](device const &dev) -> doca_error_t {
                     referenced_devices_.push_back(dev);                    
-                    return doca_sync_event_add_subscriber_location_cpu(handle_.get(), dev.handle());
+                    return doca_sync_event_add_subscriber_location_cpu(handle(), dev.handle());
                 }
             },
             sub
@@ -76,38 +73,36 @@ namespace shoc {
     }
 
     auto sync_event::init_callbacks(std::uint32_t max_tasks) -> void {
-        init_state_changed_callback();
-
         enforce_success(doca_sync_event_task_get_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_sync_event_task_get_as_doca_task>,
             &plain_status_callback<doca_sync_event_task_get_as_doca_task>,
             max_tasks
         ));
 
         enforce_success(doca_sync_event_task_notify_add_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_sync_event_task_notify_add_as_doca_task>,
             &plain_status_callback<doca_sync_event_task_notify_add_as_doca_task>,
             max_tasks
         ));
 
         enforce_success(doca_sync_event_task_notify_set_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_sync_event_task_notify_set_as_doca_task>,
             &plain_status_callback<doca_sync_event_task_notify_set_as_doca_task>,
             max_tasks
         ));
 
         enforce_success(doca_sync_event_task_wait_eq_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_sync_event_task_wait_eq_as_doca_task>,
             &plain_status_callback<doca_sync_event_task_wait_eq_as_doca_task>,
             max_tasks
         ));
 
         enforce_success(doca_sync_event_task_wait_neq_set_conf(
-            handle_.get(),
+            handle(),
             &plain_status_callback<doca_sync_event_task_wait_neq_as_doca_task>,
             &plain_status_callback<doca_sync_event_task_wait_neq_as_doca_task>,
             max_tasks
@@ -119,7 +114,7 @@ namespace shoc {
         std::size_t size = 0;
 
         enforce_success(doca_sync_event_export_to_remote_pci(
-            handle_.get(),
+            handle(),
             dev.handle(),
             reinterpret_cast<std::uint8_t const**>(&base),
             &size));
@@ -132,7 +127,7 @@ namespace shoc {
         std::size_t size = 0;
 
         enforce_success(doca_sync_event_export_to_remote_net(
-            handle_.get(),
+            handle(),
             reinterpret_cast<std::uint8_t const**>(&base),
             &size
         ));
@@ -146,7 +141,7 @@ namespace shoc {
             doca_sync_event_task_get_as_doca_task
         >(
             engine(),
-            handle_.get(),
+            handle(),
             dest
         );
     }
@@ -160,7 +155,7 @@ namespace shoc {
             doca_sync_event_task_notify_add_as_doca_task
         >(
             engine(),
-            handle_.get(),
+            handle(),
             inc_val,
             fetched
         );
@@ -174,7 +169,7 @@ namespace shoc {
             doca_sync_event_task_notify_set_as_doca_task
         >(
             engine(),
-            handle_.get(),
+            handle(),
             set_val
         );
     }
@@ -188,7 +183,7 @@ namespace shoc {
             doca_sync_event_task_wait_eq_as_doca_task
         >(
             engine(),
-            handle_.get(),
+            handle(),
             wait_val,
             mask
         );
@@ -203,7 +198,7 @@ namespace shoc {
             doca_sync_event_task_wait_neq_as_doca_task
         >(
             engine(),
-            handle_.get(),
+            handle(),
             wait_val,
             mask
         );

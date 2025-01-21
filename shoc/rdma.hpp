@@ -96,7 +96,11 @@ namespace shoc {
     };
 
     class rdma_context:
-        public context
+        public context<
+            doca_rdma,
+            doca_rdma_destroy,
+            doca_rdma_as_ctx
+        >
     {
     public:
         rdma_context(
@@ -105,11 +109,6 @@ namespace shoc {
             rdma_config config = {}
         );
 
-        [[nodiscard]]
-        auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_rdma_as_ctx(handle_.get());
-        }
-
         auto receive(
             buffer &dest,
             std::uint32_t *immediate_data = nullptr
@@ -117,9 +116,6 @@ namespace shoc {
 
         [[nodiscard]]
         auto export_connection() -> rdma_connection;
-
-        [[nodiscard]]
-        auto handle() const noexcept { return handle_.get(); }
 
     private:
         //static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) -> void;
@@ -134,7 +130,6 @@ namespace shoc {
         ) -> void;
 
         device dev_;
-        unique_handle<doca_rdma, doca_rdma_destroy> handle_;
 
         bool connected_ = false;
         coro::status_awaitable<>::payload_type *accept_receptable_ = nullptr;

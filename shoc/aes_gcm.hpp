@@ -31,7 +31,11 @@ namespace shoc {
     };
 
     class aes_gcm_context:
-        public context
+        public context<
+            doca_aes_gcm,
+            doca_aes_gcm_destroy,
+            doca_aes_gcm_as_ctx
+        >
     {
     public:
         aes_gcm_context(
@@ -39,14 +43,6 @@ namespace shoc {
             device dev,
             std::uint32_t num_tasks
         );
-
-        [[nodiscard]] auto as_ctx() const noexcept -> doca_ctx* override {
-            return doca_aes_gcm_as_ctx(handle_.get());
-        }
-
-        [[nodiscard]] auto handle() const noexcept {
-            return handle_.get();
-        }
 
         [[nodiscard]] auto encrypt(
             buffer plaintext,
@@ -68,6 +64,5 @@ namespace shoc {
 
     private:
         device dev_;
-        unique_handle<doca_aes_gcm, doca_aes_gcm_destroy> handle_;
     };
 }

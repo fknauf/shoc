@@ -12,17 +12,13 @@ namespace shoc::comch {
         memory_map &user_mmap,
         std::uint32_t max_tasks
     ):
-        context { parent }
+        context {
+            parent,
+            context::create_doca_handle<doca_comch_consumer_create>(connection, user_mmap.handle())
+        }
     {
-        doca_comch_consumer* raw_consumer = nullptr;
-
-        enforce_success(doca_comch_consumer_create(connection, user_mmap.handle(), &raw_consumer));
-        handle_.reset(raw_consumer);
-
-        context::init_state_changed_callback();
-
         enforce_success(doca_comch_consumer_task_post_recv_set_conf(
-            handle_.get(),
+            handle(),
             &consumer::post_recv_task_completion_callback,
             &consumer::post_recv_task_completion_callback,
             max_tasks
@@ -37,7 +33,7 @@ namespace shoc::comch {
 
         doca_data task_user_data = { .ptr = receptable };
 
-        enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle_.get(), dest.handle(), &task));
+        enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle(), dest.handle(), &task));
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
         doca_task_set_user_data(base_task, task_user_data);
 
@@ -69,14 +65,5 @@ namespace shoc::comch {
 
         dest->set_value(std::move(result));
         dest->resume();
-    }
-
-    auto consumer::state_changed(
-        [[maybe_unused]] doca_ctx_states prev_state,
-        doca_ctx_states next_state
-    ) -> void {
-        if(next_state == DOCA_CTX_STATE_IDLE) {
-            handle_.reset(nullptr);
-        }
     }
 }
