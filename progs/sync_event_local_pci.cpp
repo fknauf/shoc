@@ -8,12 +8,20 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/sync_event.hpp>
 
+auto get_envvar(
+    char const *name,
+    std::string const &default_value
+) -> std::string {
+    auto envvar = std::getenv(name);
+    return envvar != nullptr ? envvar : default_value;
+}
+
 auto sync_event_local(shoc::progress_engine *engine) -> shoc::coro::fiber {
     auto err = doca_error_t { DOCA_SUCCESS };
 
 #ifdef DOCA_ARCH_DPU
     auto dev = shoc::device::find_by_pci_addr(
-        "03:00.0",
+        get_envvar("DOCA_DEV", "03:00.0"),
         { 
             shoc::device_capability::sync_event_pci,
             shoc::device_capability::comch_server
@@ -29,7 +37,7 @@ auto sync_event_local(shoc::progress_engine *engine) -> shoc::coro::fiber {
     err = co_await conn->send(event_descriptor);
 #else
     auto dev = shoc::device::find_by_pci_addr(
-        "81:00.0",
+        get_envvar("DOCA_DEV", "e1:00.0"),
         {
             shoc::device_capability::sync_event_pci,
             shoc::device_capability::comch_client
