@@ -49,6 +49,12 @@ namespace shoc::comch {
             std::uint32_t consumer_id
         ) -> coro::status_awaitable<>;
 
+    protected:
+        auto state_changed(
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void override;
+
     private:
         unique_handle<doca_comch_producer, doca_comch_producer_destroy> handle_;
     };

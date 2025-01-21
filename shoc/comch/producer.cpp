@@ -59,4 +59,13 @@ namespace shoc::comch {
 
         return result;
     }
+
+    auto producer::state_changed(
+        [[maybe_unused]] doca_ctx_states prev_state,
+        doca_ctx_states next_state
+    ) -> void {
+        if(next_state == DOCA_CTX_STATE_IDLE) {
+            handle_.reset(nullptr);
+        }
+    }
 }

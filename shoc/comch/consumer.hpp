@@ -50,6 +50,12 @@ namespace shoc::comch {
          */
         auto post_recv(buffer &dest) -> consumer_recv_awaitable;
 
+    protected:
+        auto state_changed(
+            doca_ctx_states prev_state,
+            doca_ctx_states next_state
+        ) -> void override;
+
     private:
         static auto post_recv_task_completion_callback(
             doca_comch_consumer_task_post_recv *task,
