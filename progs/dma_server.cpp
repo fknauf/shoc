@@ -1,3 +1,5 @@
+#include "env.hpp"
+
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/server.hpp>
@@ -114,16 +116,10 @@ auto main() -> int {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //shoc::logger->set_level(spdlog::level::debug);
 
+    auto env = bluefield_env_dpu{};
     auto engine = shoc::progress_engine{};
 
-    auto env_dev = std::getenv("DOCA_DEV_PCI");
-    auto env_rep = std::getenv("DOCA_DEV_REP_PCI");
-
-    dma_serve(
-        &engine,
-        env_dev ? env_dev : "03:00.0",
-        env_rep ? env_rep : "81:00.0"
-    );
+    dma_serve(&engine, env.dev_pci, env.rep_pci);
 
     engine.main_loop();
 }

@@ -1,3 +1,5 @@
+#include "env.hpp"
+
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/client.hpp>
@@ -136,16 +138,12 @@ auto main(int argc, char *argv[]) -> int {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //shoc::logger->set_level(spdlog::level::debug);
 
+    auto env = bluefield_env_host{};
     auto engine = shoc::progress_engine{};
 
     std::uint32_t parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
-    auto env_pci = std::getenv("DOCA_DEV_PCI");
 
-    dma_receive(
-        &engine,
-        env_pci ? env_pci : "81:00.0",
-        parallelism
-    );
+    dma_receive(&engine, env.dev_pci, parallelism);
 
     engine.main_loop();
 }

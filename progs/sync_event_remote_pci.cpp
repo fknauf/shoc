@@ -1,3 +1,5 @@
+#include "env.hpp"
+
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/client.hpp>
@@ -8,36 +10,29 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/sync_event.hpp>
 
-auto get_envvar(
-    char const *name,
-    std::string const &default_value
-) -> std::string {
-    auto envvar = std::getenv(name);
-    return envvar != nullptr ? envvar : default_value;
-}
-
 auto sync_event_remote(
-    shoc::progress_engine *engine
+    shoc::progress_engine *engine,
+    bluefield_env env
 ) -> shoc::coro::fiber {
     auto err = doca_error_t { DOCA_SUCCESS };
     auto msg = std::string{};
 
 #ifdef DOCA_ARCH_DPU
     auto dev = shoc::device::find_by_pci_addr(
-        get_envvar("DOCA_DEV", "03:00.0"),
+        env.dev_pci,
         { 
             shoc::device_capability::sync_event_pci,
             shoc::device_capability::comch_server
         }
     );
-    auto rep = shoc::device_representor::find_by_pci_addr(dev, "81:00.0");
+    auto rep = shoc::device_representor::find_by_pci_addr(dev, env.rep_pci);
 
     auto server = co_await engine->create_context<shoc::comch::server>("shoc-sync-event-test", dev, rep);
     auto conn = co_await server->accept();
     msg = co_await conn->msg_recv();
 #else
     auto dev = shoc::device::find_by_pci_addr(
-        get_envvar("DOCA_DEV", "e1:00.0"),
+        env.dev_pci,
         {
             shoc::device_capability::sync_event_pci,
             shoc::device_capability::comch_client
@@ -72,6 +67,7 @@ auto sync_event_remote(
 
 auto main() -> int {
     auto engine = shoc::progress_engine {};
-    sync_event_remote(&engine);
+    auto env = bluefield_env{};
+    sync_event_remote(&engine, env);
     engine.main_loop();
 }

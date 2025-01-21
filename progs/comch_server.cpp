@@ -1,3 +1,4 @@
+#include "env.hpp"
 
 #include "shoc/comch/server.hpp"
 #include "shoc/coro/fiber.hpp"
@@ -17,9 +18,13 @@ auto ping_pong(shoc::comch::scoped_server_connection con) -> shoc::coro::fiber {
     }
 }
 
-auto serve_ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
-    auto dev = shoc::device::find_by_pci_addr("03:00.0", shoc::device_capability::comch_server);
-    auto rep = shoc::device_representor::find_by_pci_addr ( dev, "81:00.0", DOCA_DEVINFO_REP_FILTER_NET );
+auto serve_ping_pong(
+    shoc::progress_engine *engine,
+    char const *dev_pci,
+    char const *rep_pci
+) -> shoc::coro::fiber {
+    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
+    auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
 
     auto server = co_await engine->create_context<shoc::comch::server>("shoc-test", dev, rep);
 
@@ -37,8 +42,9 @@ int main() {
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     shoc::logger->set_level(spdlog::level::info);
 
+    auto env = bluefield_env_dpu {};
     auto engine = shoc::progress_engine{};
-    serve_ping_pong(&engine);
+    serve_ping_pong(&engine, env.dev_pci, env.rep_pci);
 
     engine.main_loop();
 }

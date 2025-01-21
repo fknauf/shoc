@@ -1,3 +1,5 @@
+#include "env.hpp"
+
 #include "shoc/comch/client.hpp"
 #include "shoc/coro/fiber.hpp"
 #include "shoc/logger.hpp"
@@ -5,9 +7,9 @@
 
 #include <iostream>
 
-auto ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
+auto ping_pong(shoc::progress_engine *engine, char const *dev_pci) -> shoc::coro::fiber {
     // get device from PCIe address
-    auto dev = shoc::device::find_by_pci_addr("81:00.0", shoc::device_capability::comch_client);
+    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_client);
 
     // wait for connection to server, that is: create the context and ask the SDK to start
     // it, then suspend. The coroutine will be resumed by the state-changed handler when
@@ -33,10 +35,11 @@ int main() {
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     shoc::logger->set_level(spdlog::level::info);
 
+    auto env = bluefield_env_host{};
     auto engine = shoc::progress_engine {};
 
     // spawn coroutine. It will run up to the first co_await, then control returns to main.
-    ping_pong(&engine);
+    ping_pong(&engine, env.dev_pci);
 
     // start event processing loop. This will resume the suspended coroutine whenever an
     // event is processed that concerns it. By default the main loop runs until all

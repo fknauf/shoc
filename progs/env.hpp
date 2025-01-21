@@ -1,0 +1,40 @@
+#pragma once
+
+#include <doca_build_config.h>
+
+#include <string>
+#include <cstdlib>
+
+namespace {
+    char const *const DEFAULT_HOST_PCI = "e1:00.0";
+    char const *const DEFAULT_DPU_PCI = "03:00.0";
+}
+
+inline auto get_envvar_with_default(char const *name, char const *default_value) {
+    auto envvar = std::getenv(name);
+    return envvar ? envvar : default_value;
+}
+
+struct bluefield_env_host {
+    char const *dev_pci;
+
+    bluefield_env_host():
+        dev_pci { get_envvar_with_default("DOCA_DEV_PCI", DEFAULT_HOST_PCI) }
+    {}
+};
+
+struct bluefield_env_dpu {
+    char const *dev_pci;
+    char const *rep_pci;
+
+    bluefield_env_dpu():
+        dev_pci { get_envvar_with_default("DOCA_DEV_PCI", DEFAULT_DPU_PCI) },
+        rep_pci { get_envvar_with_default("DOCA_DEV_REP_PCI", DEFAULT_HOST_PCI) }
+    {}
+};
+
+#ifdef DOCA_ARCH_DPU
+using bluefield_env = bluefield_env_dpu;
+#else
+using bluefield_env = bluefield_env_host;
+#endif

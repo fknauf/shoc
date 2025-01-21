@@ -1,3 +1,5 @@
+#include "env.hpp"
+
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/client.hpp>
@@ -12,9 +14,10 @@
 
 auto rdma_exchange_connection_details(
     shoc::progress_engine *engine,
-    std::span<std::byte const> local_conn_details
+    std::span<std::byte const> local_conn_details,
+    char const *dev_pci
 ) -> shoc::coro::eager_task<std::string> {
-    auto dev = shoc::device::find_by_pci_addr("81:00.0", shoc::device_capability::comch_client);
+    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_client);
     auto client = co_await engine->create_context<shoc::comch::client>("shoc-rdma-oob-send-receive-test", dev);
     
     auto err = co_await client->send(local_conn_details);
@@ -27,14 +30,15 @@ auto rdma_exchange_connection_details(
 }
 
 auto rdma_send(
-    shoc::progress_engine *engine
+    shoc::progress_engine *engine,
+    char const *dev_pci
 ) -> shoc::coro::fiber {
-    auto dev = shoc::device::find_by_pci_addr("81:00.0", shoc::device_capability::rdma);
+    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
 
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
     auto conn = rdma->export_connection();
 
-    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, conn.details());
+    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, conn.details(), dev_pci);
     conn.connect(remote_conn_details);
 
     auto data = std::string { "Hello, bRainDMAged." };
@@ -53,9 +57,10 @@ auto main() -> int {
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     shoc::logger->set_level(spdlog::level::debug);
 
+    auto env = bluefield_env_host{};
     auto engine = shoc::progress_engine {};
 
-    rdma_send(&engine);
+    rdma_send(&engine, env.dev_pci);
 
     engine.main_loop();
 }
