@@ -23,7 +23,13 @@ namespace shoc {
     }
 
     auto context_base::stop() -> context_state_awaitable {
-        enforce_success(doca_ctx_stop(as_ctx()), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
+        auto ctx = as_ctx();
+
+        if(ctx != nullptr) {
+            enforce_success(doca_ctx_stop(ctx), { DOCA_SUCCESS, DOCA_ERROR_IN_PROGRESS });
+        } else {
+            logger->warn("trying to stop a context that's already stopped");
+        }
 
         return { shared_from_this(), DOCA_CTX_STATE_IDLE };
     }

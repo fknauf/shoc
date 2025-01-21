@@ -196,6 +196,12 @@ namespace shoc {
             return HandleAsCtx(handle());
         }
 
+        ~context() {
+            // underlying DOCA resoures should have been destroyed when the context was stopped.
+            // This always happens before the SHOC object is destroyed.
+            assert(handle_.get() == nullptr);
+        }
+
     protected:
         context(
             context_parent *parent,

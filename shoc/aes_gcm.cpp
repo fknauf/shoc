@@ -19,21 +19,47 @@ namespace shoc {
     }
 
     aes_gcm_key::aes_gcm_key(
-        aes_gcm_context const &parent,
+        aes_gcm_context *parent,
         std::span<std::byte const> key_data,
         doca_aes_gcm_key_type key_type
-    ) {
+    ):
+        parent_ { parent }
+    {
         doca_aes_gcm_key *key;
 
         enforce(expected_key_size(key_type) == key_data.size(), DOCA_ERROR_INVALID_VALUE);
 
         enforce_success(doca_aes_gcm_key_create(
-            parent.handle(),
+            parent->handle(),
             key_data.data(),
             key_type,
             &key
         ));
         handle_.reset(key);
+    }
+
+    aes_gcm_key::aes_gcm_key(aes_gcm_key &&other) noexcept {
+        *this = std::move(other);
+    }
+
+    aes_gcm_key &aes_gcm_key::operator=(aes_gcm_key &&other) noexcept {
+        handle_ = std::move(other.handle_);
+        parent_ = std::exchange(other.parent_, nullptr);
+        return *this;
+    }
+
+    aes_gcm_key::~aes_gcm_key() {
+        clear();
+    }
+
+    auto aes_gcm_key::clear() -> void {
+        if(handle_.get() != nullptr) {
+            handle_.reset(nullptr);
+
+            assert(parent_ != nullptr);
+            parent_->signal_key_destroyed();
+            parent_ = nullptr;
+        }
     }
 
     aes_gcm_context::aes_gcm_context(
@@ -60,6 +86,46 @@ namespace shoc {
             plain_status_callback<doca_aes_gcm_task_decrypt_as_task>,
             num_tasks
         ));
+    }
+
+    auto aes_gcm_context::load_key(
+        std::span<std::byte const> key_bytes,
+        doca_aes_gcm_key_type key_type
+    ) -> aes_gcm_key {
+        auto key = aes_gcm_key { this, key_bytes, key_type };
+        ++loaded_keys_;
+        return key;
+    }
+
+    auto aes_gcm_context::stop() -> context_state_awaitable {
+        stop_requested_ = true;
+        do_stop_if_able();
+        return context_state_awaitable { shared_from_this(), DOCA_CTX_STATE_IDLE };
+    }
+
+    auto aes_gcm_context::signal_key_destroyed() -> void {
+        assert(loaded_keys_ > 0);
+        --loaded_keys_;
+        if(stop_requested_) {
+            do_stop_if_able();
+        }
+    }
+
+    auto aes_gcm_context::do_stop_if_able() -> void {
+        if(loaded_keys_ > 0) {
+            return;
+        }
+
+        if(handle_.get() == nullptr) {
+            logger->warn("tried to double-stop aes-gcm context");
+            return;
+        }
+
+        auto err = doca_ctx_stop(as_ctx());
+
+        if(err != DOCA_SUCCESS && err != DOCA_ERROR_IN_PROGRESS) {
+            logger->error("unable to stop aes-gcm context even though all keys are destroyed");
+        }
     }
 
     auto aes_gcm_context::encrypt(

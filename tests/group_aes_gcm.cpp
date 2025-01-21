@@ -64,7 +64,7 @@ TEST(docapp_aes_gcm, single_shot) {
 
             auto raw_key = "abcdefghijklmnopqrstuvwxyz123456";
             auto key_bytes = std::span { reinterpret_cast<std::byte const *>(raw_key), 32 };
-            auto key = shoc::aes_gcm_key { *ctx, key_bytes, DOCA_AES_GCM_KEY_256 };
+            auto key = ctx->load_key(key_bytes, DOCA_AES_GCM_KEY_256);
     
             auto err = co_await ctx->encrypt(src_buf, encrypted_buf, key, iv, tag_size, aad_size);
 
