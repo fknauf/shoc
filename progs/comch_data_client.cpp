@@ -42,7 +42,8 @@ struct cache_aligned_storage {
 
 auto receive_blocks(
     shoc::progress_engine *engine,
-    char const *pci_addr
+    char const *pci_addr,
+    bool skip_verify
 ) -> shoc::coro::fiber {
     auto dev = shoc::device::find_by_pci_addr(pci_addr, shoc::device_capability::comch_client);
 
@@ -86,11 +87,13 @@ auto receive_blocks(
     json["data_rate_gibps"] = data_rate;
     json["data_error"] = false;
 
-    for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
-        if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
-            shoc::logger->error("Block {} contains unexpected data", i);
-            json["data_error"] = true;
-            break;
+    if(!skip_verify) {
+        for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
+            if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
+                shoc::logger->error("Block {} contains unexpected data", i);
+                json["data_error"] = true;
+                break;
+            }
         }
     }
 
@@ -98,12 +101,15 @@ auto receive_blocks(
 }
 
 int main() {
-    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    //shoc::logger->set_level(spdlog::level::warn);
+    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
     auto engine = shoc::progress_engine{};
 
-    receive_blocks(&engine, env.dev_pci);
+    auto env_skip_verify = getenv("SKIP_VERIFY");
+    auto skip_verify = env_skip_verify != nullptr && std::string(env_skip_verify) == "1";
+
+    receive_blocks(&engine, env.dev_pci, skip_verify);
     engine.main_loop();
 }
