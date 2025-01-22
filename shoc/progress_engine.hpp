@@ -61,7 +61,7 @@ namespace shoc {
     };
 
     struct progress_engine_config {
-        std::uint32_t immediate_submission_attempts = 16;
+        std::uint32_t immediate_submission_attempts = 64;
         std::uint32_t resubmission_attempts = 16;
         std::chrono::microseconds resubmission_interval = std::chrono::milliseconds(1);
     };

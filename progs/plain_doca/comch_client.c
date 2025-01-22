@@ -1,3 +1,5 @@
+#include "env.h"
+
 #include <doca_buf.h>
 #include <doca_buf_inventory.h>
 #include <doca_comch.h>
@@ -369,5 +371,5 @@ int main(void) {
         .recv_queue_size = 16
     };
 
-    client_ping_pong("81:00.0", &config);
+    client_ping_pong(env_device_pci_address(), &config);
 }

@@ -359,8 +359,6 @@ namespace shoc::comch {
 
         if(con != nullptr) {
             con->signal_expired_consumer(remote_consumer_id);
-        } else {
-            logger->error("comch server got new consumer on unknown/expired connection");
         }
     }
 

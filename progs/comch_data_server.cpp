@@ -94,8 +94,8 @@ auto serve(
 }
 
 int main() {
-    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    //shoc::logger->set_level(spdlog::level::warn);
+    //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu{};
 
