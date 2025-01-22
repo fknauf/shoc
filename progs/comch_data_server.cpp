@@ -59,11 +59,11 @@ auto send_blocks(
         co_return;
     }
 
-    auto consumer_id = co_await con->accept_consumer();
+    auto remote_consumer = co_await con->accept_consumer();
 
     for(auto i : std::ranges::views::iota(std::uint32_t{}, data.block_count)) {
         auto buffer = bufinv.buf_get_by_data(mmap, data.block(i));
-        auto status = co_await prod->send(buffer, {}, consumer_id);
+        auto status = co_await prod->send(buffer, {}, remote_consumer);
 
         if(status != DOCA_SUCCESS) {
             shoc::logger->error("producer failed to send buffer: {}", doca_error_get_descr(status));

@@ -198,6 +198,12 @@ namespace shoc::comch {
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint32_t remote_consumer_id
     ) -> void {
-        // TODO: design and implement logic for consumer expiry
+        auto client = client::resolve(comch_connection);
+
+        if(client != nullptr) {
+            client->remote_consumer_queues_.expire(remote_consumer_id);
+        } else {
+            logger->error("comch client got new consumer on unknown/expired connection");
+        }
     }
 }

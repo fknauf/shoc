@@ -136,7 +136,7 @@ namespace shoc::comch {
          *
          * @return an awaitable for a remote consumer id
          */
-        auto accept_consumer() -> id_awaitable;
+        auto accept_consumer() -> remote_consumer_awaitable;
 
         auto signal_stopped_child(context_base *stopped_child) -> void override;
 
@@ -148,6 +148,7 @@ namespace shoc::comch {
         auto signal_message(std::string_view msg) -> void;
         auto signal_disconnect() -> void;
         auto signal_new_consumer(std::uint32_t remote_consumer_id) -> void;
+        auto signal_expired_consumer(std::uint32_t remote_consumer_id) -> void;
 
         auto disconnect_if_able() -> void;
 
@@ -155,7 +156,7 @@ namespace shoc::comch {
         server *ctx_ = nullptr;
 
         accepter_queues<message> message_queues_;
-        accepter_queues<std::uint32_t> remote_consumer_queues_;
+        remote_consumer_queues remote_consumer_queues_;
 
         dependent_contexts<> active_children_;
         connection_state state_ = connection_state::CONNECTED;

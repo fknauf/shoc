@@ -27,8 +27,12 @@ namespace shoc::comch {
     auto producer::send(
         buffer buf,
         std::span<std::uint8_t> immediate_data,
-        std::uint32_t consumer_id
+        shared_remote_consumer const &destination
     ) -> coro::status_awaitable<> {
+        if(destination->expired()) {
+            return coro::status_awaitable<>::from_value(DOCA_ERROR_NOT_CONNECTED);
+        }
+
         doca_comch_producer_task_send *task = nullptr;
 
         auto result = coro::status_awaitable<>::create_space();
@@ -41,7 +45,7 @@ namespace shoc::comch {
             buf.handle(),
             immediate_data.data(),
             immediate_data.size(),
-            consumer_id,
+            destination->id(),
             &task
         ));
 

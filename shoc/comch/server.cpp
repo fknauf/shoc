@@ -27,12 +27,16 @@ namespace shoc::comch {
         }
     }
 
-    auto server_connection::accept_consumer() -> id_awaitable {
+    auto server_connection::accept_consumer() -> remote_consumer_awaitable {
         return remote_consumer_queues_.accept();
     }
 
     auto server_connection::signal_new_consumer(std::uint32_t consumer_id) -> void {
         remote_consumer_queues_.supply(consumer_id);
+    }
+
+    auto server_connection::signal_expired_consumer(std::uint32_t consumer_id) -> void {
+        remote_consumer_queues_.expire(consumer_id);
     }
 
     auto server_connection::send(std::span<std::byte const> message) -> coro::status_awaitable<> {
@@ -351,7 +355,13 @@ namespace shoc::comch {
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint32_t remote_consumer_id
     ) -> void {
-        // TODO: design and implement logic for consumer expiry
+        auto con = server::resolve_connection(comch_connection);
+
+        if(con != nullptr) {
+            con->signal_expired_consumer(remote_consumer_id);
+        } else {
+            logger->error("comch server got new consumer on unknown/expired connection");
+        }
     }
 
     auto server::resolve_server(doca_comch_connection *handle) -> server* {

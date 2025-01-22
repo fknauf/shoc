@@ -77,7 +77,7 @@ namespace shoc::comch {
          *
          * @param max_tasks maximum number of parallel in-flight tasks
          */
-        auto create_producer(std::uint32_t max_tasks){
+        auto create_producer(std::uint32_t max_tasks) {
             return active_children_.create_context<producer>(this, connection_handle(), max_tasks);
         }
 
@@ -86,7 +86,7 @@ namespace shoc::comch {
          *
          * @return awaitable to co_await a remote consumer id
          */
-        auto accept_consumer() -> id_awaitable {
+        auto accept_consumer() -> remote_consumer_awaitable {
             return remote_consumer_queues_.accept();
         }
 
@@ -135,7 +135,7 @@ namespace shoc::comch {
         connection_state state_ = connection_state::DISCONNECTED;
 
         accepter_queues<message> message_queues_;
-        accepter_queues<std::uint32_t> remote_consumer_queues_;
+        remote_consumer_queues remote_consumer_queues_;
 
         dependent_contexts<> active_children_;
     };

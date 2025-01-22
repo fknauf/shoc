@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "consumer.hpp"
 
 #include <shoc/buffer.hpp>
 #include <shoc/context.hpp>
@@ -43,7 +44,7 @@ namespace shoc::comch {
         auto send(
             buffer buf,
             std::span<std::uint8_t> immediate_data,
-            std::uint32_t consumer_id
+            shared_remote_consumer const &destination
         ) -> coro::status_awaitable<>;
     };
 }
