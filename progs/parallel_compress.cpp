@@ -5,6 +5,8 @@
 #include "shoc/memory_map.hpp"
 #include "shoc/progress_engine.hpp"
 
+#include <asio.hpp>
+
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
@@ -128,11 +130,12 @@ auto main(int argc, char *argv[]) -> int try {
     auto in  = std::ifstream(argv[1], std::ios::binary);
     auto out = argc < 2 ? std::ofstream{} : std::ofstream(argv[2], std::ios::binary);
 
-    auto engine = shoc::progress_engine{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
 
     compress_file(&engine, in, out);
 
-    engine.main_loop();
+    io.run();
 } catch(shoc::doca_exception &ex) {
     shoc::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
 }

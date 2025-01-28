@@ -4,6 +4,8 @@
 #include <fmt/format.h>
 #include <gtest/gtest.h>
 
+#include <asio.hpp>
+
 #include <chrono>
 #include <string>
 
@@ -48,7 +50,8 @@ namespace {
     } while(false)
 
 TEST(docapp_engine, yielding) {
-    auto engine = shoc::progress_engine {};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     auto report1 = std::string { "not started" };
     auto report2 = std::string { "not started" };
 
@@ -114,7 +117,7 @@ TEST(docapp_engine, yielding) {
         &report2
     );
 
-    engine.main_loop();
+    io.run();
 
     EXPECT_TRUE(counters[0].finished());
     EXPECT_TRUE(counters[1].finished());
@@ -129,7 +132,8 @@ TEST(docapp_engine, yielding) {
 TEST(docapp_engine, timeouts) {
     using namespace std::chrono_literals;
 
-    auto engine = shoc::progress_engine {};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     auto report1 = std::string { "not started" };
     auto report2 = std::string { "not started" };
 
@@ -210,7 +214,7 @@ TEST(docapp_engine, timeouts) {
         &report2
     );
 
-    engine.main_loop();
+    io.run();
 
     EXPECT_TRUE(counters[0].finished());
     EXPECT_TRUE(counters[1].finished());

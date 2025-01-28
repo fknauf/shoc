@@ -11,6 +11,8 @@
 #include <spdlog/fmt/bin_to_hex.h>
 #include <nlohmann/json.hpp>
 
+#include <asio.hpp>
+
 #include <iostream>
 #include <ranges>
 #include <span>
@@ -139,11 +141,12 @@ auto main(int argc, char *argv[]) -> int {
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto engine = shoc::progress_engine{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
 
     std::uint32_t parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
 
     dma_receive(&engine, env.dev_pci, parallelism);
 
-    engine.main_loop();
+    io.run();
 }

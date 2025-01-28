@@ -6,8 +6,19 @@ set -e
 
 apt-get update
 apt-get -y upgrade
-apt-get -y install libspdlog-dev g++-12 libgtest-dev nlohmann-json3-dev jq gawk 
+apt-get -y install g++-12 jq gawk curl zip unzip
+
+cd "$(dirname "$0")"
+
+if [ ! -e ~/.vcpkg/vcpkg.path.txt ]; then
+    if [ ! -e /doca_devel/vcpkg ]; then
+        git clone https://github.com/microsoft/vcpkg.git /doca_devel/vcpkg
+        /doca_devel/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+    fi
+    /doca_devel/vcpkg/vcpkg integrate install
+fi
 
 CC=gcc-12 CXX=g++-12 meson setup --buildtype=release bench
+
 cd bench
 ninja

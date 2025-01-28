@@ -7,6 +7,8 @@
 
 #include <doca_ctx.h>
 
+#include <asio/awaitable.hpp>
+
 #include <algorithm>
 #include <concepts>
 #include <coroutine>
@@ -44,12 +46,14 @@ namespace shoc {
      *
      * See C++20 coroutine docs for the meaning of the member functions.
      */
-    class [[nodiscard]] context_state_awaitable {
+    class [[nodiscard]] context_state_awaitable:
+        public asio::awaitable<void>
+    {
     public:
         context_state_awaitable(std::shared_ptr<context_base> ctx, doca_ctx_states desired_state):
             ctx_(std::move(ctx)), desired_state_(desired_state)
         {
-            logger->trace("context_state_awaitable ctx = {}, desired_state = {}", static_cast<void*>(ctx_.get()), desired_state_);
+            logger->trace("context_state_awaitable ctx = {}, desired_state = {}", static_cast<void*>(ctx_.get()), static_cast<int>(desired_state_));
         }
 
         auto await_ready() const noexcept -> bool;
@@ -347,7 +351,9 @@ namespace shoc {
      * but will return a scoped wrapper around the new context.
      */
     template<std::derived_from<context_base> ConcreteContext>
-    class create_context_awaitable {
+    class create_context_awaitable:
+        public asio::awaitable<shared_scoped_context<ConcreteContext>>
+    {
     public:
         create_context_awaitable(std::shared_ptr<ConcreteContext> ctx, context_state_awaitable start_awaitable):
             ctx_ { std::move(ctx) }, start_awaitable_ { std::move(start_awaitable) }

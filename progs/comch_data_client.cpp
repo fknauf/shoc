@@ -11,6 +11,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <asio.hpp>
+
 #include <iostream>
 #include <sstream>
 #include <string_view>
@@ -105,11 +107,13 @@ int main() {
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto engine = shoc::progress_engine{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
 
     auto env_skip_verify = getenv("SKIP_VERIFY");
     auto skip_verify = env_skip_verify != nullptr && std::string(env_skip_verify) == "1";
 
     receive_blocks(&engine, env.dev_pci, skip_verify);
-    engine.main_loop();
+
+    io.run();
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "asio_descriptor.hpp"
 #include "common/status.hpp"
 #include "context.hpp"
 #include "coro/fiber.hpp"
@@ -10,6 +11,14 @@
 #include "unique_handle.hpp"
 
 #include <doca_pe.h>
+
+#include <asio/awaitable.hpp>
+#include <asio/any_io_executor.hpp>
+#include <asio/posix/descriptor.hpp>
+#include <asio/steady_timer.hpp>
+#include <asio/strand.hpp>
+#include <asio/use_awaitable.hpp>
+#include <system_error>
 
 #include <chrono>
 #include <concepts>
@@ -23,43 +32,6 @@
 #include <vector>
 
 namespace shoc {
-    namespace detail {
-        struct coro_timeout {
-            duration_timer timer;
-            std::coroutine_handle<> waiter;
-        };
-    }
-
-    class yield_awaitable:
-        public std::suspend_always
-    {
-    public:
-        yield_awaitable(progress_engine *engine):
-            engine_ { engine }
-        {}
-
-        auto await_suspend(std::coroutine_handle<> yielder) const -> void;
-
-    private:
-        progress_engine *engine_;
-    };
-
-    class timeout_awaitable:
-        public std::suspend_always
-    {
-    public:
-        timeout_awaitable(progress_engine *engine, std::chrono::microseconds delay):
-            engine_ { engine },
-            delay_ { delay }
-        {}
-
-        auto await_suspend(std::coroutine_handle<> waiter) const -> void;
-
-    private:
-        progress_engine *engine_;
-        std::chrono::microseconds delay_;
-    };
-
     struct progress_engine_config {
         std::uint32_t immediate_submission_attempts = 64;
         std::uint32_t resubmission_attempts = 16;
@@ -83,11 +55,25 @@ namespace shoc {
         public context_parent
     {
     public:
-        friend class yield_awaitable;
-        friend class timeout_awaitable;
+        using executor_type = asio::any_io_executor;
 
-        progress_engine(progress_engine_config cfg = {});
+        progress_engine(
+            asio::io_context &io,
+            progress_engine_config cfg = {}
+        ):
+            progress_engine{ io.get_executor(), cfg }
+        {}
+
+        progress_engine(
+            executor_type executor,
+            progress_engine_config cfg = {}
+        );
+
         ~progress_engine();
+
+        auto &strand() const {
+            return strand_;
+        }
 
         auto stop() -> void;
 
@@ -103,17 +89,6 @@ namespace shoc {
             return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
         }
 
-        /**
-         * Main event-handling loop: Wait for events and process them until there are no more
-         * active dependent contexts.
-         */
-        auto main_loop() -> void;
-
-        /**
-         * Main event-handling loop with a custom loop condition.
-         */
-        auto main_loop_while(std::function<bool()> condition) -> void;
-
         auto connect(context_base *ctx) -> void;
         auto signal_stopped_child(context_base *ctx) -> void override;
 
@@ -123,13 +98,14 @@ namespace shoc {
         }
 
         [[nodiscard]]
-        auto yield() {
-            return yield_awaitable { this };
+        auto timeout(std::chrono::microseconds delay) {
+            auto timer = asio::steady_timer(strand_, delay);
+            return timer.async_wait(asio::use_awaitable);
         }
 
         [[nodiscard]]
-        auto timeout(std::chrono::microseconds delay) {
-            return timeout_awaitable { this, delay };
+        auto yield() {
+            return timeout(std::chrono::microseconds(0));
         }
 
         auto submit_task(
@@ -141,27 +117,24 @@ namespace shoc {
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
         auto request_notification() const -> void;
         auto clear_notification() const -> void;
-        auto wait(int timeout_ms = -1) const -> int;
 
-        auto push_yielding_coroutine(std::coroutine_handle<> yielder) -> void;
-        auto push_waiting_coroutine(std::coroutine_handle<> waiter, std::chrono::microseconds delay) -> void;
+        auto renew_trigger() -> void;
+        auto process_trigger(std::error_code ec) -> void;
 
-        auto process_trigger(int trigger_fd) -> void;
         auto delayed_resubmission(
             doca_task *task,
             coro::error_receptable *reportee,
             std::uint32_t attempts,
             std::chrono::microseconds delay
-        ) -> coro::fiber;
+        ) -> asio::awaitable<void>;
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
         progress_engine_config cfg_;
 
-        event_counter yield_counter_;
-        std::queue<std::coroutine_handle<>> pending_yielders_;
-        std::unordered_map<int, detail::coro_timeout> timeout_waiters_;
-        epoll_handle epoll_;
         dependent_contexts<context_base> connected_contexts_;
+
+        asio::strand<executor_type> strand_;
+        asio_descriptor<> notify_backend_;
     };
 
     namespace detail {

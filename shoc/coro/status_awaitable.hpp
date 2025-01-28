@@ -5,6 +5,8 @@
 #include <shoc/common/overload.hpp>
 #include <shoc/error.hpp>
 
+#include <asio/awaitable.hpp>
+
 #include <concepts>
 #include <coroutine>
 #include <memory>
@@ -118,7 +120,8 @@ namespace shoc::coro {
      * to use.
      */
     template<typename AdditionalData = void>
-    class [[nodiscard]] status_awaitable {
+    class [[nodiscard]] status_awaitable:
+        public asio::awaitable<doca_error_t> {
     public:
         using payload_type = status_receptable<AdditionalData>;
 

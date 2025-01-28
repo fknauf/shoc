@@ -8,6 +8,8 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/rdma.hpp>
 
+#include <asio.hpp>
+
 #include <iostream>
 #include <string_view>
 #include <vector>
@@ -58,9 +60,10 @@ auto main() -> int {
     shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto engine = shoc::progress_engine {};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
 
     rdma_send(&engine, env.dev_pci);
 
-    engine.main_loop();
+    io.run();
 }

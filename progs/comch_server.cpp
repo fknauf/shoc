@@ -5,6 +5,8 @@
 #include "shoc/coro/task.hpp"
 #include "shoc/progress_engine.hpp"
 
+#include <asio.hpp>
+
 #include <iostream>
 #include <string_view>
 
@@ -43,8 +45,9 @@ int main() {
     shoc::logger->set_level(spdlog::level::info);
 
     auto env = bluefield_env_dpu {};
-    auto engine = shoc::progress_engine{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     serve_ping_pong(&engine, env.dev_pci, env.rep_pci);
 
-    engine.main_loop();
+    io.run();
 }

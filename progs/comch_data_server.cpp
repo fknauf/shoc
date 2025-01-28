@@ -9,6 +9,8 @@
 #include <shoc/memory_map.hpp>
 #include <shoc/progress_engine.hpp>
 
+#include <asio.hpp>
+
 #include <iostream>
 #include <memory>
 #include <ranges>
@@ -98,8 +100,8 @@ int main() {
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu{};
-
-    auto engine = shoc::progress_engine{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     serve(&engine, env.dev_pci, env.rep_pci);
-    engine.main_loop();
+    io.run();
 }

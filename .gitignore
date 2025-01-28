@@ -6,3 +6,7 @@ asan
 bench
 json
 results
+vcpkg_installed
+venv-conan
+dependencies
+foo

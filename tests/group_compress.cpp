@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include <asio.hpp>
+
 #include <ranges>
 #include <string>
 #include <vector>
@@ -23,7 +25,8 @@
 #define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_compress, single_shot) {
-    auto engine = shoc::progress_engine {};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     auto report = std::string { "fiber not started" };
 
     [](
@@ -73,7 +76,7 @@ TEST(docapp_compress, single_shot) {
         &report
     );
 
-    engine.main_loop();
+    io.run();
 
     ASSERT_EQ("", report);
 }

@@ -10,13 +10,7 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/sync_event.hpp>
 
-auto get_envvar(
-    char const *name,
-    std::string const &default_value
-) -> std::string {
-    auto envvar = std::getenv(name);
-    return envvar != nullptr ? envvar : default_value;
-}
+#include <asio.hpp>
 
 auto sync_event_local(
     shoc::progress_engine *engine,
@@ -78,7 +72,8 @@ auto sync_event_local(
 
 auto main() -> int {
     auto env = bluefield_env{};
-    auto engine = shoc::progress_engine {};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     sync_event_local(&engine, env);
-    engine.main_loop();
+    io.run();
 }

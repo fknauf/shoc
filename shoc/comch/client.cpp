@@ -42,7 +42,7 @@ namespace shoc::comch {
 
     client::~client() {
         if(doca_state() != DOCA_CTX_STATE_IDLE) {
-            logger->error("client not idle upon destruction, state = {}", doca_state());
+            logger->error("client not idle upon destruction, state = {}", static_cast<int>(doca_state()));
         }
     }
 

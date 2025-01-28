@@ -10,6 +10,8 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/sync_event.hpp>
 
+#include <asio.hpp>
+
 auto sync_event_remote(
     shoc::progress_engine *engine,
     bluefield_env env
@@ -66,8 +68,9 @@ auto sync_event_remote(
 }
 
 auto main() -> int {
-    auto engine = shoc::progress_engine {};
     auto env = bluefield_env{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
     sync_event_remote(&engine, env);
-    engine.main_loop();
+    io.run();
 }

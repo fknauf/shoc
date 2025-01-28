@@ -3,6 +3,9 @@
 #include "error.hpp"
 #include "logger.hpp"
 
+#include <asio/co_spawn.hpp>
+#include <asio/detached.hpp>
+
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include <unistd.h>
@@ -13,31 +16,51 @@
 #include <thread>
 
 namespace shoc {
-    progress_engine::progress_engine(progress_engine_config cfg):
-        cfg_ { std::move(cfg) }
+    progress_engine::progress_engine(
+        executor_type executor,
+        progress_engine_config cfg
+    ):
+        cfg_ { std::move(cfg) },
+        strand_ { std::move(executor) },
+        notify_backend_ { strand_ }
     {
         doca_pe *pe;
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
-        epoll_.add_event_source(notification_handle());
-        epoll_.add_event_source(yield_counter_.eventfd());
+
+        notify_backend_.assign(notification_handle());
+        renew_trigger();
     }
 
     progress_engine::~progress_engine() {
-        logger->debug("~pe: {} contexts still running, stopping them.", connected_contexts_.size());
+        notify_backend_.cancel();
 
-        connected_contexts_.stop_all();
+        if(!connected_contexts_.empty()) {
+            logger->error("attempted to destroy progress engine while attached contexts are still running");
+            logger->debug("~pe: {} contexts still running, attempting to stop.", connected_contexts_.size());
 
-        logger->debug("~pe: Waiting for contexts to stop...");
+            clear_notification();
+            connected_contexts_.stop_all();
+            while(doca_pe_progress(handle()) > 0) {
+                // do nothing.
+            }
 
-        while(!connected_contexts_.empty()) {
-            auto trigger_fd = wait(10);
-            process_trigger(trigger_fd);
+            logger->debug("~pe: {} contexts still running, giving up.", connected_contexts_.size());
 
-            logger->debug("~pe: {} contexts still running.", connected_contexts_.size());
+            // we could wait for pending DOCA events, but if a context is kept alive
+            // by a fiber waiting for a different event that'll lead to deadlocks.
+            // If we give up control of the 
+
+            // epoll_handle epoll_;
+            // epoll_.add_event_source(notification_handle());
+            // do {
+            //     request_notification();
+            //     auto trigger_fd = epoll_.wait(10);
+            //     process_trigger(std::errc::success);
+            // } while(!connected_contexts_.empty());
+        } else {
+            logger->debug("~pe: all contexts stopped.");
         }
-
-        logger->debug("~pe: all contexts stopped.");
     }
 
     auto progress_engine::notification_handle() const -> doca_event_handle_t {
@@ -70,77 +93,30 @@ namespace shoc {
         connected_contexts_.remove_stopped_context(ctx);
     }
 
-    auto progress_engine::wait(int timeout_ms) const -> int {
+    auto progress_engine::renew_trigger() -> void {
         request_notification();
-        auto trigger = epoll_.wait(timeout_ms);
-        clear_notification();
-        return trigger;
+
+        notify_backend_.async_wait(
+            asio::posix::descriptor::wait_read,
+            [this](std::error_code ec) {
+                process_trigger(ec);
+            }
+        );
     }
 
-    auto progress_engine::process_trigger(int trigger_fd) -> void {
-        auto timer_it = timeout_waiters_.find(trigger_fd);
-
-        // timers take priority to ensure timely execution (as much as
-        // possible, i.e. no guarantees but reasonable effort)
-        if(timer_it != timeout_waiters_.end()) {
-            auto waiter = timer_it->second.waiter;
-            timeout_waiters_.erase(timer_it);
-            waiter.resume();
-            return;
+    auto progress_engine::process_trigger(std::error_code ec) -> void {
+        if(ec) {
+            logger->error("unexpected system error in DOCA event handle: {}", ec.message());
         }
 
+        clear_notification();
         while(doca_pe_progress(handle()) > 0) {
             // do nothing; progress() calls the event handlers.
         }
 
-        // yielders do not take priority.
-        if(trigger_fd == yield_counter_.eventfd()) {
-            auto triggers_left = yield_counter_.pop();
-
-            while(triggers_left > 0 && !pending_yielders_.empty()) {
-                auto coro = pending_yielders_.front();
-                pending_yielders_.pop();
-                coro.resume();
-                --triggers_left;
-            }
+        if(!connected_contexts_.empty()) {
+            renew_trigger();
         }
-    }
-
-    auto progress_engine::main_loop() -> void {
-        main_loop_while([this] {
-            return
-                !connected_contexts_.empty() ||
-                !timeout_waiters_.empty() ||
-                !pending_yielders_.empty();
-        });
-    }
-
-    auto progress_engine::main_loop_while(std::function<bool()> condition) -> void {
-        while(condition()) {
-            auto trigger = wait();
-            process_trigger(trigger);
-        }
-    }
-
-    auto progress_engine::push_yielding_coroutine(std::coroutine_handle<> yielder) -> void {
-        pending_yielders_.push(yielder);
-        yield_counter_.increase();
-    }
-
-    auto progress_engine::push_waiting_coroutine(std::coroutine_handle<> waiter, std::chrono::microseconds delay) -> void {
-        auto new_timer = duration_timer { delay };
-        auto fd = new_timer.timerfd();
-
-        timeout_waiters_.insert(std::make_pair(fd, detail::coro_timeout { std::move(new_timer), waiter }));
-        epoll_.add_event_source(fd);
-    }
-
-    auto yield_awaitable::await_suspend(std::coroutine_handle<> yielder) const -> void {
-        engine_->push_yielding_coroutine(yielder);
-    }
-
-    auto timeout_awaitable::await_suspend(std::coroutine_handle<> waiter) const -> void {
-        engine_->push_waiting_coroutine(waiter, delay_);
     }
 
     auto progress_engine::submit_task(
@@ -156,7 +132,7 @@ namespace shoc {
         } while(err == DOCA_ERROR_AGAIN && attempts <= cfg_.immediate_submission_attempts);
         
         if(err == DOCA_ERROR_AGAIN) {
-            delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval);
+            asio::co_spawn(strand(), delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval), asio::detached);
         } else if(err != DOCA_SUCCESS) {
             doca_task_free(task);
             reportee->set_error(err);
@@ -168,7 +144,7 @@ namespace shoc {
         coro::error_receptable *reportee,
         std::uint32_t attempts,
         std::chrono::microseconds interval
-    ) -> coro::fiber {
+    ) -> asio::awaitable<void> {
         doca_error_t err;
 
         do {

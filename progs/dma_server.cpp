@@ -10,6 +10,8 @@
 
 #include <spdlog/fmt/bin_to_hex.h>
 
+#include <asio.hpp>
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -117,9 +119,10 @@ auto main() -> int {
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu{};
-    auto engine = shoc::progress_engine{};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine{ io };
 
     dma_serve(&engine, env.dev_pci, env.rep_pci);
 
-    engine.main_loop();
+    io.run();
 }
