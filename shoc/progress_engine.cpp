@@ -3,8 +3,9 @@
 #include "error.hpp"
 #include "logger.hpp"
 
-#include <asio/co_spawn.hpp>
-#include <asio/detached.hpp>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/cobalt/detached.hpp>
 
 #include <fcntl.h>
 #include <sys/epoll.h>
@@ -17,19 +18,18 @@
 
 namespace shoc {
     progress_engine::progress_engine(
-        executor_type executor,
-        progress_engine_config cfg
+        progress_engine_config cfg,
+        boost::cobalt::executor executor
     ):
         cfg_ { std::move(cfg) },
-        strand_ { std::move(executor) },
-        notify_backend_ { strand_ }
+        executor_ { std::move(executor) },
+        notify_backend_ { executor_ }
     {
         doca_pe *pe;
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
 
         notify_backend_.assign(notification_handle());
-        renew_trigger();
     }
 
     progress_engine::~progress_engine() {
@@ -93,34 +93,20 @@ namespace shoc {
         connected_contexts_.remove_stopped_context(ctx);
     }
 
-    auto progress_engine::renew_trigger() -> void {
-        request_notification();
-
-        notify_backend_.async_wait(
-            asio::posix::descriptor::wait_read,
-            [this](std::error_code ec) {
-                process_trigger(ec);
+    auto progress_engine::run() -> boost::cobalt::promise<void> try {
+        while(!connected_contexts_.empty()) {
+            request_notification();
+            co_await notify_backend_.async_wait(
+                boost::asio::posix::descriptor::wait_read,
+                boost::cobalt::use_op
+            );
+            clear_notification();
+            while(doca_pe_progress(handle()) > 0) {
+                // do nothing; progress() calls the event handlers.
             }
-        );
-    }
-
-    auto progress_engine::process_trigger(std::error_code ec) -> void {
-        if(ec) {
-            logger->error("unexpected system error in DOCA event handle: {}", ec.message());
         }
-
-        clear_notification();
-        while(doca_pe_progress(handle()) > 0) {
-            // do nothing; progress() calls the event handlers.
-        }
-
-        if(!connected_contexts_.empty()) {
-            renew_trigger();
-        }
-    }
-
-    auto progress_engine::spawn(asio::awaitable<void> fiber) -> void {
-        asio::co_spawn(strand_, std::move(fiber), asio::detached); 
+    } catch(boost::system::system_error &ex) {
+        logger->error("unexpected system error in DOCA event handle: {}", ex.code().message());
     }
 
     auto progress_engine::submit_task(
@@ -136,7 +122,7 @@ namespace shoc {
         } while(err == DOCA_ERROR_AGAIN && attempts <= cfg_.immediate_submission_attempts);
         
         if(err == DOCA_ERROR_AGAIN) {
-            asio::co_spawn(strand(), delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval), asio::detached);
+            delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval);
         } else if(err != DOCA_SUCCESS) {
             doca_task_free(task);
             reportee->set_error(err);
@@ -148,11 +134,15 @@ namespace shoc {
         coro::error_receptable *reportee,
         std::uint32_t attempts,
         std::chrono::microseconds interval
-    ) -> asio::awaitable<void> {
+    ) -> boost::cobalt::detached {
         doca_error_t err;
 
+        using steady_timer = boost::cobalt::use_op_t::as_default_on_t<boost::asio::steady_timer>;
+        auto timer = steady_timer(executor_);
+
         do {
-            co_await timeout(interval);
+            timer.expires_after(interval);
+            co_await timer.async_wait();
             err = doca_task_submit(task);
             --attempts;
         } while(err == DOCA_ERROR_AGAIN && attempts > 0);

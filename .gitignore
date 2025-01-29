@@ -10,3 +10,4 @@ vcpkg_installed
 venv-conan
 dependencies
 foo
+out

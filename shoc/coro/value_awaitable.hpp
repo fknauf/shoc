@@ -6,8 +6,6 @@
 #include <shoc/error.hpp>
 #include <shoc/logger.hpp>
 
-#include <asio/awaitable.hpp>
-
 #include <cassert>
 #include <coroutine>
 #include <memory>
@@ -109,8 +107,7 @@ namespace shoc::coro {
      * the first of them.
      */
     template<typename T>
-    class [[nodiscard]] value_awaitable:
-        public asio::awaitable<T>
+    class [[nodiscard]] value_awaitable
     {
     public:
         using payload_type = value_receptable<T>;

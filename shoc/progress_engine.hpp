@@ -12,12 +12,9 @@
 
 #include <doca_pe.h>
 
-#include <asio/awaitable.hpp>
-#include <asio/any_io_executor.hpp>
-#include <asio/posix/descriptor.hpp>
-#include <asio/steady_timer.hpp>
-#include <asio/strand.hpp>
-#include <asio/use_awaitable.hpp>
+#include <boost/asio/post.hpp>
+#include <boost/cobalt/promise.hpp>
+#include <boost/cobalt/this_thread.hpp>
 #include <system_error>
 
 #include <chrono>
@@ -55,25 +52,11 @@ namespace shoc {
         public context_parent
     {
     public:
-        using executor_type = asio::any_io_executor;
-
         progress_engine(
-            asio::io_context &io,
-            progress_engine_config cfg = {}
-        ):
-            progress_engine{ io.get_executor(), cfg }
-        {}
-
-        progress_engine(
-            executor_type executor,
-            progress_engine_config cfg = {}
+            progress_engine_config cfg = {},
+            boost::cobalt::executor executor = boost::cobalt::this_thread::get_executor()
         );
-
         ~progress_engine();
-
-        auto &strand() const {
-            return strand_;
-        }
 
         auto stop() -> void;
 
@@ -98,14 +81,8 @@ namespace shoc {
         }
 
         [[nodiscard]]
-        auto timeout(std::chrono::microseconds delay) {
-            auto timer = asio::steady_timer(strand_, delay);
-            return timer.async_wait(asio::use_awaitable);
-        }
-
-        [[nodiscard]]
         auto yield() {
-            return timeout(std::chrono::microseconds(0));
+            return boost::asio::post(boost::cobalt::use_op);
         }
 
         auto submit_task(
@@ -113,30 +90,25 @@ namespace shoc {
             coro::error_receptable *reportee
         ) -> void;
 
-        auto spawn(asio::awaitable<void> fiber) -> void;
+        auto run() -> boost::cobalt::promise<void>;
 
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
         auto request_notification() const -> void;
         auto clear_notification() const -> void;
 
-        auto renew_trigger() -> void;
-        auto process_trigger(std::error_code ec) -> void;
-
         auto delayed_resubmission(
             doca_task *task,
             coro::error_receptable *reportee,
             std::uint32_t attempts,
             std::chrono::microseconds delay
-        ) -> asio::awaitable<void>;
+        ) -> boost::cobalt::detached;
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
         progress_engine_config cfg_;
-
+        boost::cobalt::executor executor_;
+        asio_descriptor<boost::cobalt::executor> notify_backend_;
         dependent_contexts<context_base> connected_contexts_;
-
-        asio::strand<executor_type> strand_;
-        asio_descriptor<> notify_backend_;
     };
 
     namespace detail {

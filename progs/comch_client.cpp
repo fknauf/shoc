@@ -5,14 +5,14 @@
 #include "shoc/logger.hpp"
 #include "shoc/progress_engine.hpp"
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <iostream>
 
 auto ping_pong(
     shoc::progress_engine *engine,
     char const *dev_pci
-) -> asio::awaitable<void> {
+) -> boost::cobalt::detached {
     // get device from PCIe address
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_client);
 
@@ -36,19 +36,19 @@ auto ping_pong(
     // is stopped, co_await client->stop() is possible.
 }
 
-int main() {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main
+{
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     shoc::logger->set_level(spdlog::level::info);
 
     auto env = bluefield_env_host{};
-    auto io = asio::io_context { };
-    auto engine = shoc::progress_engine { io };
+    auto engine = shoc::progress_engine { };
 
     // spawn coroutine. It will run up to the first co_await, then control returns to main.
-    engine.spawn(ping_pong(&engine, env.dev_pci));
-
-    // start event processing loop. This will resume the suspended coroutine whenever an
-    // event is processed that concerns it. By default the main loop runs until all
-    // dependent contexts are stopped.
-    io.run();
+    ping_pong(&engine, env.dev_pci);
+    
+    co_await engine.run();
 }

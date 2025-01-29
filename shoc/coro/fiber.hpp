@@ -1,7 +1,7 @@
 #pragma once
 
-#include <asio/awaitable.hpp>
+#include <boost/cobalt/detached.hpp>
 
 namespace shoc::coro {
-    using fiber = asio::awaitable<void>;
+    using fiber = boost::cobalt::detached;
 }

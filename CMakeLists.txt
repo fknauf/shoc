@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_COMPILER g++-12)
 set(CMAKE_CC_COMPILER gcc-12)
 
-add_compile_options(-Wall -Wextra -Werror)
+add_compile_options(-Wall -Wextra -Werror -Wno-mismatched-new-delete)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(
@@ -23,7 +23,7 @@ pkg_check_modules(
 file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
 include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
 
-find_package(asio REQUIRED)
+find_package(Boost CONFIG REQUIRED COMPONENTS cobalt)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest REQUIRED)
@@ -59,21 +59,11 @@ add_library(
 target_link_libraries(
     shoc 
     PUBLIC
-    asio::asio
+    Boost::cobalt
     spdlog::spdlog
     fmt::fmt
     ${DOCA_LIBRARIES}
 )
-
-function(add_shoc_example_program)
-    add_executable(${ARGV})
-    target_link_libraries(${ARGV1} shoc)
-endfunction()
-
-function(add_plain_doca_program)
-    add_executable(${ARGV})
-    target_link_libraries(${ARGV1} ${DOCA_LIBRARIES})
-endfunction()
 
 add_executable(comch_client progs/comch_client.cpp)
 target_link_libraries(comch_client shoc)
@@ -172,5 +162,6 @@ target_link_libraries(doca_dma_client ${DOCA_LIBRARIES})
 
 add_executable(bug-comch-consumer-start-lost-server bug-reports/comch-consumer-start-lost/server.c)
 target_link_libraries(bug-comch-consumer-start-lost-server ${DOCA_LIBRARIES})
+
 add_executable(bug-comch-consumer-start-lost-client bug-reports/comch-consumer-start-lost/client.c)
 target_link_libraries(bug-comch-consumer-start-lost-client ${DOCA_LIBRARIES})
