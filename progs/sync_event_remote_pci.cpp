@@ -10,12 +10,12 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/sync_event.hpp>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 auto sync_event_remote(
     shoc::progress_engine *engine,
     bluefield_env env
-) -> shoc::coro::fiber {
+) -> boost::cobalt::detached {
     auto err = doca_error_t { DOCA_SUCCESS };
     auto msg = std::string{};
 
@@ -67,12 +67,14 @@ auto sync_event_remote(
     }
 }
 
-auto main() -> int {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     auto env = bluefield_env{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{};
 
-    engine.spawn(sync_event_remote(&engine, env));
+    sync_event_remote(&engine, env);
 
-    io.run();
+    co_await engine.run();
 }

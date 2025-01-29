@@ -9,7 +9,7 @@
 #include <shoc/memory_map.hpp>
 #include <shoc/progress_engine.hpp>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <iostream>
 #include <memory>
@@ -52,7 +52,7 @@ auto send_blocks(
     data_descriptor &data,
     shoc::memory_map &mmap,
     shoc::buffer_inventory &bufinv
-) -> asio::awaitable<void> {
+) -> boost::cobalt::detached {
     auto prod = co_await con->create_producer(16);
     auto send_status = co_await con->send(fmt::format("{} {}", data.block_count, data.block_size));
 
@@ -95,13 +95,17 @@ auto serve(
     }
 }
 
-int main() {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
-    engine.spawn(serve(&engine, env.dev_pci, env.rep_pci));
-    io.run();
+    auto engine = shoc::progress_engine{};
+    
+    serve(&engine, env.dev_pci, env.rep_pci);
+    
+    co_await engine.run();
 }

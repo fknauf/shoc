@@ -11,7 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -46,7 +46,7 @@ auto receive_blocks(
     shoc::progress_engine *engine,
     char const *pci_addr,
     bool skip_verify
-) -> asio::awaitable<void> {
+) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(pci_addr, shoc::device_capability::comch_client);
 
     auto client = co_await engine->create_context<shoc::comch::client>("shoc-data-test", dev);
@@ -102,18 +102,20 @@ auto receive_blocks(
     std::cout << json.dump(4) << std::endl;
 }
 
-int main() {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{};
 
     auto env_skip_verify = getenv("SKIP_VERIFY");
     auto skip_verify = env_skip_verify != nullptr && std::string(env_skip_verify) == "1";
 
-    engine.spawn(receive_blocks(&engine, env.dev_pci, skip_verify));
+    receive_blocks(&engine, env.dev_pci, skip_verify);
 
-    io.run();
+    co_await engine.run();
 }

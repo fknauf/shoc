@@ -8,7 +8,7 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/rdma.hpp>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <iostream>
 #include <string_view>
@@ -18,7 +18,7 @@ auto rdma_exchange_connection_details(
     shoc::progress_engine *engine,
     std::span<std::byte const> local_conn_details,
     char const *dev_pci
-) -> asio::awaitable<std::string> {
+) -> boost::cobalt::promise<std::string> {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_client);
     auto client = co_await engine->create_context<shoc::comch::client>("shoc-rdma-oob-send-receive-test", dev);
     
@@ -34,7 +34,7 @@ auto rdma_exchange_connection_details(
 auto rdma_send(
     shoc::progress_engine *engine,
     char const *dev_pci
-) -> shoc::coro::fiber {
+) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
 
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
@@ -55,15 +55,17 @@ auto rdma_send(
     }
 }
 
-auto main() -> int {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{};
 
-    engine.spawn(rdma_send(&engine, env.dev_pci));
+    rdma_send(&engine, env.dev_pci);
 
-    io.run();
+    co_await engine.run();
 }

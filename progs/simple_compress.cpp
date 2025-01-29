@@ -5,7 +5,7 @@
 #include "shoc/memory_map.hpp"
 #include "shoc/progress_engine.hpp"
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <algorithm>
 #include <fstream>
@@ -37,7 +37,7 @@ auto compress_file(
     shoc::progress_engine *engine,
     std::istream &in,
     std::ostream &out
-) -> shoc::coro::fiber
+) -> boost::cobalt::detached
 {
     std::uint32_t batches;
     std::uint32_t batchsize;
@@ -76,7 +76,7 @@ auto compress_file(
         auto status = co_await compress->compress(src, dst, &checksums);
 
         shoc::logger->debug("compress_chunk complete: {}, status = {}, crc = {}, adler = {}",
-                            i, status, checksums.crc, checksums.adler);
+                            i, static_cast<int>(status), checksums.crc, checksums.adler);
 
         dst_ranges[i] = dst.data();
     }
@@ -109,23 +109,25 @@ auto compress_file(
     }
 }
 
-auto main(int argc, char *argv[]) -> int try {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main try {
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     shoc::logger->set_level(spdlog::level::warn);
 
     if(argc < 2) {
         std::cerr << "Usage: " << argv[0] << " INFILE [OUTFILE]\n";
-        return -1;
+        co_return -1;
     }
 
     auto in = std::ifstream(argv[1], std::ios::binary);
     auto out = argc < 3 ? std::ofstream{} : std::ofstream(argv[2], std::ios::binary);
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{};
 
-    engine.spawn(compress_file(&engine, in, out));
+    compress_file(&engine, in, out);
 
-    io.run();
+    co_await engine.run();
 } catch(shoc::doca_exception &ex) {
-    shoc::logger->error("ecode = {}, message = {}", ex.doca_error(), ex.what());
+    shoc::logger->error("ecode = {}, message = {}", static_cast<int>(ex.doca_error()), ex.what());
 }

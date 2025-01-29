@@ -10,7 +10,7 @@
 
 #include <spdlog/fmt/bin_to_hex.h>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <algorithm>
 #include <iomanip>
@@ -74,7 +74,7 @@ auto handle_connection(
     shoc::device &dev,
     test_data const &data,
     shoc::comch::scoped_server_connection conn
-) -> shoc::coro::fiber {
+) -> boost::cobalt::detached {
     auto local_mmap = shoc::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_ONLY };
     auto export_desc = local_mmap.export_pci(dev);
 
@@ -99,7 +99,7 @@ auto dma_serve(
     shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> shoc::coro::fiber {
+) -> boost::cobalt::detached {
     auto data = test_data { 256, 1 << 20 };
     auto dev = shoc::device::find_by_pci_addr(dev_pci, { shoc::device_capability::dma, shoc::device_capability::comch_server });
     auto rep = shoc::device_representor::find_by_pci_addr ( dev, rep_pci );
@@ -114,15 +114,17 @@ auto dma_serve(
     }
 }
 
-auto main() -> int {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{};
 
-    engine.spawn(dma_serve(&engine, env.dev_pci, env.rep_pci));
+    dma_serve(&engine, env.dev_pci, env.rep_pci);
 
-    io.run();
+    co_await engine.run();
 }

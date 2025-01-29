@@ -5,7 +5,7 @@
 #include "shoc/coro/task.hpp"
 #include "shoc/progress_engine.hpp"
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <iostream>
 #include <string_view>
@@ -14,7 +14,7 @@ auto serve_ping_pong(
     shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> asio::awaitable<void> {
+) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr ( dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET );
 
@@ -31,15 +31,17 @@ auto serve_ping_pong(
     }
 }
 
-int main() {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
     shoc::logger->set_level(spdlog::level::info);
 
     auto env = bluefield_env_dpu{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{};
 
-    engine.spawn(serve_ping_pong(&engine, env.dev_pci, env.rep_pci));
+    serve_ping_pong(&engine, env.dev_pci, env.rep_pci);
 
-    io.run();
+    co_await engine.run();
 }

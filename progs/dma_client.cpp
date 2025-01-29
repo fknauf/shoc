@@ -11,7 +11,7 @@
 #include <spdlog/fmt/bin_to_hex.h>
 #include <nlohmann/json.hpp>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <iostream>
 #include <ranges>
@@ -52,7 +52,7 @@ auto dma_receive(
     shoc::progress_engine *engine,
     char const *pci_addr,
     std::uint32_t parallelism
-) -> shoc::coro::fiber {
+) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(
         pci_addr,
         {
@@ -136,17 +136,19 @@ auto dma_receive(
     std::cout << json.dump(4) << std::endl;
 }
 
-auto main(int argc, char *argv[]) -> int {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
+    auto engine = shoc::progress_engine{ };
 
     std::uint32_t parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
 
-    engine.spawn(dma_receive(&engine, env.dev_pci, parallelism));
+    dma_receive(&engine, env.dev_pci, parallelism);
 
-    io.run();
+    co_await engine.run();
 }
