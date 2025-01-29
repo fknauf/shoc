@@ -77,7 +77,7 @@ auto main() -> int {
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
 
-    rdma_receive(&engine, env.dev_pci, env.rep_pci);
+    engine.spawn(rdma_receive(&engine, env.dev_pci, env.rep_pci));
 
     io.run();
 }

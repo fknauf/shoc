@@ -113,6 +113,8 @@ namespace shoc {
             coro::error_receptable *reportee
         ) -> void;
 
+        auto spawn(asio::awaitable<void> fiber) -> void;
+
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
         auto request_notification() const -> void;

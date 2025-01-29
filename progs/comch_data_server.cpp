@@ -52,7 +52,7 @@ auto send_blocks(
     data_descriptor &data,
     shoc::memory_map &mmap,
     shoc::buffer_inventory &bufinv
-) -> shoc::coro::fiber {
+) -> asio::awaitable<void> {
     auto prod = co_await con->create_producer(16);
     auto send_status = co_await con->send(fmt::format("{} {}", data.block_count, data.block_size));
 
@@ -102,6 +102,6 @@ int main() {
     auto env = bluefield_env_dpu{};
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
-    serve(&engine, env.dev_pci, env.rep_pci);
+    engine.spawn(serve(&engine, env.dev_pci, env.rep_pci));
     io.run();
 }

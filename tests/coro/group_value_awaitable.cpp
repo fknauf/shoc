@@ -1,16 +1,26 @@
 #include <shoc/coro/fiber.hpp>
 #include <shoc/coro/value_awaitable.hpp>
 
+#include <asio/asio.hpp>
 #include <gtest/gtest.h>
 
+
 namespace {
-    auto do_wait(shoc::coro::value_awaitable<int> &awaitable, int expected, bool *checkpoint) -> shoc::coro::fiber {
+    auto do_wait(
+        shoc::coro::value_awaitable<int> &awaitable,
+        int expected,
+        bool *checkpoint
+    ) -> asio::awaitable<void> {
         auto x = co_await awaitable;
         EXPECT_EQ(x, expected);
         *checkpoint = true;
     }
 
-    auto do_wait_for_error(shoc::coro::value_awaitable<int> &awaitable, doca_error_t expected, bool *checkpoint) -> shoc::coro::fiber {
+    auto do_wait_for_error(
+        shoc::coro::value_awaitable<int> &awaitable,
+        doca_error_t expected,
+        bool *checkpoint
+    ) -> asio::awaitable<void> {
         try {
             co_await awaitable;
         } catch(shoc::doca_exception &e) {
@@ -24,16 +34,13 @@ TEST(docapp_coro_value_awaitable, plain_value_precomputed) {
     auto awaitable = shoc::coro::value_awaitable<int>::from_value(42);
     bool checkpoint = false;
 
-    do_wait(awaitable, 42, &checkpoint);
-
     ASSERT_TRUE(checkpoint);
 }
 
 TEST(docapp_coro_value_awaitable, plain_value_suspended) {
+    auto io = asio::io_context { 1}
     auto awaitable = shoc::coro::value_awaitable<int>::create_space();
     bool checkpoint = false;
-
-    do_wait(awaitable, 42, &checkpoint);
 
     ASSERT_FALSE(checkpoint);
 

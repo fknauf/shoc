@@ -18,7 +18,7 @@ auto rdma_exchange_connection_details(
     shoc::progress_engine *engine,
     std::span<std::byte const> local_conn_details,
     char const *dev_pci
-) -> shoc::coro::eager_task<std::string> {
+) -> asio::awaitable<std::string> {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_client);
     auto client = co_await engine->create_context<shoc::comch::client>("shoc-rdma-oob-send-receive-test", dev);
     
@@ -63,7 +63,7 @@ auto main() -> int {
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
 
-    rdma_send(&engine, env.dev_pci);
+    engine.spawn(rdma_send(&engine, env.dev_pci));
 
     io.run();
 }

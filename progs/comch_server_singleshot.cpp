@@ -14,7 +14,7 @@ auto serve_ping_pong(
     shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> shoc::coro::fiber {
+) -> asio::awaitable<void> {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr ( dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET );
 
@@ -39,7 +39,7 @@ int main() {
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
 
-    serve_ping_pong(&engine, env.dev_pci, env.rep_pci);
+    engine.spawn(serve_ping_pong(&engine, env.dev_pci, env.rep_pci));
 
     io.run();
 }

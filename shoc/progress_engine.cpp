@@ -119,6 +119,10 @@ namespace shoc {
         }
     }
 
+    auto progress_engine::spawn(asio::awaitable<void> fiber) -> void {
+        asio::co_spawn(strand_, std::move(fiber), asio::detached); 
+    }
+
     auto progress_engine::submit_task(
         doca_task *task,
         coro::error_receptable *reportee

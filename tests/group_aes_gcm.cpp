@@ -23,15 +23,16 @@
 #define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_aes_gcm, single_shot) {
-    auto engine = shoc::progress_engine {};
+    auto io = asio::io_context{};
+    auto engine = shoc::progress_engine { io };
     auto report = std::string { "fiber not started" };
 
     shoc::logger->set_level(spdlog::level::info);
 
-    [](
+    engine.spawn([](
         shoc::progress_engine *engine,
         std::string *report
-    ) -> shoc::coro::fiber {
+    ) -> asio::awaitable<void> {
         try {
             *report = "";
 
@@ -91,9 +92,9 @@ TEST(docapp_aes_gcm, single_shot) {
     } (
         &engine,
         &report
-    );
+    ));
 
-    engine.main_loop();
+    io.run();
 
     ASSERT_EQ("", report);
 }

@@ -47,7 +47,8 @@ int main() {
     auto env = bluefield_env_dpu {};
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
-    serve_ping_pong(&engine, env.dev_pci, env.rep_pci);
+    
+    engine.spawn(serve_ping_pong(&engine, env.dev_pci, env.rep_pci));
 
     io.run();
 }

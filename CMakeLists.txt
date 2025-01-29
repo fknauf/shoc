@@ -26,6 +26,7 @@ include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
 find_package(asio REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(GTest REQUIRED)
 
 add_definitions(${DOCA_CFLAGS} -DDOCA_ALLOW_EXPERIMENTAL_API)
 include_directories(. ${DOCA_INCLUDE_DIRS})
@@ -64,5 +65,112 @@ target_link_libraries(
     ${DOCA_LIBRARIES}
 )
 
+function(add_shoc_example_program)
+    add_executable(${ARGV})
+    target_link_libraries(${ARGV1} shoc)
+endfunction()
+
+function(add_plain_doca_program)
+    add_executable(${ARGV})
+    target_link_libraries(${ARGV1} ${DOCA_LIBRARIES})
+endfunction()
+
 add_executable(comch_client progs/comch_client.cpp)
 target_link_libraries(comch_client shoc)
+
+add_executable(comch_server progs/comch_server.cpp)
+target_link_libraries(comch_server shoc)
+
+add_executable(comch_server_singleshot progs/comch_server_singleshot.cpp)
+target_link_libraries(comch_server_singleshot shoc)
+
+add_executable(comch_data_client progs/comch_data_client.cpp)
+target_link_libraries(comch_data_client shoc)
+
+add_executable(comch_data_server progs/comch_data_server.cpp)
+target_link_libraries(comch_data_server shoc)
+
+add_executable(simple_compress progs/simple_compress.cpp)
+target_link_libraries(simple_compress shoc)
+
+add_executable(parallel_compress progs/parallel_compress.cpp)
+target_link_libraries(parallel_compress shoc)
+
+add_executable(dma_client progs/dma_client.cpp)
+target_link_libraries(dma_client shoc)
+
+add_executable(dma_server progs/dma_server.cpp)
+target_link_libraries(dma_server shoc)
+
+add_executable(rdma_dpu_receive progs/rdma_dpu_receive.cpp)
+target_link_libraries(rdma_dpu_receive shoc)
+
+add_executable(rdma_host_send progs/rdma_host_send.cpp)
+target_link_libraries(rdma_host_send shoc)
+
+add_executable(sync_event_local_pci progs/sync_event_local_pci.cpp)
+target_link_libraries(sync_event_local_pci shoc)
+
+add_executable(sync_event_remote_pci progs/sync_event_remote_pci.cpp)
+target_link_libraries(sync_event_remote_pci shoc)
+
+add_executable(generate_testdata tools/generate_testdata.cpp)
+
+add_executable(test-shoc
+    #tests/coro/group_task.cpp
+    #tests/coro/group_value_awaitable.cpp
+    # keep commented until we have a crypto-enabled bluefield
+    # 'tests/group_aes_gcm.cpp',
+    tests/group_compress.cpp
+    tests/group_dma.cpp
+    tests/group_engine.cpp
+    tests/group_event_sources.cpp)
+target_link_libraries(test-shoc shoc GTest::gtest GTest::gtest_main)
+
+add_executable(doca_simple_compress progs/plain_doca/simple_compress.c)
+target_link_libraries(doca_simple_compress ${DOCA_LIBRARIES})
+
+add_executable(doca_parallel_compress progs/plain_doca/parallel_compress.c)
+target_link_libraries(doca_parallel_compress ${DOCA_LIBRARIES})
+
+add_executable(doca_comch_server progs/plain_doca/comch_server.c)
+target_link_libraries(doca_comch_server ${DOCA_LIBRARIES})
+
+add_executable(doca_comch_client progs/plain_doca/comch_client.c)
+target_link_libraries(doca_comch_client ${DOCA_LIBRARIES})
+
+add_executable(doca_comch_data_server
+    progs/plain_doca/comch_data_server/connection.c
+    progs/plain_doca/comch_data_server/main.c
+    progs/plain_doca/comch_data_server/memory.c
+    progs/plain_doca/comch_data_server/server.c
+)
+target_link_libraries(doca_comch_data_server ${DOCA_LIBRARIES})
+
+add_executable(doca_comch_data_client
+    progs/plain_doca/comch_data_client/client.c
+    progs/plain_doca/comch_data_client/consumer.c
+    progs/plain_doca/comch_data_client/main.c
+    progs/plain_doca/comch_data_client/memory.c
+)
+target_link_libraries(doca_comch_data_client ${DOCA_LIBRARIES})
+
+add_executable(doca_dma_server
+    progs/plain_doca/dma_server/main.c
+    progs/plain_doca/dma_server/memory.c
+    progs/plain_doca/dma_server/server.c
+)
+target_link_libraries(doca_dma_server ${DOCA_LIBRARIES})
+
+add_executable(doca_dma_client
+    progs/plain_doca/dma_client/comch.c
+    progs/plain_doca/dma_client/common.c
+    progs/plain_doca/dma_client/dma.c
+    progs/plain_doca/dma_client/main.c
+)
+target_link_libraries(doca_dma_client ${DOCA_LIBRARIES})
+
+add_executable(bug-comch-consumer-start-lost-server bug-reports/comch-consumer-start-lost/server.c)
+target_link_libraries(bug-comch-consumer-start-lost-server ${DOCA_LIBRARIES})
+add_executable(bug-comch-consumer-start-lost-client bug-reports/comch-consumer-start-lost/client.c)
+target_link_libraries(bug-comch-consumer-start-lost-client ${DOCA_LIBRARIES})

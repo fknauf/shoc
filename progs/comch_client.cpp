@@ -45,7 +45,7 @@ int main() {
     auto engine = shoc::progress_engine { io };
 
     // spawn coroutine. It will run up to the first co_await, then control returns to main.
-    asio::co_spawn(engine.strand(), ping_pong(&engine, env.dev_pci), asio::detached);
+    engine.spawn(ping_pong(&engine, env.dev_pci));
 
     // start event processing loop. This will resume the suspended coroutine whenever an
     // event is processed that concerns it. By default the main loop runs until all

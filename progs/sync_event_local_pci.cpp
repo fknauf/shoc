@@ -74,6 +74,8 @@ auto main() -> int {
     auto env = bluefield_env{};
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
-    sync_event_local(&engine, env);
+    
+    engine.spawn(sync_event_local(&engine, env));
+    
     io.run();
 }

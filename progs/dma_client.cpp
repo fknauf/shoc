@@ -146,7 +146,7 @@ auto main(int argc, char *argv[]) -> int {
 
     std::uint32_t parallelism = argc < 2 ? 1 : std::atoi(argv[1]);
 
-    dma_receive(&engine, env.dev_pci, parallelism);
+    engine.spawn(dma_receive(&engine, env.dev_pci, parallelism));
 
     io.run();
 }

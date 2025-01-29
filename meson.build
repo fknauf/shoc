@@ -3,6 +3,12 @@ project('doca_sample', [ 'c', 'cpp' ],
     meson_version: '>= 0.61.2'
 )
 
+fs = import('fs')
+vcpkg_dir = fs.read(fs.expanduser('~/.vcpkg/vcpkg.path.txt'))
+vcpkg = find_program('vcpkg', dirs: [ vcpkg_dir ], required: true)
+run_command(vcpkg, 'install', '--x-wait-for-lock', '--x-manifest-root=' + meson.current_source_dir())
+vcpkg_installed_dir = meson.current_source_dir() + '/vcpkg_installed'
+
 SAMPLE_NAME = 'doca-cpp-eventbased'
 
 add_project_arguments('-D DOCA_ALLOW_EXPERIMENTAL_API', language: ['c', 'cpp'])
@@ -11,12 +17,14 @@ add_project_arguments('-D _POSIX_C_SOURCE=200809L', language: ['c'])
 add_project_arguments('-fcoroutines', language: ['cpp'])
 
 deps = [
+    dependency('asio'),
     dependency('doca-aes-gcm'),
     dependency('doca-common'),
     dependency('doca-compress'),
     dependency('doca-comch'),
     dependency('doca-dma'),
     dependency('doca-rdma'),
+    dependency('fmt'),
     dependency('spdlog')
 ]
 

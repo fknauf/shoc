@@ -46,7 +46,7 @@ auto receive_blocks(
     shoc::progress_engine *engine,
     char const *pci_addr,
     bool skip_verify
-) -> shoc::coro::fiber {
+) -> asio::awaitable<void> {
     auto dev = shoc::device::find_by_pci_addr(pci_addr, shoc::device_capability::comch_client);
 
     auto client = co_await engine->create_context<shoc::comch::client>("shoc-data-test", dev);
@@ -113,7 +113,7 @@ int main() {
     auto env_skip_verify = getenv("SKIP_VERIFY");
     auto skip_verify = env_skip_verify != nullptr && std::string(env_skip_verify) == "1";
 
-    receive_blocks(&engine, env.dev_pci, skip_verify);
+    engine.spawn(receive_blocks(&engine, env.dev_pci, skip_verify));
 
     io.run();
 }

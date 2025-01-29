@@ -29,10 +29,10 @@ TEST(docapp_compress, single_shot) {
     auto engine = shoc::progress_engine{ io };
     auto report = std::string { "fiber not started" };
 
-    [](
+    engine.spawn([](
         shoc::progress_engine *engine,
         std::string *report
-    ) -> shoc::coro::fiber {
+    ) -> asio::awaitable<void> {
         try {
             *report = "";
 
@@ -74,7 +74,7 @@ TEST(docapp_compress, single_shot) {
     } (
         &engine,
         &report
-    );
+    ));
 
     io.run();
 

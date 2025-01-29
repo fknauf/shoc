@@ -123,7 +123,7 @@ auto main(int argc, char *argv[]) -> int try {
     auto io = asio::io_context{};
     auto engine = shoc::progress_engine{ io };
 
-    compress_file(&engine, in, out);
+    engine.spawn(compress_file(&engine, in, out));
 
     io.run();
 } catch(shoc::doca_exception &ex) {

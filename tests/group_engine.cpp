@@ -57,11 +57,11 @@ TEST(docapp_engine, yielding) {
 
     fiber_counters counters[2];
 
-    [](
+    engine.spawn([](
         shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> shoc::coro::fiber {
+    ) -> asio::awaitable<void> {
         try {
             *report = "";
 
@@ -85,9 +85,9 @@ TEST(docapp_engine, yielding) {
         &engine,
         counters,
         &report1
-    );
+    ));
 
-    [](
+    engine.spawn([](
         shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
@@ -115,7 +115,7 @@ TEST(docapp_engine, yielding) {
         &engine,
         counters,
         &report2
-    );
+    ));
 
     io.run();
 
@@ -139,11 +139,11 @@ TEST(docapp_engine, timeouts) {
 
     fiber_counters counters[2];
 
-    [](
+    engine.spawn([](
         shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> shoc::coro::fiber {
+    ) -> asio::awaitable<void> {
         try {
             *report = "";
 
@@ -175,9 +175,9 @@ TEST(docapp_engine, timeouts) {
         &engine,
         counters,
         &report1
-    );
+    ));
 
-    [](
+    engine.spawn([](
         shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
@@ -212,7 +212,7 @@ TEST(docapp_engine, timeouts) {
         &engine,
         counters,
         &report2
-    );
+    ));
 
     io.run();
 
