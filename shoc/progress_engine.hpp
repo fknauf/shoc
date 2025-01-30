@@ -11,7 +11,7 @@
 
 #include <boost/asio/post.hpp>
 #include <boost/cobalt/detached.hpp>
-#include <boost/cobalt/promise.hpp>
+#include <boost/cobalt/task.hpp>
 #include <boost/cobalt/this_thread.hpp>
 #include <system_error>
 
@@ -51,8 +51,7 @@ namespace shoc {
     {
     public:
         progress_engine(
-            progress_engine_config cfg = {},
-            boost::cobalt::executor executor = boost::cobalt::this_thread::get_executor()
+            progress_engine_config cfg = {}
         );
         ~progress_engine();
 
@@ -88,7 +87,9 @@ namespace shoc {
             coro::error_receptable *reportee
         ) -> void;
 
-        auto run() -> boost::cobalt::promise<void>;
+        auto run(
+            boost::cobalt::executor executor = boost::cobalt::this_thread::get_executor()
+        ) -> boost::cobalt::task<void>;
 
     private:
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
@@ -104,8 +105,6 @@ namespace shoc {
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
         progress_engine_config cfg_;
-        boost::cobalt::executor executor_;
-        asio_descriptor<boost::cobalt::executor> notify_backend_;
         dependent_contexts<context_base> connected_contexts_;
     };
 

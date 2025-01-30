@@ -26,7 +26,7 @@
 TEST(docapp_aes_gcm, single_shot) {
     auto report = std::string { "fiber not started" };
 
-    shoc::logger->set_level(spdlog::level::info);
+    shoc::logger->set_level(spdlog::level::warn);
 
     auto fiber_fn = [](
         shoc::progress_engine *engine,

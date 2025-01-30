@@ -22,7 +22,7 @@ auto serve_ping_pong(
     shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> boost::cobalt::detached {
+) -> boost::cobalt::detached try {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
 
@@ -36,6 +36,11 @@ auto serve_ping_pong(
         // connection are processed by the engine.
         ping_pong(std::move(con));
     }
+} catch(shoc::doca_exception &ex) {
+    // We get DOCA_ERROR_NOT_CONNECTED from server->accept() if we're sent SIGINT or SIGTERM.
+    //if(ex.doca_error() != DOCA_ERROR_NOT_CONNECTED) {
+        shoc::logger->info("ping/pong server closed: {}", ex.what());
+    //}
 }
 
 auto co_main(

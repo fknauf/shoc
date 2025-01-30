@@ -3,9 +3,12 @@
 #include "error.hpp"
 #include "logger.hpp"
 
+#include <boost/asio/as_tuple.hpp>
 #include <boost/asio/co_spawn.hpp>
+#include <boost/asio/error.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/cobalt/detached.hpp>
+#include <boost/cobalt/run.hpp>
 
 #include <fcntl.h>
 #include <sys/epoll.h>
@@ -18,23 +21,16 @@
 
 namespace shoc {
     progress_engine::progress_engine(
-        progress_engine_config cfg,
-        boost::cobalt::executor executor
+        progress_engine_config cfg
     ):
-        cfg_ { std::move(cfg) },
-        executor_ { std::move(executor) },
-        notify_backend_ { executor_ }
+        cfg_ { std::move(cfg) }
     {
         doca_pe *pe;
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
-
-        notify_backend_.assign(notification_handle());
     }
 
     progress_engine::~progress_engine() {
-        notify_backend_.cancel();
-
         if(!connected_contexts_.empty()) {
             logger->error("attempted to destroy progress engine while attached contexts are still running");
             logger->debug("~pe: {} contexts still running, attempting to stop.", connected_contexts_.size());
@@ -45,19 +41,7 @@ namespace shoc {
                 // do nothing.
             }
 
-            logger->debug("~pe: {} contexts still running, giving up.", connected_contexts_.size());
-
-            // we could wait for pending DOCA events, but if a context is kept alive
-            // by a fiber waiting for a different event that'll lead to deadlocks.
-            // If we give up control of the 
-
-            // epoll_handle epoll_;
-            // epoll_.add_event_source(notification_handle());
-            // do {
-            //     request_notification();
-            //     auto trigger_fd = epoll_.wait(10);
-            //     process_trigger(std::errc::success);
-            // } while(!connected_contexts_.empty());
+            logger->debug("~pe: {} contexts still running.", connected_contexts_.size());
         } else {
             logger->debug("~pe: all contexts stopped.");
         }
@@ -93,20 +77,31 @@ namespace shoc {
         connected_contexts_.remove_stopped_context(ctx);
     }
 
-    auto progress_engine::run() -> boost::cobalt::promise<void> try {
+    auto progress_engine::run(
+        boost::cobalt::executor executor
+    ) -> boost::cobalt::task<void> {        
+        auto notifier = asio_descriptor<boost::cobalt::executor> { std::move(executor), notification_handle() };
+
         while(!connected_contexts_.empty()) {
             request_notification();
-            co_await notify_backend_.async_wait(
+            auto [ ec ] = co_await notifier.async_wait(
                 boost::asio::posix::descriptor::wait_read,
-                boost::cobalt::use_op
+                boost::asio::as_tuple(boost::cobalt::use_op)
             );
             clear_notification();
+
             while(doca_pe_progress(handle()) > 0) {
-                // do nothing; progress() calls the event handlers.
+                // do nothing; doca_pe_progress calls the event handlers.
+            }
+
+            if(ec == boost::asio::error::operation_aborted) {
+                connected_contexts_.stop_all();
+                while(doca_pe_progress(handle()) > 0) { }
+            } else if(ec) {
+                logger->error("unexpected system error in DOCA event handle: {}", ec.message());
+                co_return;
             }
         }
-    } catch(boost::system::system_error &ex) {
-        logger->error("unexpected system error in DOCA event handle: {}", ex.code().message());
     }
 
     auto progress_engine::submit_task(
@@ -135,10 +130,11 @@ namespace shoc {
         std::uint32_t attempts,
         std::chrono::microseconds interval
     ) -> boost::cobalt::detached {
-        doca_error_t err;
-
         using steady_timer = boost::cobalt::use_op_t::as_default_on_t<boost::asio::steady_timer>;
-        auto timer = steady_timer(executor_);
+
+        doca_error_t err;
+        auto executor = co_await boost::cobalt::this_coro::executor;        
+        auto timer = steady_timer(std::move(executor));
 
         do {
             timer.expires_after(interval);
