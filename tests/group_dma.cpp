@@ -1,6 +1,5 @@
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
-#include <shoc/coro/fiber.hpp>
 #include <shoc/device.hpp>
 #include <shoc/dma.hpp>
 #include <shoc/memory_map.hpp>
@@ -8,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <ranges>
 #include <string>
@@ -25,14 +24,12 @@
 #define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_dma, local_copy) {
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
     auto report = std::string { "fiber not started" };
 
-    engine.spawn([](
+    auto fiber_fn = [](
         shoc::progress_engine *engine,
         std::string *report
-    ) -> asio::awaitable<void> {
+    ) -> boost::cobalt::detached {
         try {
             *report = "";
 
@@ -68,12 +65,21 @@ TEST(docapp_dma, local_copy) {
         } catch(...) {
             CO_FAIL("unknown error");
         }
-    } (
-        &engine,
-        &report
-    ));
+    };
 
-    io.run();
+    auto task = [](
+        auto &fiber_fn,
+        std::string *report
+    ) -> boost::cobalt::task<void> {
+        auto engine = shoc::progress_engine{};
+        fiber_fn(&engine, report);
+        co_await engine.run();
+    } (
+        fiber_fn,
+        &report
+    );
+
+    boost::cobalt::run(std::move(task));
 
     ASSERT_EQ("", report);
 }

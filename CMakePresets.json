@@ -12,6 +12,13 @@
             "cacheVariables": {
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release"
             }
+        },
+        {
+            "name": "bench",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
         }
     ],
     "buildPresets": [
@@ -24,6 +31,10 @@
             "name": "release",
             "configurePreset": "default",
             "configuration": "Release"
+        },
+        {
+            "name": "bench",
+            "configurePreset": "bench"
         }
     ]
 }

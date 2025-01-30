@@ -4,7 +4,6 @@
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/client.hpp>
 #include <shoc/comch/consumer.hpp>
-#include <shoc/coro/fiber.hpp>
 #include <shoc/logger.hpp>
 #include <shoc/memory_map.hpp>
 #include <shoc/progress_engine.hpp>

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_COMPILER g++-12)
 set(CMAKE_CC_COMPILER gcc-12)
 
-add_compile_options(-Wall -Wextra -Werror -Wno-mismatched-new-delete)
+add_compile_options(-Wall -Wextra -Werror $<$<COMPILE_LANGUAGE:CXX>:-Wno-mismatched-new-delete>)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(
@@ -47,8 +47,6 @@ add_library(
     shoc/context.cpp
     shoc/device.cpp
     shoc/dma.cpp
-    shoc/epoll_handle.cpp
-    shoc/event_sources.cpp
     shoc/logger.cpp
     shoc/memory_map.cpp
     shoc/progress_engine.cpp
@@ -107,14 +105,12 @@ target_link_libraries(sync_event_remote_pci shoc)
 add_executable(generate_testdata tools/generate_testdata.cpp)
 
 add_executable(test-shoc
-    #tests/coro/group_task.cpp
-    #tests/coro/group_value_awaitable.cpp
-    # keep commented until we have a crypto-enabled bluefield
-    # 'tests/group_aes_gcm.cpp',
+    tests/coro/group_value_awaitable.cpp
+    tests/group_aes_gcm.cpp
     tests/group_compress.cpp
     tests/group_dma.cpp
     tests/group_engine.cpp
-    tests/group_event_sources.cpp)
+)
 target_link_libraries(test-shoc shoc GTest::gtest GTest::gtest_main)
 
 add_executable(doca_simple_compress progs/plain_doca/simple_compress.c)

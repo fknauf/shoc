@@ -1,12 +1,13 @@
 #include <shoc/aes_gcm.hpp>
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
-#include <shoc/coro/fiber.hpp>
 #include <shoc/device.hpp>
 #include <shoc/memory_map.hpp>
 #include <shoc/progress_engine.hpp>
 
 #include <gtest/gtest.h>
+
+#include <boost/cobalt.hpp>
 
 #include <ranges>
 #include <string>
@@ -23,16 +24,14 @@
 #define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_aes_gcm, single_shot) {
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine { io };
     auto report = std::string { "fiber not started" };
 
     shoc::logger->set_level(spdlog::level::info);
 
-    engine.spawn([](
+    auto fiber_fn = [](
         shoc::progress_engine *engine,
         std::string *report
-    ) -> asio::awaitable<void> {
+    ) -> boost::cobalt::detached {
         try {
             *report = "";
 
@@ -84,17 +83,33 @@ TEST(docapp_aes_gcm, single_shot) {
 
             CO_ASSERT_EQ(DOCA_SUCCESS, err, std::string { "decryption failed: " } + doca_error_get_descr(err));
             CO_ASSERT(std::ranges::equal(src_data, decrypted_buf.data()), "decrypted data are different from source data");
+        } catch(shoc::doca_exception &e) {
+            if(e.doca_error() == DOCA_ERROR_NOT_FOUND) {
+                // crypto-disabled bluefield
+                co_return;
+            }
         } catch(std::exception &ex) {
             CO_FAIL(ex.what());
         } catch(...) {
             CO_FAIL("unknown error");
         }
-    } (
-        &engine,
-        &report
-    ));
+    };
 
-    io.run();
+    auto task = [](
+        auto fiber_fn,
+        std::string *report
+    ) -> boost::cobalt::task<void> {
+        auto engine = shoc::progress_engine{};
+
+        fiber_fn(&engine, report);
+
+        co_await engine.run();
+    } (
+        fiber_fn,
+        &report
+    );
+
+    boost::cobalt::run(std::move(task));
 
     ASSERT_EQ("", report);
 }

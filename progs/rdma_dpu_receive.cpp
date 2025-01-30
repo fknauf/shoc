@@ -3,7 +3,6 @@
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/server.hpp>
-#include <shoc/coro/fiber.hpp>
 #include <shoc/device.hpp>
 #include <shoc/progress_engine.hpp>
 #include <shoc/rdma.hpp>

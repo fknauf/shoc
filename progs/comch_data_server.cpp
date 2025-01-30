@@ -4,7 +4,6 @@
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/producer.hpp>
 #include <shoc/comch/server.hpp>
-#include <shoc/coro/fiber.hpp>
 #include <shoc/logger.hpp>
 #include <shoc/memory_map.hpp>
 #include <shoc/progress_engine.hpp>
@@ -78,7 +77,7 @@ auto serve(
     shoc::progress_engine *engine,
     char const *dev_pci,
     char const *rep_pci
-) -> shoc::coro::fiber {
+) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
     auto data = data_descriptor { 256, 1 << 20 };

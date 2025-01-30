@@ -1,7 +1,6 @@
 #include "env.hpp"
 
 #include "shoc/comch/client.hpp"
-#include "shoc/coro/fiber.hpp"
 #include "shoc/logger.hpp"
 #include "shoc/progress_engine.hpp"
 

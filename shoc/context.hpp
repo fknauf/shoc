@@ -1,6 +1,5 @@
 #pragma once
 
-#include "coro/task.hpp"
 #include "error.hpp"
 #include "logger.hpp"
 #include "unique_handle.hpp"

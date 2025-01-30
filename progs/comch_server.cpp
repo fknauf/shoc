@@ -1,8 +1,6 @@
 #include "env.hpp"
 
 #include "shoc/comch/server.hpp"
-#include "shoc/coro/fiber.hpp"
-#include "shoc/coro/task.hpp"
 #include "shoc/progress_engine.hpp"
 
 #include <boost/cobalt.hpp>

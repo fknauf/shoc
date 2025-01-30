@@ -3,16 +3,14 @@
 #include "asio_descriptor.hpp"
 #include "common/status.hpp"
 #include "context.hpp"
-#include "coro/fiber.hpp"
 #include "coro/value_awaitable.hpp"
-#include "epoll_handle.hpp"
 #include "error.hpp"
-#include "event_sources.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_pe.h>
 
 #include <boost/asio/post.hpp>
+#include <boost/cobalt/detached.hpp>
 #include <boost/cobalt/promise.hpp>
 #include <boost/cobalt/this_thread.hpp>
 #include <system_error>

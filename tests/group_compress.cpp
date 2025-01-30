@@ -1,14 +1,13 @@
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/compress.hpp>
-#include <shoc/coro/fiber.hpp>
 #include <shoc/device.hpp>
 #include <shoc/memory_map.hpp>
 #include <shoc/progress_engine.hpp>
 
 #include <gtest/gtest.h>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <ranges>
 #include <string>
@@ -25,14 +24,12 @@
 #define CO_ASSERT_GE(val1, val2, message) CO_ASSERT((val1) >= (val2), message)
 
 TEST(docapp_compress, single_shot) {
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
     auto report = std::string { "fiber not started" };
 
-    engine.spawn([](
+    auto fiber_fn = [](
         shoc::progress_engine *engine,
         std::string *report
-    ) -> asio::awaitable<void> {
+    ) -> boost::cobalt::detached {
         try {
             *report = "";
 
@@ -66,17 +63,31 @@ TEST(docapp_compress, single_shot) {
 
             CO_ASSERT_EQ(DOCA_SUCCESS, decompress_status, std::string { "decompression failed: " } + doca_error_get_descr(decompress_status));
             CO_ASSERT(std::ranges::equal(src_data, decompressed_buf.data()), "decompressed data is different from source data");
+        } catch(shoc::doca_exception &e) {
+            // Bluefield 3 has no compression device, only decompression
+            if(e.doca_error() == DOCA_ERROR_NOT_FOUND) {
+                co_return;
+            }
         } catch(std::exception &ex) {
             CO_FAIL(ex.what());
         } catch(...) {
             CO_FAIL("unknown error");
         }
-    } (
-        &engine,
-        &report
-    ));
+    };
 
-    io.run();
+    auto task = [](
+        auto fiber_fn,
+        std::string *report
+    ) -> boost::cobalt::task<void> {
+        auto engine = shoc::progress_engine{};
+        fiber_fn(&engine, report);
+        co_await engine.run();
+    } (
+        fiber_fn,
+        &report
+    );
+
+    boost::cobalt::run(std::move(task));
 
     ASSERT_EQ("", report);
 }

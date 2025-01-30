@@ -1,16 +1,32 @@
-#include <shoc/coro/fiber.hpp>
 #include <shoc/coro/value_awaitable.hpp>
-
-#include <asio/asio.hpp>
+#include <boost/cobalt.hpp>
 #include <gtest/gtest.h>
 
-
 namespace {
+    struct fiber {
+        struct promise_type {
+            auto get_return_object() const noexcept { return fiber{}; }
+            auto unhandled_exception() const noexcept {
+                try {
+                    std::rethrow_exception(std::current_exception());
+                } catch(std::exception &e) {
+                    EXPECT_TRUE(false) << "fiber exited with error: " << e.what();
+                } catch(...) {
+                    EXPECT_TRUE(false) << "fiber exited with unknown error";
+                }
+            }
+
+            auto return_void() const noexcept {}
+            auto initial_suspend() const noexcept { return std::suspend_never{}; }
+            auto final_suspend() const noexcept { return std::suspend_never{}; }
+        };
+    };
+
     auto do_wait(
         shoc::coro::value_awaitable<int> &awaitable,
         int expected,
         bool *checkpoint
-    ) -> asio::awaitable<void> {
+    ) -> fiber {
         auto x = co_await awaitable;
         EXPECT_EQ(x, expected);
         *checkpoint = true;
@@ -20,7 +36,7 @@ namespace {
         shoc::coro::value_awaitable<int> &awaitable,
         doca_error_t expected,
         bool *checkpoint
-    ) -> asio::awaitable<void> {
+    ) -> fiber {
         try {
             co_await awaitable;
         } catch(shoc::doca_exception &e) {
@@ -34,13 +50,16 @@ TEST(docapp_coro_value_awaitable, plain_value_precomputed) {
     auto awaitable = shoc::coro::value_awaitable<int>::from_value(42);
     bool checkpoint = false;
 
+    do_wait(awaitable, 42, &checkpoint);
+
     ASSERT_TRUE(checkpoint);
 }
 
 TEST(docapp_coro_value_awaitable, plain_value_suspended) {
-    auto io = asio::io_context { 1}
     auto awaitable = shoc::coro::value_awaitable<int>::create_space();
     bool checkpoint = false;
+
+    do_wait(awaitable, 42, &checkpoint);
 
     ASSERT_FALSE(checkpoint);
 

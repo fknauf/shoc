@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 #include <gtest/gtest.h>
 
-#include <asio.hpp>
+#include <boost/cobalt.hpp>
 
 #include <chrono>
 #include <string>
@@ -50,18 +50,16 @@ namespace {
     } while(false)
 
 TEST(docapp_engine, yielding) {
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
     auto report1 = std::string { "not started" };
     auto report2 = std::string { "not started" };
 
     fiber_counters counters[2];
 
-    engine.spawn([](
+    auto first_fiber_fn = [](
         shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> asio::awaitable<void> {
+    ) -> boost::cobalt::detached {
         try {
             *report = "";
 
@@ -81,17 +79,13 @@ TEST(docapp_engine, yielding) {
         }
 
         counters[0].finish();
-    } (
-        &engine,
-        counters,
-        &report1
-    ));
+    };
 
-    engine.spawn([](
+    auto second_fiber_fn = [](
         shoc::progress_engine *engine,
         fiber_counters counters[2],
         std::string *report
-    ) -> shoc::coro::fiber {
+    ) -> boost::cobalt::detached {
         try {
             *report = "";
 
@@ -111,13 +105,30 @@ TEST(docapp_engine, yielding) {
         }
 
         counters[1].finish();
-    } (
-        &engine,
-        counters,
-        &report2
-    ));
+    };
 
-    io.run();
+    auto task = [](
+        auto first_fiber_fn,
+        auto second_fiber_fn,
+        fiber_counters counters[2],
+        std::string *report1,
+        std::string *report2
+    ) -> boost::cobalt::task<void> {
+        auto engine = shoc::progress_engine{};
+
+        first_fiber_fn(&engine, counters, report1);
+        second_fiber_fn(&engine, counters, report2);
+
+        co_await engine.run();
+    } (
+        first_fiber_fn,
+        second_fiber_fn,
+        counters,
+        &report1,
+        &report2
+    );
+
+    boost::cobalt::run(std::move(task));
 
     EXPECT_TRUE(counters[0].finished());
     EXPECT_TRUE(counters[1].finished());
@@ -127,101 +138,4 @@ TEST(docapp_engine, yielding) {
     EXPECT_EQ(counters[1].yields(), 1);
     EXPECT_EQ(counters[0].wakeups(), 1);
     EXPECT_EQ(counters[1].wakeups(), 1);
-}
-
-TEST(docapp_engine, timeouts) {
-    using namespace std::chrono_literals;
-
-    auto io = asio::io_context{};
-    auto engine = shoc::progress_engine{ io };
-    auto report1 = std::string { "not started" };
-    auto report2 = std::string { "not started" };
-
-    fiber_counters counters[2];
-
-    engine.spawn([](
-        shoc::progress_engine *engine,
-        fiber_counters counters[2],
-        std::string *report
-    ) -> asio::awaitable<void> {
-        try {
-            *report = "";
-
-            counters[0].inc_yields();
-            co_await engine->yield();
-            counters[0].inc_wakeups();
-
-            auto start = std::chrono::system_clock::now();
-
-            counters[0].inc_yields();
-            co_await engine->timeout(10ms);
-            counters[0].inc_wakeups();
-
-            auto end = std::chrono::system_clock::now();
-            auto delta_t = end - start;
-            CO_ASSERT_GE(delta_t, 10ms, fmt::format("timeout too short: {}", delta_t));
-            CO_ASSERT_LT(delta_t, 15ms, fmt::format("timeout too long: {}", delta_t));
-
-            CO_ASSERT_YIELDS(2, 2);
-            CO_ASSERT_WAKEUPS(2, 2);
-        } catch(std::exception &ex) {
-            CO_FAIL(ex.what());
-        } catch(...) {
-            CO_FAIL("unknown error");
-        }
-
-        counters[0].finish();
-    } (
-        &engine,
-        counters,
-        &report1
-    ));
-
-    engine.spawn([](
-        shoc::progress_engine *engine,
-        fiber_counters counters[2],
-        std::string *report
-    ) -> shoc::coro::fiber {
-        try {
-            *report = "";
-            counters[1].inc_yields();
-            co_await engine->yield();
-            counters[1].inc_wakeups();
-
-            auto start = std::chrono::system_clock::now();
-
-            counters[1].inc_yields();
-            co_await engine->timeout(5ms);
-            counters[1].inc_wakeups();
-
-            CO_ASSERT_YIELDS(2, 2);
-            CO_ASSERT_WAKEUPS(1, 2);
-
-            auto end = std::chrono::system_clock::now();
-            auto delta_t = end - start;
-            CO_ASSERT_GE(delta_t, 5ms, fmt::format("timeout too short: {}", delta_t));
-            CO_ASSERT_LT(delta_t, 10ms, fmt::format("timeout too long: {}", delta_t));
-        } catch(std::exception &ex) {
-            CO_FAIL(ex.what());
-        } catch(...) {
-            CO_FAIL("unknown error");
-        }
-
-        counters[1].finish();
-    } (
-        &engine,
-        counters,
-        &report2
-    ));
-
-    io.run();
-
-    EXPECT_TRUE(counters[0].finished());
-    EXPECT_TRUE(counters[1].finished());
-    EXPECT_EQ("", report1);
-    EXPECT_EQ("", report2);
-    EXPECT_EQ(counters[0].yields(), 2);
-    EXPECT_EQ(counters[1].yields(), 2);
-    EXPECT_EQ(counters[0].wakeups(), 2);
-    EXPECT_EQ(counters[1].wakeups(), 2);
 }

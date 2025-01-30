@@ -18,7 +18,7 @@ if [ ! -e ~/.vcpkg/vcpkg.path.txt ]; then
     /doca_devel/vcpkg/vcpkg integrate install
 fi
 
-CC=gcc-12 CXX=g++-12 meson setup --buildtype=release bench
 
+cmake -B bench --preset bench
 cd bench
 ninja
