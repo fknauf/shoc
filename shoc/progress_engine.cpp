@@ -21,13 +21,17 @@
 
 namespace shoc {
     progress_engine::progress_engine(
-        progress_engine_config cfg
+        progress_engine_config cfg,
+        boost::cobalt::executor executor
     ):
-        cfg_ { std::move(cfg) }
+        cfg_ { std::move(cfg) },
+        notifier_ { std::move(executor) }
     {
         doca_pe *pe;
         enforce_success(doca_pe_create(&pe));
         handle_.reset(pe);
+
+        notifier_.assign(notification_handle());
     }
 
     progress_engine::~progress_engine() {
@@ -77,17 +81,19 @@ namespace shoc {
         connected_contexts_.remove_stopped_context(ctx);
     }
 
-    auto progress_engine::run(
-        boost::cobalt::executor executor
-    ) -> boost::cobalt::task<void> {        
-        auto notifier = asio_descriptor<boost::cobalt::executor> { std::move(executor), notification_handle() };
+    auto progress_engine::run() -> boost::cobalt::task<void> {
+        active_ = true;
 
-        while(!connected_contexts_.empty()) {
+        while(registered_fibers_ > 0 || !connected_contexts_.empty()) {
             request_notification();
-            auto [ ec ] = co_await notifier.async_wait(
+            logger->debug("progress engine: waiting for notification");
+            notifier_.release();
+            notifier_.assign(notification_handle());
+            auto [ ec ] = co_await notifier_.async_wait(
                 boost::asio::posix::descriptor::wait_read,
                 boost::asio::as_tuple(boost::cobalt::use_op)
             );
+            logger->debug("progress engine: got notification");
             clear_notification();
 
             while(doca_pe_progress(handle()) > 0) {
@@ -97,10 +103,30 @@ namespace shoc {
             if(ec == boost::asio::error::operation_aborted) {
                 connected_contexts_.stop_all();
                 while(doca_pe_progress(handle()) > 0) { }
+                break;
             } else if(ec) {
                 logger->error("unexpected system error in DOCA event handle: {}", ec.message());
-                co_return;
+                break;
             }
+        }
+
+        active_ = false;
+    }
+
+    auto progress_engine::register_fiber() -> void {
+        ++registered_fibers_;
+    }
+
+    auto progress_engine::deregister_fiber() -> void {
+        if(registered_fibers_ <= 0) {
+            logger->error("deregistered more fibers than were registered");
+            return;
+        }
+
+        --registered_fibers_;
+
+        if(registered_fibers_ == 0 && connected_contexts_.empty()) {
+            notifier_.cancel();
         }
     }
 
@@ -141,7 +167,7 @@ namespace shoc {
             co_await timer.async_wait();
             err = doca_task_submit(task);
             --attempts;
-        } while(err == DOCA_ERROR_AGAIN && attempts > 0);
+        } while(err == DOCA_ERROR_AGAIN && attempts > 0 && !connected_contexts_.empty());
 
         if(err != DOCA_SUCCESS) {
             doca_task_free(task);

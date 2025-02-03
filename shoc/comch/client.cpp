@@ -55,10 +55,10 @@ namespace shoc::comch {
     auto client::stop() -> context_state_awaitable {
         if(state_ == connection_state::CONNECTED) {
             state_ = connection_state::DISCONNECTING;
-        }
 
-        active_children_.stop_all();
-        disconnect_if_able();
+            active_children_.stop_all();
+            disconnect_if_able();
+        }
 
         return context_state_awaitable { shared_from_this(), DOCA_CTX_STATE_IDLE };
     }

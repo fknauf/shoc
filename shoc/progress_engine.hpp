@@ -51,7 +51,8 @@ namespace shoc {
     {
     public:
         progress_engine(
-            progress_engine_config cfg = {}
+            progress_engine_config cfg = {},
+            boost::cobalt::executor executor = boost::cobalt::this_thread::get_executor()
         );
         ~progress_engine();
 
@@ -87,11 +88,16 @@ namespace shoc {
             coro::error_receptable *reportee
         ) -> void;
 
-        auto run(
-            boost::cobalt::executor executor = boost::cobalt::this_thread::get_executor()
-        ) -> boost::cobalt::task<void>;
+        auto run() -> boost::cobalt::task<void>;
+
+        auto active() const { return active_; }
 
     private:
+        friend class progress_engine_handle;
+
+        auto register_fiber() -> void;
+        auto deregister_fiber() -> void;
+
         [[nodiscard]] auto notification_handle() const -> doca_event_handle_t;
         auto request_notification() const -> void;
         auto clear_notification() const -> void;
@@ -105,7 +111,70 @@ namespace shoc {
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
         progress_engine_config cfg_;
+        asio_descriptor<boost::cobalt::executor> notifier_;
         dependent_contexts<context_base> connected_contexts_;
+        int registered_fibers_ = 0;
+        bool active_ = false;
+    };
+
+    class progress_engine_handle {
+    public:
+        progress_engine_handle(progress_engine *engine = nullptr):
+            engine_ { engine }
+        {
+            if(engine_ != nullptr) {
+                engine_->register_fiber();
+            }
+        }
+
+        progress_engine_handle(progress_engine_handle const &other):
+            progress_engine_handle { other.engine_ }
+        {}
+
+        progress_engine_handle(progress_engine_handle &&other):
+            engine_ { std::exchange(other.engine_, nullptr) }
+        {}
+
+        progress_engine_handle &operator=(progress_engine_handle const &other) {
+            if(engine_ != other.engine_) {
+                clear();
+                auto copy = progress_engine_handle(other);
+                *this = std::move(copy);
+            }
+
+            return *this;
+        }
+
+        progress_engine_handle &operator=(progress_engine_handle &&other) {
+            if(std::addressof(other) != this) {
+                clear();
+                engine_ = std::exchange(other.engine_, nullptr);
+            }
+
+            return *this;
+        }
+
+        ~progress_engine_handle() {
+            clear();
+        }
+        
+        explicit operator bool() const noexcept {
+            return engine_ != nullptr;
+        }
+
+        auto clear() -> void {
+            if(engine_ != nullptr) {
+                engine_->deregister_fiber();
+                engine_ = nullptr;
+            }
+        }
+
+        auto get() const { return engine_; }
+        auto operator->() const { return get(); }
+        auto &operator*() const { return *get(); }
+
+    private:
+        progress_engine *engine_;
     };
 
     namespace detail {
