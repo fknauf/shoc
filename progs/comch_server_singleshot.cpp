@@ -9,7 +9,7 @@
 #include <string_view>
 
 auto serve_ping_pong(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached {

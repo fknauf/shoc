@@ -19,7 +19,7 @@ auto ping_pong(shoc::comch::scoped_server_connection con) -> boost::cobalt::deta
 }
 
 auto serve_ping_pong(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached try {

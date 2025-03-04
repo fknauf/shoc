@@ -85,28 +85,34 @@ namespace shoc {
         active_ = true;
 
         while(registered_fibers_ > 0 || !connected_contexts_.empty()) {
-            request_notification();
-            logger->debug("progress engine: waiting for notification");
-            notifier_.release();
-            notifier_.assign(notification_handle());
-            auto [ ec ] = co_await notifier_.async_wait(
-                boost::asio::posix::descriptor::wait_read,
-                boost::asio::as_tuple(boost::cobalt::use_op)
-            );
-            logger->debug("progress engine: got notification");
-            clear_notification();
+            if(cfg_.polling == polling_mode::busy) {
+                co_await yield();
 
-            while(doca_pe_progress(handle()) > 0) {
-                // do nothing; doca_pe_progress calls the event handlers.
-            }
+                while(doca_pe_progress(handle()) > 0) {
+                    // do nothing; doca_pe_progress calls the event handlers.
+                }    
+            } else {
+                request_notification();
+                logger->debug("progress engine: waiting for notification");
+                auto [ ec ] = co_await notifier_.async_wait(
+                    boost::asio::posix::descriptor::wait_read,
+                    boost::asio::as_tuple(boost::cobalt::use_op)
+                );
+                logger->debug("progress engine: got notification");
+                clear_notification();
 
-            if(ec == boost::asio::error::operation_aborted) {
-                connected_contexts_.stop_all();
-                while(doca_pe_progress(handle()) > 0) { }
-                break;
-            } else if(ec) {
-                logger->error("unexpected system error in DOCA event handle: {}", ec.message());
-                break;
+                while(doca_pe_progress(handle()) > 0) {
+                    // do nothing; doca_pe_progress calls the event handlers.
+                }
+
+                if(ec == boost::asio::error::operation_aborted) {
+                    connected_contexts_.stop_all();
+                    while(doca_pe_progress(handle()) > 0) { }
+                    break;
+                } else if(ec) {
+                    logger->error("unexpected system error in DOCA event handle: {}", ec.message());
+                    break;
+                }
             }
         }
 

@@ -27,10 +27,16 @@
 #include <vector>
 
 namespace shoc {
+    enum class polling_mode {
+        epoll,
+        busy
+    };
+
     struct progress_engine_config {
         std::uint32_t immediate_submission_attempts = 64;
         std::uint32_t resubmission_attempts = 16;
         std::chrono::microseconds resubmission_interval = std::chrono::milliseconds(1);
+        polling_mode polling = polling_mode::busy;
     };
 
     /**
@@ -93,7 +99,7 @@ namespace shoc {
         auto active() const { return active_; }
 
     private:
-        friend class progress_engine_handle;
+        friend class progress_engine_lease;
 
         auto register_fiber() -> void;
         auto deregister_fiber() -> void;
@@ -117,9 +123,9 @@ namespace shoc {
         bool active_ = false;
     };
 
-    class progress_engine_handle {
+    class progress_engine_lease {
     public:
-        progress_engine_handle(progress_engine *engine = nullptr):
+        progress_engine_lease(progress_engine *engine = nullptr):
             engine_ { engine }
         {
             if(engine_ != nullptr) {
@@ -127,25 +133,25 @@ namespace shoc {
             }
         }
 
-        progress_engine_handle(progress_engine_handle const &other):
-            progress_engine_handle { other.engine_ }
+        progress_engine_lease(progress_engine_lease const &other):
+            progress_engine_lease { other.engine_ }
         {}
 
-        progress_engine_handle(progress_engine_handle &&other):
+        progress_engine_lease(progress_engine_lease &&other):
             engine_ { std::exchange(other.engine_, nullptr) }
         {}
 
-        progress_engine_handle &operator=(progress_engine_handle const &other) {
+        progress_engine_lease &operator=(progress_engine_lease const &other) {
             if(engine_ != other.engine_) {
                 clear();
-                auto copy = progress_engine_handle(other);
+                auto copy = progress_engine_lease(other);
                 *this = std::move(copy);
             }
 
             return *this;
         }
 
-        progress_engine_handle &operator=(progress_engine_handle &&other) {
+        progress_engine_lease &operator=(progress_engine_lease &&other) {
             if(std::addressof(other) != this) {
                 clear();
                 engine_ = std::exchange(other.engine_, nullptr);
@@ -154,7 +160,7 @@ namespace shoc {
             return *this;
         }
 
-        ~progress_engine_handle() {
+        ~progress_engine_lease() {
             clear();
         }
         

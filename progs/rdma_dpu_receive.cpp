@@ -16,7 +16,7 @@
 #include <fmt/printf.h>
 
 auto rdma_exchange_connection_details(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     std::span<std::byte const> local_conn_details,
     char const *dev_pci,
     char const *rep_pci
@@ -42,7 +42,7 @@ auto rdma_exchange_connection_details(
 }
 
 auto rdma_receive(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached {

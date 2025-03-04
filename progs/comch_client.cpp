@@ -14,7 +14,7 @@
 struct stat shoc_stat_buffer;
 
 auto ping_pong(
-    shoc::progress_engine_handle engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci
 ) -> boost::cobalt::detached {
     auto executor = co_await boost::cobalt::this_coro::executor;
@@ -38,17 +38,18 @@ auto ping_pong(
             co_return;
         }
 
+        std::cout << "yielding..." << std::endl;
+        co_await engine->yield();
+        //co_await boost::asio::steady_timer(co_await boost::cobalt::this_coro::executor, std::chrono::seconds(1)).async_wait(boost::cobalt::use_op);
+        std::cout << "resumed." << std::endl;
+
         // wait for response
         auto msg = co_await client->msg_recv();
         std::cout << msg << std::endl;
 
-        co_await engine->yield();
-
         co_await client->stop();
+        std::cout << "stopped client" << std::endl;
     }
-
-    // client stops automatically through RAII. If code needs to happen after the client
-    // is stopped, co_await client->stop() is possible.
 }
 
 auto co_main(

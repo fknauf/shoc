@@ -74,7 +74,7 @@ auto send_blocks(
 }
 
 auto serve(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached {

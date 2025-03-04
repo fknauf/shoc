@@ -14,7 +14,7 @@
 #include <vector>
 
 auto rdma_exchange_connection_details(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     std::span<std::byte const> local_conn_details,
     char const *dev_pci
 ) -> boost::cobalt::promise<std::string> {
@@ -31,7 +31,7 @@ auto rdma_exchange_connection_details(
 }
 
 auto rdma_send(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci
 ) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);

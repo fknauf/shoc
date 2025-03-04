@@ -42,7 +42,7 @@ struct cache_aligned_storage {
 };
 
 auto receive_blocks(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *pci_addr,
     bool skip_verify
 ) -> boost::cobalt::detached {

@@ -32,7 +32,7 @@ struct cache_aligned_memory {
 };
 
 auto compress_file(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     std::istream &in,
     std::ostream &out
 ) -> boost::cobalt::detached {

@@ -24,9 +24,10 @@ file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
 include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
 
 find_package(Boost CONFIG REQUIRED COMPONENTS cobalt)
-find_package(fmt REQUIRED)
-find_package(spdlog REQUIRED)
-find_package(GTest REQUIRED)
+find_package(cxxopts CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+find_package(GTest CONFIG REQUIRED)
 
 add_definitions(${DOCA_CFLAGS} -DDOCA_ALLOW_EXPERIMENTAL_API)
 include_directories(. ${DOCA_INCLUDE_DIRS})
@@ -161,3 +162,6 @@ target_link_libraries(bug-comch-consumer-start-lost-server ${DOCA_LIBRARIES})
 
 add_executable(bug-comch-consumer-start-lost-client bug-reports/comch-consumer-start-lost/client.c)
 target_link_libraries(bug-comch-consumer-start-lost-client ${DOCA_LIBRARIES})
+
+add_executable(encrypt progs/encrypt.cpp)
+target_link_libraries(encrypt shoc cxxopts::cxxopts)

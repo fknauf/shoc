@@ -95,7 +95,7 @@ auto handle_connection(
 }
 
 auto dma_serve(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached {

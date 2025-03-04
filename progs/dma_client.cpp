@@ -48,7 +48,7 @@ struct data_extents {
 };
 
 auto dma_receive(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     char const *pci_addr,
     std::uint32_t parallelism
 ) -> boost::cobalt::detached {

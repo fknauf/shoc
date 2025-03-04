@@ -12,7 +12,7 @@
 #include <boost/cobalt.hpp>
 
 auto sync_event_remote(
-    shoc::progress_engine *engine,
+    shoc::progress_engine_lease engine,
     bluefield_env env
 ) -> boost::cobalt::detached {
     auto err = doca_error_t { DOCA_SUCCESS };
