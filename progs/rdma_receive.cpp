@@ -7,6 +7,7 @@
 #include <shoc/progress_engine.hpp>
 #include <shoc/rdma.hpp>
 
+#include <boost/asio.hpp>
 #include <boost/cobalt.hpp>
 
 #include <iostream>
@@ -16,41 +17,35 @@
 #include <fmt/printf.h>
 
 auto rdma_exchange_connection_details(
-    shoc::progress_engine_lease engine,
-    std::span<std::byte const> local_conn_details,
-    char const *dev_pci,
-    char const *rep_pci
+    std::span<std::byte const> local_conn_details
 ) -> boost::cobalt::promise<std::vector<std::byte>> {
-    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
-    auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
-    auto server = co_await engine->create_context<shoc::comch::server>("shoc-rdma-oob-send-receive-test", dev, rep);
+    using boost::asio::ip::tcp;
+    using boost::asio::detached;
+    using tcp_acceptor = boost::cobalt::use_op_t::as_default_on_t<tcp::acceptor>;
 
-    auto conn = co_await server->accept();
-    auto remote_msg = co_await conn->msg_recv();
-    auto err = co_await conn->send(local_conn_details);
+    auto executor = co_await boost::cobalt::this_coro::executor;
+    
+    auto listener = tcp_acceptor{ executor, { tcp::v4(), 12345 }};
+    auto sock = co_await listener.async_accept();
 
-    if(err != DOCA_SUCCESS) {
-        throw shoc::doca_exception(err);
-    }
+    std::byte received_buffer[256];
+    auto bytes_received = co_await sock.async_read_some(boost::asio::buffer(received_buffer));
+    auto bytes = std::vector<std::byte>(received_buffer, received_buffer + bytes_received);
 
-    auto bytes = std::vector<std::byte>(
-        reinterpret_cast<std::byte*>(remote_msg.data()),
-        reinterpret_cast<std::byte*>(remote_msg.data()) + remote_msg.size()
-    );
+    co_await boost::asio::async_write(sock, boost::asio::buffer(local_conn_details));
 
     co_return bytes;
 }
 
 auto rdma_receive(
     shoc::progress_engine_lease engine,
-    char const *dev_pci,
-    char const *rep_pci
+    char const *dev_pci
 ) -> boost::cobalt::detached {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
     auto conn = rdma->export_connection();
 
-    auto remote_conn_details = co_await rdma_exchange_connection_details(engine, conn.details(), dev_pci, rep_pci);
+    auto remote_conn_details = co_await rdma_exchange_connection_details(conn.details());
     conn.connect(remote_conn_details);
 
     auto space = std::vector<char>(1024);
@@ -78,7 +73,7 @@ auto co_main(
     auto env = bluefield_env_dpu{};
     auto engine = shoc::progress_engine{};
 
-    rdma_receive(&engine, env.dev_pci, env.rep_pci);
+    rdma_receive(&engine, env.dev_pci);
 
     co_await engine.run();
 }

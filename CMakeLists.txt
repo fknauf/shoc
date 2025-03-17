@@ -91,11 +91,11 @@ target_link_libraries(dma_client shoc)
 add_executable(dma_server progs/dma_server.cpp)
 target_link_libraries(dma_server shoc)
 
-add_executable(rdma_dpu_receive progs/rdma_dpu_receive.cpp)
-target_link_libraries(rdma_dpu_receive shoc)
+add_executable(rdma_receive progs/rdma_receive.cpp)
+target_link_libraries(rdma_receive shoc)
 
-add_executable(rdma_host_send progs/rdma_host_send.cpp)
-target_link_libraries(rdma_host_send shoc)
+add_executable(rdma_send progs/rdma_send.cpp)
+target_link_libraries(rdma_send shoc)
 
 add_executable(sync_event_local_pci progs/sync_event_local_pci.cpp)
 target_link_libraries(sync_event_local_pci shoc)
