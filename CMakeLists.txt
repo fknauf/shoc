@@ -108,6 +108,7 @@ add_executable(generate_testdata tools/generate_testdata.cpp)
 add_executable(test-shoc
     tests/coro/group_value_awaitable.cpp
     tests/group_aes_gcm.cpp
+    tests/group_aligned_mem.cpp
     tests/group_compress.cpp
     tests/group_dma.cpp
     tests/group_engine.cpp

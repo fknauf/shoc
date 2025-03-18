@@ -1,5 +1,6 @@
 #include "env.hpp"
 
+#include <shoc/aligned_memory.hpp>
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/server.hpp>
@@ -28,7 +29,7 @@ auto rdma_exchange_connection_details(
     auto listener = tcp_acceptor{ executor, { tcp::v4(), 12345 }};
     auto sock = co_await listener.async_accept();
 
-    std::byte received_buffer[256];
+    std::byte received_buffer[4096];
     auto bytes_received = co_await sock.async_read_some(boost::asio::buffer(received_buffer));
     auto bytes = std::vector<std::byte>(received_buffer, received_buffer + bytes_received);
 
@@ -40,27 +41,44 @@ auto rdma_exchange_connection_details(
 auto rdma_receive(
     shoc::progress_engine_lease engine,
     char const *dev_pci
-) -> boost::cobalt::detached {
+) -> boost::cobalt::detached try {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
     auto conn = rdma->export_connection();
 
     auto remote_conn_details = co_await rdma_exchange_connection_details(conn.details());
+
+    shoc::logger->debug("exchanged connection details, connecting...");
+
     conn.connect(remote_conn_details);
 
-    auto space = std::vector<char>(1024);
+    shoc::logger->debug("connected.");
+
+    auto membuffer = shoc::aligned_memory { 1024 };
+    auto space = membuffer.as_writable_bytes();
     auto mmap = shoc::memory_map { dev, space };
     auto bufinv = shoc::buffer_inventory { 1 };
     auto recv_buf = bufinv.buf_get_by_addr(mmap, space);
 
     std::uint32_t immediate_data = 0;
+
+    shoc::logger->debug("receiving data...");
+
     auto err = co_await rdma->receive(recv_buf, &immediate_data);
+
+    shoc::logger->debug("data received.");
 
     if(err == DOCA_SUCCESS) {
         fmt::printf("{}\nimm = {}", std::string_view{ recv_buf.data().begin(), recv_buf.data().end() }, immediate_data);
     } else {
         shoc::logger->error("failed to receive data: {}", doca_error_get_descr(err));
     }
+} catch(shoc::doca_exception &e) {
+    shoc::logger->error("SHOC error: {}", e.what());
+} catch(boost::system::error_code &e) {
+    shoc::logger->error("Boost Error: {}", e.what());
+} catch(std::exception &e) {
+    shoc::logger->error("Generic Error: {}", e.what());
 }
 
 auto co_main(
