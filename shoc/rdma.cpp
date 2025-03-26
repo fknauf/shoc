@@ -277,6 +277,8 @@ namespace shoc {
         if(config.gid_index.has_value()) {
             enforce_success(doca_rdma_set_gid_index(handle(), config.gid_index.value()));
         }
+        enforce_success(doca_rdma_set_max_num_connections(handle(), config.max_num_connections));
+        enforce_success(doca_rdma_set_transport_type(handle(), config.transport_type));
 
         enforce_success(doca_rdma_set_connection_state_callbacks(
             handle(),

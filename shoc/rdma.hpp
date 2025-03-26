@@ -20,6 +20,8 @@ namespace shoc {
         std::uint32_t rdma_permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE;
         std::optional<std::uint32_t> gid_index = std::nullopt;
         std::uint32_t max_tasks = 16;
+        std::uint16_t max_num_connections = 1;
+        doca_rdma_transport_type transport_type = DOCA_RDMA_TRANSPORT_TYPE_RC;
     };
 
     class rdma_context;
