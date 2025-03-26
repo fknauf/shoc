@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 
 namespace shoc {
     struct rdma_config {
@@ -23,9 +24,61 @@ namespace shoc {
 
     class rdma_context;
 
+    class rdma_address {
+    public:
+        friend class rdma_context;
+
+        rdma_address(
+            doca_rdma_addr_type addr_type,
+            char const *address,
+            std::uint16_t port
+        );
+
+        [[nodiscard]]
+        auto handle() const noexcept {
+            return addr_.get();
+        }
+
+        [[nodiscard]]
+        auto addr_type() const -> doca_rdma_addr_type {
+            return params().addr_type;
+        }
+
+        [[nodiscard]]
+        auto address() const -> char const * {
+            return params().address;
+        }
+
+        [[nodiscard]]
+        auto port() const -> std::uint16_t {
+            return params().port;
+        }
+
+    private:
+        struct params_type {
+            doca_rdma_addr_type addr_type;
+            char const *address;
+            std::uint16_t port;
+        };
+
+        [[nodiscard]]
+        auto params() const -> params_type;
+
+        unique_handle<doca_rdma_addr, doca_rdma_addr_destroy> addr_;
+    };
+
+    enum rdma_cm_role {
+        none,
+        server,
+        client
+    };
+
     class rdma_connection {
     public:
         rdma_connection(rdma_context *parent);
+
+        // for RDMA CM, where the doca_rdma_connection object already exists
+        rdma_connection(rdma_context *parent, doca_rdma_connection *cm_conn) noexcept;
 
         auto connect(std::span<std::byte const> remote_details) -> void;
         auto connect(std::string_view remote_details) -> void;
@@ -43,6 +96,11 @@ namespace shoc {
             buffer const &src,
             std::uint32_t immediate_data
         ) -> coro::status_awaitable<>;
+
+        auto receive(
+            buffer &dest,
+            std::uint32_t *immediate_data = nullptr
+        ) -> coro::status_awaitable<std::uint32_t>;
 
         auto read(
             buffer const &src,
@@ -77,7 +135,7 @@ namespace shoc {
             sync_event_remote_net const &event,
             buffer dst
         ) -> coro::status_awaitable<>;
-        
+
         auto remote_net_sync_event_notify_set(
             sync_event_remote_net const &event,
             buffer src
@@ -92,7 +150,7 @@ namespace shoc {
     private:
         rdma_context *parent_ = nullptr;
         std::span<std::byte const> details_;
-        doca_rdma_connection *handle_ = nullptr;
+        unique_handle<doca_rdma_connection, doca_rdma_connection_disconnect> handle_;
     };
 
     class rdma_context:
@@ -109,19 +167,20 @@ namespace shoc {
             rdma_config config = {}
         );
 
-        auto receive(
-            buffer &dest,
-            std::uint32_t *immediate_data = nullptr
-        ) -> coro::status_awaitable<std::uint32_t>;
-
         [[nodiscard]]
         auto export_connection() -> rdma_connection;
 
+        [[nodiscard]]
+        auto listen(std::uint16_t port) -> coro::value_awaitable<rdma_connection>;
+
+        [[nodiscard]]
+        auto connect(rdma_address const &peer) -> coro::value_awaitable<rdma_connection>;
+
     private:
-        //static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) -> void;
-        //static auto connection_established (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
-        //static auto connection_failure     (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
-        //static auto connection_disconnected(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) -> void;
+        static auto connection_request     (doca_rdma_connection *conn,                           doca_data ctx_user_data) noexcept -> void;
+        static auto connection_established (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) noexcept -> void;
+        static auto connection_failure     (doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) noexcept -> void;
+        static auto connection_disconnected(doca_rdma_connection *conn, doca_data conn_user_data, doca_data ctx_user_data) noexcept -> void;
 
         static auto receive_completion_callback(
             doca_rdma_task_receive *task,
@@ -131,7 +190,12 @@ namespace shoc {
 
         device dev_;
 
-        bool connected_ = false;
-        coro::status_awaitable<>::payload_type *accept_receptable_ = nullptr;
+        auto take_connection_receptable(
+            doca_rdma_connection *conn,
+            doca_data conn_user_data
+        ) -> coro::value_receptable<rdma_connection>*;
+
+        std::unordered_map<std::uint16_t, coro::value_receptable<rdma_connection>*> listeners_;
+        rdma_cm_role cm_role_ = rdma_cm_role::none;
     };
 }

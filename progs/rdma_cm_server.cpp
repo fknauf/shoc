@@ -17,44 +17,21 @@
 
 #include <fmt/printf.h>
 
-auto rdma_exchange_connection_details(
-    std::span<std::byte const> local_conn_details
-) -> boost::cobalt::promise<std::vector<std::byte>> {
-    using boost::asio::ip::tcp;
-    using boost::asio::detached;
-    using tcp_acceptor = boost::cobalt::use_op_t::as_default_on_t<tcp::acceptor>;
 
-    auto executor = co_await boost::cobalt::this_coro::executor;
-    
-    auto listener = tcp_acceptor{ executor, { tcp::v4(), 12345 }};
-    auto sock = co_await listener.async_accept();
-
-    std::byte received_buffer[4096];
-    auto bytes_received = co_await sock.async_read_some(boost::asio::buffer(received_buffer));
-    auto bytes = std::vector<std::byte>(received_buffer, received_buffer + bytes_received);
-
-    co_await boost::asio::async_write(sock, boost::asio::buffer(local_conn_details));
-
-    co_return bytes;
-}
-
-auto rdma_receive(
+auto rdma_cm_serve(
     shoc::progress_engine_lease engine,
     char const *dev_pci
 ) -> boost::cobalt::detached try {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
-    auto conn = rdma->export_connection();
 
-    auto remote_conn_details = co_await rdma_exchange_connection_details(conn.details());
+    shoc::logger->debug("listening for RDMA CM on port 18515...");
 
-    shoc::logger->debug("exchanged connection details, connecting...");
-
-    conn.connect(remote_conn_details);
+    auto conn = co_await rdma->listen(18515);
 
     shoc::logger->debug("connected.");
 
-    auto membuffer = shoc::aligned_memory { 1024 };
+    auto membuffer = shoc::aligned_memory { 1 << 23 };
     auto space = membuffer.as_writable_bytes();
     auto mmap = shoc::memory_map { dev, space };
     auto bufinv = shoc::buffer_inventory { 1 };
@@ -69,7 +46,7 @@ auto rdma_receive(
     shoc::logger->debug("data received.");
 
     if(err == DOCA_SUCCESS) {
-        fmt::printf("{}\nimm = {}", std::string_view{ recv_buf.data().begin(), recv_buf.data().end() }, immediate_data);
+        fmt::print("{}\nimm = {}\n", std::string_view{ recv_buf.data().begin(), recv_buf.data().end() }, immediate_data);
     } else {
         shoc::logger->error("failed to receive data: {}", doca_error_get_descr(err));
     }
@@ -91,7 +68,7 @@ auto co_main(
     auto env = bluefield_env{};
     auto engine = shoc::progress_engine{};
 
-    rdma_receive(&engine, env.dev_pci);
+    rdma_cm_serve(&engine, env.dev_pci);
 
     co_await engine.run();
 }

@@ -97,6 +97,9 @@ target_link_libraries(rdma_receive shoc)
 add_executable(rdma_send progs/rdma_send.cpp)
 target_link_libraries(rdma_send shoc)
 
+add_executable(rdma_cm_server progs/rdma_cm_server.cpp)
+target_link_libraries(rdma_cm_server shoc)
+
 add_executable(sync_event_local_pci progs/sync_event_local_pci.cpp)
 target_link_libraries(sync_event_local_pci shoc)
 

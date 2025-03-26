@@ -101,7 +101,7 @@ auto co_main(
     shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
     shoc::logger->set_level(spdlog::level::debug);
 
-    auto env = bluefield_env_host{};
+    auto env = bluefield_env{};
     auto engine = shoc::progress_engine{};
 
     rdma_send(&engine, env.dev_pci, argv[1]);
