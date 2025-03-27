@@ -5,7 +5,7 @@
 #include <doca_log.h>
 
 namespace shoc {
-    std::shared_ptr<spdlog::logger> const logger = spdlog::stderr_color_st("docapp");
+    std::shared_ptr<spdlog::logger> const logger = spdlog::stderr_color_st("shoc");
 
     auto set_sdk_log_level(doca_log_level level) -> void {
         doca_log_backend *sdk_log;

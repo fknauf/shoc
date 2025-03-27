@@ -30,6 +30,8 @@ namespace shoc {
     public:
         friend class rdma_context;
 
+        rdma_address() = default;
+
         rdma_address(
             doca_rdma_addr_type addr_type,
             char const *address,

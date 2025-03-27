@@ -21,14 +21,15 @@
 auto rdma_cm_client(
     shoc::progress_engine_lease engine,
     char const *dev_pci,
-    std::string const &server_address
+    std::string const &server_address,
+    std::uint16_t port
 ) -> boost::cobalt::detached try {
     auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
 
-    auto addr = shoc::rdma_address(DOCA_RDMA_ADDR_TYPE_IPv4, server_address.c_str(), 18515);
+    auto addr = shoc::rdma_address(DOCA_RDMA_ADDR_TYPE_IPv4, server_address.c_str(), port);
     
-    shoc::logger->debug("connecting to RDMA CM server {} port 18515...", server_address);
+    shoc::logger->debug("connecting to RDMA CM server {} port {}...", server_address, port);
 
     auto conn = co_await rdma->connect(addr);
 
@@ -75,7 +76,7 @@ auto co_main(
     auto env = bluefield_env{};
     auto engine = shoc::progress_engine{};
 
-    rdma_cm_client(&engine, env.dev_pci, argv[1]);
+    rdma_cm_client(&engine, env.dev_pci, argv[1], 18515);
 
     co_await engine.run();
 }

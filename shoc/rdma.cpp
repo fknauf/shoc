@@ -46,6 +46,12 @@ namespace shoc {
     ) {
         doca_rdma_addr *addr;
         enforce_success(doca_rdma_addr_create(addr_type, address, port, &addr));
+
+        if(addr == nullptr) {
+            logger->error("Tried to create rdma_address from invalid ipv4/ipv6/gid. Type {}, address {}, port {}", static_cast<int>(addr_type), address, port);
+            throw doca_exception(DOCA_ERROR_INVALID_VALUE);
+        }
+
         addr_.reset(addr);
     }
 
@@ -385,14 +391,18 @@ namespace shoc {
             return coro::value_awaitable<rdma_connection>::from_error(DOCA_ERROR_BAD_STATE);
         }
 
+        logger->debug("Attempting RDMA CM connection to {} port {}", peer.address(), peer.port());
+
         auto dest = coro::value_awaitable<rdma_connection>::create_space();
 
         doca_data conn_user_data = { .ptr = dest.receptable_ptr() };
         auto err = doca_rdma_connect_to_addr(handle(), peer.handle(), conn_user_data);
 
         if(err == DOCA_SUCCESS) {
+            logger->debug("sent RDMA connection request");
             cm_role_ = rdma_cm_role::client;
         } else {
+            logger->debug("RDMA connection request failed: {}", doca_error_get_descr(err));
             dest.receptable_ptr()->set_error(err);
         }
 
@@ -421,6 +431,8 @@ namespace shoc {
         doca_rdma_connection *conn,
         doca_data ctx_user_data
     ) noexcept -> void {
+        logger->debug("got RDMA connection request");
+
         auto ctx = static_cast<context_base*>(ctx_user_data.ptr);
         auto rdma = static_cast<rdma_context*>(ctx);
         assert(rdma->cm_role_ == rdma_cm_role::server);
@@ -453,6 +465,8 @@ namespace shoc {
         doca_data conn_user_data,
         doca_data ctx_user_data
     ) noexcept -> void {
+        logger->debug("RDMA connection established");
+
         auto ctx = static_cast<context_base*>(ctx_user_data.ptr);
         auto rdma = static_cast<rdma_context*>(ctx);
 
@@ -471,6 +485,8 @@ namespace shoc {
         doca_data conn_user_data,
         doca_data ctx_user_data
     ) noexcept -> void {
+        logger->debug("RDMA connection failure");
+
         auto ctx = static_cast<context_base*>(ctx_user_data.ptr);
         auto rdma = static_cast<rdma_context*>(ctx);
 
@@ -488,7 +504,9 @@ namespace shoc {
         [[maybe_unused]] doca_rdma_connection *conn,
         [[maybe_unused]] doca_data conn_user_data,
         [[maybe_unused]] doca_data ctx_user_data
-    ) noexcept -> void { }
+    ) noexcept -> void {
+        logger->debug("RDMA connection disconnected");
+    }
 
     auto rdma_context::take_connection_receptable(
         doca_rdma_connection *conn,
