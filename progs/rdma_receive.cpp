@@ -69,7 +69,8 @@ auto rdma_receive(
     shoc::logger->debug("data received.");
 
     if(err == DOCA_SUCCESS) {
-        fmt::printf("{}\nimm = {}", std::string_view{ recv_buf.data().begin(), recv_buf.data().end() }, immediate_data);
+        std::cout << std::string_view{ recv_buf.data().begin(), recv_buf.data().end() } << std::endl;
+        std::cout << "imm = " << immediate_data;
     } else {
         shoc::logger->error("failed to receive data: {}", doca_error_get_descr(err));
     }
