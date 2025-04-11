@@ -163,7 +163,10 @@ namespace shoc {
         return devinfo_has_capabilities(as_devinfo(), required_caps);
     }
 
-    auto device::find_by_pci_addr(std::string const &pci_addr, std::initializer_list<device_capability> required_caps) -> device {
+    auto device::find_by_pci_addr(
+        std::string const &pci_addr,
+        std::initializer_list<device_capability> required_caps
+    ) -> device {
         for(auto dev : device_list{}) {
             std::uint8_t is_addr_equal = 0;
             auto err = doca_devinfo_is_equal_pci_addr(dev, pci_addr.c_str(), &is_addr_equal);
@@ -175,6 +178,30 @@ namespace shoc {
             ) {
                 doca_dev *dev_handle = nullptr;
 
+                if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
+                    return device { dev_handle };
+                }
+            }
+        }
+
+        throw doca_exception(DOCA_ERROR_NOT_FOUND);
+    }
+
+    auto device::find_by_ibdev_name(
+        std::string const &requested_name,
+        std::initializer_list<device_capability> required_caps
+    ) -> device {
+        char dev_name[DOCA_DEVINFO_IBDEV_NAME_SIZE];
+
+        for(auto dev : device_list {}) {
+            auto err = doca_devinfo_get_ibdev_name(dev, dev_name, sizeof dev_name);
+
+            if(
+                err == DOCA_SUCCESS &&
+                dev_name == requested_name &&
+                devinfo_has_capabilities(dev, required_caps)
+            ) {
+                doca_dev *dev_handle = nullptr;
                 if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
                     return device { dev_handle };
                 }

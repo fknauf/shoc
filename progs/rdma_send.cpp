@@ -50,10 +50,10 @@ auto rdma_exchange_connection_details(
 
 auto rdma_send(
     shoc::progress_engine_lease engine,
-    char const *dev_pci,
+    std::string const &ibdev_name,
     std::string const &remote_address
 ) -> boost::cobalt::detached try {
-    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
+    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::rdma);
 
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
     auto conn = rdma->export_connection();
@@ -104,7 +104,7 @@ auto co_main(
     auto env = bluefield_env{};
     auto engine = shoc::progress_engine{};
 
-    rdma_send(&engine, env.dev_pci, argv[1]);
+    rdma_send(&engine, env.ibdev_name, argv[1]);
 
     co_await engine.run();
 }

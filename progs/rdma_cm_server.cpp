@@ -20,9 +20,9 @@
 
 auto rdma_cm_serve(
     shoc::progress_engine_lease engine,
-    char const *dev_pci
+    std::string const &ibdev_name
 ) -> boost::cobalt::detached try {
-    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::rdma);
+    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
 
     shoc::logger->debug("listening for RDMA CM on port 18515...");
@@ -68,7 +68,7 @@ auto co_main(
     auto env = bluefield_env{};
     auto engine = shoc::progress_engine{};
 
-    rdma_cm_serve(&engine, env.dev_pci);
+    rdma_cm_serve(&engine, env.ibdev_name);
 
     co_await engine.run();
 }

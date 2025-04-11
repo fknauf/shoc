@@ -39,10 +39,15 @@ namespace shoc {
         [[nodiscard]] auto has_capabilities(std::initializer_list<device_capability> required_caps) const noexcept -> bool;
 
         [[nodiscard]] static auto find_by_pci_addr(std::string const &pci_addr, std::initializer_list<device_capability> required_caps = {}) -> device;
+        [[nodiscard]] static auto find_by_ibdev_name(std::string const &ibdev_name, std::initializer_list<device_capability> required_caps = {}) -> device;
         [[nodiscard]] static auto find_by_capabilities(std::initializer_list<device_capability> required_caps) -> device;
 
         [[nodiscard]] static auto find_by_pci_addr(std::string const &pci_addr, device_capability required_cap) -> device {
             return find_by_pci_addr(pci_addr, { required_cap });
+        }
+
+        [[nodiscard]] static auto find_by_ibdev_name(std::string const &ibdev_name, device_capability required_cap) -> device {
+            return find_by_ibdev_name(ibdev_name, { required_cap });
         }
 
         [[nodiscard]] static auto find_by_capabilities(device_capability required_cap) -> device {
