@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "shoc",
   "version": "0.1.0",
-  "builtin-baseline": "ab42fb3032acd29dd12cea7897f85025526a60e6",
+  "builtin-baseline": "df8bfe519564ae001903e5cdd32af0999531ef71",
   "dependencies": [
     "boost-cobalt",
     "cppcodec",
