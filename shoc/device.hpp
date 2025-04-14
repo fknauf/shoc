@@ -19,7 +19,8 @@ namespace shoc {
         dma,
         rdma,
         aes_gcm,
-        sync_event_pci
+        sync_event_pci,
+        erasure_coding
     };
 
     /**

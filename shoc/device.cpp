@@ -6,6 +6,7 @@
 #include <doca_comch_consumer.h>
 #include <doca_comch_producer.h>
 #include <doca_dma.h>
+#include <doca_erasure_coding.h>
 #include <doca_rdma.h>
 #include <doca_sync_event.h>
 
@@ -126,6 +127,11 @@ namespace shoc {
                 case device_capability::sync_event_pci:
                     return doca_sync_event_cap_is_export_to_remote_pci_supported(dev) == DOCA_SUCCESS
                         && doca_sync_event_cap_task_wait_eq_is_supported(dev) == DOCA_SUCCESS
+                        ;
+                case device_capability::erasure_coding:
+                    return doca_ec_cap_task_create_is_supported(dev) == DOCA_SUCCESS
+                        && doca_ec_cap_task_update_is_supported(dev) == DOCA_SUCCESS
+                        && doca_ec_cap_task_recover_is_supported(dev) == DOCA_SUCCESS
                         ;
                 default:
                     return false;

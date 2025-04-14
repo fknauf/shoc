@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <memory>
 #include <span>
@@ -47,6 +48,13 @@ namespace shoc {
             return aligned_;
         }
 
+        auto assign(std::span<std::byte const> data) -> void {
+            assert(data.size() < aligned_.size());
+
+            auto last = std::copy(data.begin(), data.end(), aligned_.begin());
+            std::fill(last, aligned_.end(), std::byte{});
+        }
+
     private:
         std::vector<std::byte> memory_;
         std::span<std::byte> aligned_;
@@ -75,6 +83,22 @@ namespace shoc {
         auto writable_block(std::size_t index) {
             auto offset = index * block_size_;
             return memory_.as_writable_bytes().subspan(offset, block_size_);
+        }
+
+        auto as_bytes() const {
+            return memory_.as_bytes();
+        }
+
+        auto as_writable_bytes() {
+            return memory_.as_writable_bytes();
+        }
+
+        auto assign(std::span<std::byte const> data) -> void {
+            memory_.assign(data);
+        }
+
+        auto assign(std::span<char const> data) -> void{
+            memory_.assign(std::as_bytes(data));
         }
 
     private:

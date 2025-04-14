@@ -18,6 +18,7 @@ pkg_check_modules(
     doca-compress
     doca-comch
     doca-dma
+    doca-erasure-coding
     doca-rdma)
 
 file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
@@ -48,6 +49,7 @@ add_library(
     shoc/context.cpp
     shoc/device.cpp
     shoc/dma.cpp
+    shoc/erasure_coding.cpp
     shoc/logger.cpp
     shoc/memory_map.cpp
     shoc/progress_engine.cpp
@@ -118,6 +120,7 @@ add_executable(test-shoc
     tests/group_compress.cpp
     tests/group_dma.cpp
     tests/group_engine.cpp
+    tests/group_erasure_coding.cpp
 )
 target_link_libraries(test-shoc shoc GTest::gtest GTest::gtest_main)
 
