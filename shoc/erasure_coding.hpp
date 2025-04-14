@@ -71,7 +71,7 @@ namespace shoc {
         ec_context(
             context_parent *parent,
             device dev,
-            std::uint32_t max_tasks
+            std::uint32_t max_tasks = 16
         );
 
         auto create(
