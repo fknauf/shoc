@@ -25,14 +25,14 @@ namespace shoc {
     ec_update_matrix::ec_update_matrix(
         ec_context const &ctx,
         ec_coding_matrix const &coding_matrix,
-        std::span<std::uint32_t> update_indices
+        std::span<std::uint32_t const> update_indices
     ) {
         doca_ec_matrix *matrix;
 
         enforce_success(doca_ec_matrix_create_update(
             ctx.handle(),
             coding_matrix.handle(),
-            update_indices.data(),
+            const_cast<std::uint32_t*>(update_indices.data()),
             update_indices.size(),
             &matrix
         ));
@@ -43,14 +43,14 @@ namespace shoc {
     ec_recover_matrix::ec_recover_matrix(
         ec_context const &ctx,
         ec_coding_matrix const &coding_matrix,
-        std::span<std::uint32_t> missing_indices
+        std::span<std::uint32_t const> missing_indices
     ) {
         doca_ec_matrix *matrix;
 
         enforce_success(doca_ec_matrix_create_recover(
             ctx.handle(),
             coding_matrix.handle(),
-            missing_indices.data(),
+            const_cast<std::uint32_t*>(missing_indices.data()),
             missing_indices.size(),
             &matrix
         ));
@@ -96,7 +96,7 @@ namespace shoc {
     auto ec_context::create(
         ec_coding_matrix const &coding_matrix,
         buffer const &original_data_blocks,
-        buffer &rdnc_blocks        
+        buffer &rdnc_blocks
     ) -> coro::status_awaitable<> {
         return detail::plain_status_offload<
             doca_ec_task_create_allocate_init,
@@ -144,4 +144,3 @@ namespace shoc {
         );
     }
 }
-

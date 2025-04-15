@@ -43,6 +43,12 @@ namespace shoc {
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
         );
 
+        memory_map(
+            std::initializer_list<device> devices,
+            std::span<std::byte const> range,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_ONLY
+        );
+
         /**
          * @param devices list of devices that'll have access to this memory
          * @param range memory region to map as a contiguous range of std::byte, char, or uint8_t
@@ -56,6 +62,14 @@ namespace shoc {
             memory_map { devices, create_span<std::byte>(std::forward<decltype(range)>(range)), permissions }
         {}
 
+        memory_map(
+            std::initializer_list<device> devices,
+            const_byte_range auto &&range,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_ONLY
+        ):
+            memory_map { devices, create_span<std::byte const>(std::forward<decltype(range)>(range)), permissions }
+        {}
+
         /**
          * Convenience constructor for mappings involving a single device
          *
@@ -67,6 +81,14 @@ namespace shoc {
             device dev,
             non_cv_byte_range auto &&range,
             std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
+        ):
+            memory_map(std::initializer_list{dev}, std::forward<decltype(range)>(range), permissions)
+        {}
+
+        memory_map(
+            device dev,
+            const_byte_range auto &&range,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_ONLY
         ):
             memory_map(std::initializer_list{dev}, std::forward<decltype(range)>(range), permissions)
         {}

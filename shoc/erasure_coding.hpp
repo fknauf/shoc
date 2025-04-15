@@ -35,9 +35,9 @@ namespace shoc {
         ec_recover_matrix(
             ec_context const &ctx,
             ec_coding_matrix const &coding_matrix,
-            std::span<std::uint32_t> missing_indices
+            std::span<std::uint32_t const> missing_indices
         );
-    
+
         [[nodiscard]]
         auto handle() const noexcept { return handle_.get(); }
 
@@ -50,7 +50,7 @@ namespace shoc {
         ec_update_matrix(
             ec_context const &ctx,
             ec_coding_matrix const &coding_matrix,
-            std::span<std::uint32_t> update_indices
+            std::span<std::uint32_t const> update_indices
         );
 
         [[nodiscard]]
@@ -103,7 +103,7 @@ namespace shoc {
         [[nodiscard]]
         auto update_matrix(
             ec_coding_matrix const &coding_matrix,
-            std::span<std::uint32_t> update_indices
+            std::span<std::uint32_t const> update_indices
         ) const {
             return ec_update_matrix(*this, coding_matrix, update_indices);
         }
@@ -111,12 +111,12 @@ namespace shoc {
         [[nodiscard]]
         auto recover_matrix(
             ec_coding_matrix const &coding_matrix,
-            std::span<std::uint32_t> missing_indices
+            std::span<std::uint32_t const> missing_indices
         ) const {
             return ec_recover_matrix(*this, coding_matrix, missing_indices);
         }
 
     private:
         device dev_;
-    }; 
+    };
 }

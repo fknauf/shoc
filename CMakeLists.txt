@@ -11,7 +11,7 @@ add_compile_options(-Wall -Wextra -Werror $<$<COMPILE_LANGUAGE:CXX>:-Wno-mismatc
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(
-    DOCA 
+    DOCA
     REQUIRED
     doca-aes-gcm
     doca-common
@@ -61,7 +61,7 @@ add_library(
 )
 
 target_link_libraries(
-    shoc 
+    shoc
     PUBLIC
     Boost::cobalt
     spdlog::spdlog
@@ -180,5 +180,8 @@ target_link_libraries(bug-comch-consumer-start-lost-client ${DOCA_LIBRARIES})
 add_executable(encrypt progs/encrypt.cpp)
 target_link_libraries(encrypt shoc cxxopts::cxxopts)
 
-add_executable(erasure_encoder progs/erasure_encoder.cpp)
-target_link_libraries(erasure_encoder shoc cxxopts::cxxopts)
+add_executable(erasure_encode progs/erasure_encode.cpp)
+target_link_libraries(erasure_encode shoc cxxopts::cxxopts)
+
+add_executable(erasure_recover progs/erasure_recover.cpp)
+target_link_libraries(erasure_recover shoc cxxopts::cxxopts)

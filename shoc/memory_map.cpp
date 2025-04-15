@@ -21,8 +21,7 @@ namespace shoc {
         enforce_success(doca_mmap_create(&map));
         handle_.reset(map);
 
-        auto u8range = reinterpret_span<std::uint8_t>(range);
-        enforce_success(doca_mmap_set_memrange(handle(), u8range.data(), u8range.size()));
+        enforce_success(doca_mmap_set_memrange(handle(), range.data(), range.size()));
 
         for(auto &dev : devices) {
             enforce_success(doca_mmap_add_dev(handle(), dev.handle()));
@@ -31,6 +30,21 @@ namespace shoc {
         enforce_success(doca_mmap_set_permissions(handle(), permissions));
         enforce_success(doca_mmap_start(handle()));
     }
+
+    memory_map::memory_map(
+        std::initializer_list<device> devices,
+        std::span<std::byte const> range,
+        std::uint32_t permissions
+    ):
+        memory_map {
+            devices,
+            std::span {
+                const_cast<std::byte*>(range.data()),
+                range.size()
+            },
+            permissions
+        }
+    {}
 
     memory_map::memory_map(
         device const &dev,

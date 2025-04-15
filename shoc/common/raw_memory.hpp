@@ -68,6 +68,12 @@ namespace shoc {
     template<typename R>
     concept byte_range = spannable_range<R> && byteish<std::ranges::range_value_t<R>>;
 
+    template<typename R>
+    concept const_byte_range =
+        spannable_range<R>
+        && byteish<std::ranges::range_value_t<R>>
+        && std::is_const_v<std::ranges::range_value_t<R>>;
+
     /**
      * Create a byte-span from a base address and size
      *
@@ -85,7 +91,7 @@ namespace shoc {
 
     /**
      * Reinterpret a byte span from one byte-type to another, e.g. span<char> -> span<byte>
-     * 
+     *
      * @param in input span
      * @return same span punned to a different byte type
      */
@@ -102,7 +108,7 @@ namespace shoc {
     /**
      * Create a span of bytes a range of bytes, possibly across different byte types,
      * e.g. std::string -> std::span<std::byte>
-     * 
+     *
      * @param in input range
      * @return the range's memory region as a span of bytes
      */

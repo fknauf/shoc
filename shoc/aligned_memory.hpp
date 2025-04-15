@@ -17,7 +17,7 @@ namespace shoc {
             auto base_ptr = static_cast<void*>(memory_.data());
             auto space = memory_.size();
             std::align(alignment, size, base_ptr, space);
-    
+
             aligned_ = std::span { static_cast<std::byte*>(base_ptr), size };
         }
 
@@ -66,6 +66,8 @@ namespace shoc {
 
     class aligned_blocks {
     public:
+        aligned_blocks() = default;
+
         aligned_blocks(std::size_t block_count, std::size_t block_size):
             memory_ { block_count * block_size },
             block_count_ { block_count },
@@ -103,7 +105,7 @@ namespace shoc {
 
     private:
         aligned_memory memory_;
-        std::size_t block_count_;
-        std::size_t block_size_;
+        std::size_t block_count_ = 0;
+        std::size_t block_size_ = 0;
     };
 }
