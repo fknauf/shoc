@@ -16,7 +16,7 @@ namespace shoc {
         {
             auto base_ptr = static_cast<void*>(memory_.data());
             auto space = memory_.size();
-            std::align(64, size, base_ptr, space);
+            std::align(alignment, size, base_ptr, space);
     
             aligned_ = std::span { static_cast<std::byte*>(base_ptr), size };
         }

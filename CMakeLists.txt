@@ -179,3 +179,6 @@ target_link_libraries(bug-comch-consumer-start-lost-client ${DOCA_LIBRARIES})
 
 add_executable(encrypt progs/encrypt.cpp)
 target_link_libraries(encrypt shoc cxxopts::cxxopts)
+
+add_executable(erasure_encoder progs/erasure_encoder.cpp)
+target_link_libraries(erasure_encoder shoc cxxopts::cxxopts)
