@@ -16,6 +16,9 @@
 #include <unordered_map>
 
 namespace shoc {
+    /**
+     * Configuration parameters of an RDMA offloading context
+     */
     struct rdma_config {
         std::uint32_t rdma_permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE;
         std::optional<std::uint32_t> gid_index = std::nullopt;
@@ -26,6 +29,9 @@ namespace shoc {
 
     class rdma_context;
 
+    /**
+     * Address for RDMA CM connections
+     */
     class rdma_address {
     public:
         friend class rdma_context;
@@ -77,6 +83,10 @@ namespace shoc {
         client
     };
 
+    /**
+     * Encapsulation of an RDMA connection. Obtained from rdma_context. Most tasks
+     * are offloaded here.
+     */
     class rdma_connection {
     public:
         rdma_connection(rdma_context *parent);
@@ -84,38 +94,87 @@ namespace shoc {
         // for RDMA CM, where the doca_rdma_connection object already exists
         rdma_connection(rdma_context *parent, doca_rdma_connection *cm_conn) noexcept;
 
+        /**
+         * Establish connection with remote when connection details are exchanged out
+         * of band (without CM)
+         * 
+         * When connecting without CM, the connection is exported from rdma_context and
+         * connection details are exchanged out of band. After that the connection is
+         * established using the remote connection details. This function does that.
+         * 
+         * @param remote_details connection details as exported on the remote side
+         */
         auto connect(std::span<std::byte const> remote_details) -> void;
         auto connect(std::string_view remote_details) -> void;
 
+        /**
+         * @return exported connection details for out-of-band exchange (when not using CM)
+         */
         [[nodiscard]]
         auto details() const noexcept {
             return details_;
         }
 
+        /**
+         * IB send verb
+         * 
+         * @param src buffer to send
+         */
         auto send(
             buffer const &src
         ) -> coro::status_awaitable<>;
 
+        /**
+         * IB send_imm verb
+         * 
+         * @param src buffer to send
+         * @param immediate_data immediate data to send alongside the buffer
+         */
         auto send(
             buffer const &src,
             std::uint32_t immediate_data
         ) -> coro::status_awaitable<>;
 
+        /**
+         * IB receive verb. Must be called before the remote sends.
+         * 
+         * @param dest destination buffer to receive the data
+         * @param immediate_data pointer to a buffer for immediate data, or nullptr if none
+         */
         auto receive(
             buffer &dest,
             std::uint32_t *immediate_data = nullptr
         ) -> coro::status_awaitable<std::uint32_t>;
 
+        /**
+         * IB read verb: read remote memory location to local
+         * 
+         * @param src remote source buffer
+         * @param dest local destination buffer
+         */
         auto read(
             buffer const &src,
             buffer &dest
         ) -> coro::status_awaitable<>;
 
+        /**
+         * IB write: write to remote memory location
+         * 
+         * @param src local source buffer
+         * @param dest remote destination buffer
+         */
         auto write(
             buffer const &src,
             buffer &dest
         ) -> coro::status_awaitable<>;
 
+        /**
+         * IB write_imm: write to remote memory location
+         * 
+         * @param src local source buffer
+         * @param dest remote destination buffer
+         * @param immediate_data immediate data to send alongside the write
+         */
         auto write(
             buffer const &src,
             buffer &dest,

@@ -1,7 +1,7 @@
 # Simple Hardware-Offloading Coroutines (SHOC) for Bluefield DPUs
 
-This repo contains a SHOC implementation for Bluefield DPUs, a C++ toolkit for simpler DOCA development built around C++20 coroutines.
-It is supplementary to the corresponding short paper submission to USENIX ATC 2025.
+This repo contains a SHOC implementation for Bluefield DPUs, a C++ toolkit for simpler DOCA development built
+around C++20 coroutines and integrated into Boost.Cobalt.
 
 This README assumes familiarity (at least in broad strokes) with the core concepts of the DOCA SDK.
 
@@ -46,40 +46,6 @@ Afterwards, per-trial results are in the `results` subdirectory. A summary can b
 
 The columns of the summary correspond to table 1 in the short paper.
 
-## Notes about reproduction on Bluefield-3
-
-We got access to a BF-3 card only shortly before submission of the paper, so all experimental results in the paper
-were obtained on a Bluefield-2. SHOC is not limited to BF-2, but we ran into some compatibility issues with the experiments:
-
-1. Deflate compression is no longer available on Bluefield-3, so the compression experiment does not work there.
-
-2. The comch experiment client side triggers a bug in DOCA 2.9: the consumer's start event is lost on BF-3
-when the `epoll`-based waiting mechanism is used. This can be worked around in SHOC by replacing the `wait` method in
-`shoc/progress_engine.cpp` with
-
-```c++
-auto progress_engine::wait([[maybe_unused]] int timeout_ms) -> void {
-    return epoll_.wait(0);
-}
-```
-
-and in plain DOCA by removing from function `receive_datastream` in `progs/plain_doca/comch_data_client/client.c` the calls
-to `doca_request_notification` and `doca_clear_notification` and setting the epoll timeout to 0:
-
-```c
-    // doca_pe_request_notification(engine);
-    nfd = epoll_wait(epoll_fd, &ep_event, 1, 0);
-
-    ...
-    // doca_pe_clear_notification(engine, 0);
-```
-
-However, this will cause the client to busy-wait and likely skew the experimental results.
-
-3. The DMA experiment works out of the box, but 4 parallel tasks are not enough to saturate a Bluefield-3. To run the experiment
-at saturation, amend `experiments/dma_client.sh` to start `bench/dma_client` and `bench/doca_dma_client` with a number greater than
-4 as parameter for the parallel case. In our setup, 32 was enough.
-
 ## Motivation and Motivating Example
 
 Bluefield DPUs come with the C-based DOCA SDK, a callback-based asynchronous
@@ -114,14 +80,16 @@ By contrast the coroutines-based model allows us to keep the whole logic in a si
 
 ```c++
 #include "shoc/comch/client.hpp"
-#include "shoc/coro/fiber.hpp"
 #include "shoc/logger.hpp"
 #include "shoc/progress_engine.hpp"
 
+#include <boost/cobalt.hpp>
 #include <iostream>
 
-auto ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
-    auto dev = shoc::comch::comch_device { "81:00.0" };
+auto ping_pong(
+    shoc::progress_engine_lease engine
+) -> boost::cobalt::detached {
+    auto dev = shoc::device::find_by_pci_addr("e1:00.0", shoc::device_capability::comch_client);
 
     // wait for connection to server, that is: create the context and ask the SDK to start
     // it, then suspend. The coroutine will be resumed by the state-changed handler when
@@ -143,16 +111,19 @@ auto ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
     // is stopped, co_await client->stop() is possible.
 }
 
-int main() {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     auto engine = shoc::progress_engine {};
 
     // spawn coroutine. It will run up to the first co_await, then control returns to main.
     ping_pong(&engine);
 
     // start event processing loop. This will resume the suspended coroutine whenever an
-    // event is processed that concerns it. By default the main loop runs until all
-    // dependent contexts are stopped.
-    engine.main_loop();
+    // event is processed that concerns it. Runs as long as offloading contexts exist
+    // or there are still fibers holding a shoc::progress_engine_lease.
+    co_await engine.run();
 }
 ```
 
@@ -162,13 +133,15 @@ spawning a new coroutine:
 
 ```c++
 #include "shoc/comch/server.hpp"
-#include "shoc/coro/fiber.hpp"
 #include "shoc/progress_engine.hpp"
 
+#include <boost/cobalt.hpp>
 #include <iostream>
 #include <string_view>
 
-auto ping_pong(shoc::comch::scoped_server_connection con) -> shoc::coro::fiber {
+auto ping_pong(
+    shoc::comch::scoped_server_connection con
+) -> boost::cobalt::detached {
     auto msg = co_await con->msg_recv();
     std::cout << msg << std::endl;
     auto status = co_await con->send("pong");
@@ -181,9 +154,11 @@ auto ping_pong(shoc::comch::scoped_server_connection con) -> shoc::coro::fiber {
     // co_await con->disconnect(); is possible when required.
 }
 
-auto serve_ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
-    auto dev = shoc::comch::comch_device { "03:00.0" };
-    auto rep = shoc::device_representor::find_by_pci_addr ( dev, "81:00.0" );
+auto serve_ping_pong(
+    shoc::progress_engine_lease engine
+) -> shoc::coro::fiber {
+    auto dev = shoc::device::find_by_pci_addr("03:00.0", shoc::device_capability::comch_server);
+    auto rep = shoc::device_representor::find_by_pci_addr(dev, "81:00.0");
 
     auto server = co_await engine->create_context<shoc::comch::server>("shoc-test", dev, rep);
 
@@ -197,11 +172,13 @@ auto serve_ping_pong(shoc::progress_engine *engine) -> shoc::coro::fiber {
     }
 }
 
-int main() {
+auto co_main(
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
+) -> boost::cobalt::main {
     auto engine = shoc::progress_engine{};
     serve_ping_pong(&engine);
-
-    engine.main_loop();
+    co_await engine.run();
 }
 ```
 
