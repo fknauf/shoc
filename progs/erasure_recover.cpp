@@ -37,10 +37,11 @@ public:
 
         auto ignored_set = std::unordered_set<std::uint32_t>(ignored.begin(), ignored.end());
         assert(ignored.size() == ignored_set.size());
-        auto block_count = data_block_count_ + rdnc_block_count_ - ignored_set.size();
 
-        available_blocks_ = shoc::aligned_blocks { block_count, block_size_ };
+        available_blocks_ = shoc::aligned_blocks { data_block_count_, block_size_ };
         auto dest_idx = std::size_t{0};
+
+        shoc::logger->debug("loading {} available blocks of {} bytes", data_block_count_, block_size_);
 
         for(auto block : json["blocks"]) {
             auto src_idx = block["index"].get<std::uint32_t>();
@@ -58,6 +59,10 @@ public:
                 [](std::uint8_t c) { return static_cast<std::byte>(c); }
             );
             ++dest_idx;
+
+            if(dest_idx >= data_block_count_) {
+                break;
+            }
         }
     }
 
