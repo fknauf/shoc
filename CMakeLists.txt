@@ -52,6 +52,7 @@ add_library(
     shoc/device.cpp
     shoc/dma.cpp
     shoc/erasure_coding.cpp
+    shoc/flow.cpp
     shoc/logger.cpp
     shoc/memory_map.cpp
     shoc/progress_engine.cpp
