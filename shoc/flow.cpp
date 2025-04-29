@@ -161,4 +161,171 @@ namespace shoc {
     auto flow_port::pipes_dump(FILE *dest) -> void {
         doca_flow_port_pipes_dump(handle(), dest);
     }
+
+    flow_pipe_cfg::flow_pipe_cfg(flow_port const &port) {
+        doca_flow_pipe_cfg *raw_handle;
+        enforce_success(doca_flow_pipe_cfg_create(&raw_handle, port.handle()));
+        handle_.reset(raw_handle);
+    }
+
+    auto flow_pipe_cfg::set_match(
+        doca_flow_match const &match,
+        std::optional<doca_flow_match> const &match_mask
+    ) -> flow_pipe_cfg & {
+        enforce_success(doca_flow_pipe_cfg_set_match(
+            handle(),
+            &match,
+            match_mask.has_value() ? &*match_mask : nullptr
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_actions(
+        std::span<doca_flow_actions *const> actions,
+        std::optional<std::span<doca_flow_actions *const>> actions_masks,
+        std::optional<std::span<doca_flow_action_descs *const>> action_descs
+    ) -> flow_pipe_cfg & {
+        enforce(!actions_masks.has_value() || actions_masks->size() == actions.size(), DOCA_ERROR_INVALID_VALUE);
+        enforce(!action_descs.has_value() || action_descs->size() == actions.size(), DOCA_ERROR_INVALID_VALUE);
+
+        enforce_success(doca_flow_pipe_cfg_set_actions(
+            handle(),
+            actions.data(),
+            actions_masks.has_value() ? actions_masks->data() : nullptr,
+            action_descs.has_value() ? action_descs->data() : nullptr,
+            actions.size()
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_monitor(
+        doca_flow_monitor const &monitor
+    ) -> flow_pipe_cfg & {
+        enforce_success(doca_flow_pipe_cfg_set_monitor(
+            handle(),
+            &monitor
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_ordered_lists(
+        std::span<doca_flow_ordered_list *const> ordered_lists
+    ) -> flow_pipe_cfg & {
+        enforce_success(doca_flow_pipe_cfg_set_ordered_lists(
+            handle(),
+            ordered_lists.data(),
+            ordered_lists.size()
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_name(
+        char const *name
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_name(
+            handle(),
+            name
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_type(
+        doca_flow_pipe_type type
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_type(
+            handle(),
+            type
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_domain(
+        doca_flow_pipe_domain domain
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_domain(
+            handle(),
+            domain
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_is_root(
+        bool is_root
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_is_root(
+            handle(),
+            is_root
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_nr_entries(
+        std::uint32_t nr_entries
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_nr_entries(
+            handle(),
+            nr_entries
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_is_resizable(
+        bool is_resizable
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_is_resizable(
+            handle(),
+            is_resizable
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_dir_info(
+        doca_flow_direction_info dir_info
+    ) -> flow_pipe_cfg & {
+        enforce_success(doca_flow_pipe_cfg_set_dir_info(
+            handle(),
+            dir_info
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_miss_counter(
+        bool miss_counter
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_miss_counter(
+            handle(),
+            miss_counter
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_congestion_level_threshold(
+        std::uint8_t congestion_level_threshold
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_congestion_level_threshold(
+            handle(),
+            congestion_level_threshold
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_user_ctx(
+        void *user_ctx
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_user_ctx(
+            handle(),
+            user_ctx
+        ));
+        return *this;
+    }
+
+    auto flow_pipe_cfg::set_hash_map_algorithm(
+        std::uint32_t algorithm_flags
+    ) -> flow_pipe_cfg& {
+        enforce_success(doca_flow_pipe_cfg_set_hash_map_algorithm(
+            handle(),
+            algorithm_flags
+        ));
+        return *this;
+    }
 }
