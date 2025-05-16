@@ -1,7 +1,19 @@
-#include "error.hpp"
 #include "flow.hpp"
 
+#include "common/overload.hpp"
+#include "error.hpp"
+
+#include <boost/container/small_vector.hpp>
+
+#include <algorithm>
+#include <ranges>
+#include <utility>
+
 namespace shoc {
+    /////////////////////
+    // flow_cfg
+    /////////////////////
+
     auto flow_cfg::ensure_handle_exists() -> void {
         if(!handle_) {
             doca_flow_cfg *raw_handle;
@@ -68,6 +80,10 @@ namespace shoc {
     //auto flow_cfg::set_cb_entry_process(doca_flow_entry_process_cb cb) -> flow_cfg &;
     //auto flow_cfg::set_cb_shared_resource_unbind(doca_flow_shared_resource_unbind_cb) -> flow_cfg &;
 
+    auto flow_cfg::build() const -> flow_library_scope {
+        return { *this };
+    }
+
     auto flow_init(flow_cfg const &cfg) -> doca_error_t {
         return doca_flow_init(cfg.handle());
     }
@@ -76,12 +92,21 @@ namespace shoc {
         doca_flow_destroy();
     }
 
+    /////////////////////
+    // flow_port_cfg
+    /////////////////////
+
     auto flow_port_cfg::ensure_handle_exists() -> void {
         if(!handle_) {
             doca_flow_port_cfg *raw_handle;
             enforce_success(doca_flow_port_cfg_create(&raw_handle));
             handle_.reset(raw_handle);
         }
+    }
+
+    auto flow_port_cfg::set_port_id(std::uint16_t port_id) -> flow_port_cfg& {
+        enforce_success(doca_flow_port_cfg_set_port_id(safe_handle(), port_id));
+        return *this;
     }
 
     auto flow_port_cfg::set_devargs(char const *devargs) -> flow_port_cfg& {
@@ -162,10 +187,47 @@ namespace shoc {
         doca_flow_port_pipes_dump(handle(), dest);
     }
 
+    /////////////////////////
+    // flow_extended_actions
+    /////////////////////////
+
+    flow_extended_actions::flow_extended_actions(
+        doca_flow_actions const &actions,
+        std::optional<doca_flow_actions> const &mask,
+        std::vector<doca_flow_action_desc> descs
+    ):
+        actions_ { actions },
+        mask_ { mask },
+        descs_ { std::move(descs) }
+    {
+        enforce(descs.size() < 256, DOCA_ERROR_INVALID_VALUE);
+    }
+
+    auto flow_extended_actions::descs_ptr() -> doca_flow_action_descs* {
+        descs_index_ = { 
+            .nb_action_desc = static_cast<std::uint8_t>(descs_.size()),
+            .desc_array = descs_.data()
+        };
+
+        return &descs_index_;
+    }
+
+    /////////////////////////
+    // flow_pipe_cfg
+    /////////////////////////
+
+
     flow_pipe_cfg::flow_pipe_cfg(flow_port const &port) {
         doca_flow_pipe_cfg *raw_handle;
         enforce_success(doca_flow_pipe_cfg_create(&raw_handle, port.handle()));
         handle_.reset(raw_handle);
+    }
+
+    auto flow_pipe_cfg::build(
+        flow_fwd fwd,
+        flow_fwd fwd_miss
+    ) const -> flow_pipe {
+        return { *this, std::move(fwd), std::move(fwd_miss) };
     }
 
     auto flow_pipe_cfg::set_match(
@@ -198,6 +260,22 @@ namespace shoc {
         return *this;
     }
 
+    auto flow_pipe_cfg::set_actions(
+        std::span<flow_extended_actions> actions
+    ) -> flow_pipe_cfg & {
+        auto actions_index = boost::container::small_vector<doca_flow_actions*, 128>(actions.size());
+        auto masks_index = boost::container::small_vector<doca_flow_actions*, 128>(actions.size());
+        auto descs_index = boost::container::small_vector<doca_flow_action_descs*, 128>(actions.size());
+
+        for(auto i : std::views::iota(std::size_t{0}, actions.size())) {
+            actions_index[i] = actions[i].actions_ptr();
+            masks_index[i] = actions[i].mask_ptr();
+            descs_index[i] = actions[i].descs_ptr();
+        }
+
+        return set_actions(actions_index, masks_index, descs_index);
+    }
+
     auto flow_pipe_cfg::set_monitor(
         doca_flow_monitor const &monitor
     ) -> flow_pipe_cfg & {
@@ -208,16 +286,16 @@ namespace shoc {
         return *this;
     }
 
-    auto flow_pipe_cfg::set_ordered_lists(
-        std::span<doca_flow_ordered_list *const> ordered_lists
-    ) -> flow_pipe_cfg & {
-        enforce_success(doca_flow_pipe_cfg_set_ordered_lists(
-            handle(),
-            ordered_lists.data(),
-            ordered_lists.size()
-        ));
-        return *this;
-    }
+//    auto flow_pipe_cfg::set_ordered_lists(
+//        std::span<doca_flow_ordered_list *const> ordered_lists
+//    ) -> flow_pipe_cfg & {
+//        enforce_success(doca_flow_pipe_cfg_set_ordered_lists(
+//            handle(),
+//            ordered_lists.data(),
+//            ordered_lists.size()
+//        ));
+//        return *this;
+//    }
 
     auto flow_pipe_cfg::set_name(
         char const *name
@@ -327,5 +405,57 @@ namespace shoc {
             algorithm_flags
         ));
         return *this;
+    }
+
+    /////////////////////
+    // flow_pipe
+    /////////////////////
+
+    flow_pipe::flow_pipe(
+        flow_pipe_cfg const &cfg,
+        flow_fwd fwd,
+        flow_fwd fwd_miss
+    ) {
+        auto docaify_fwd = [] (flow_fwd const &f) {
+            return std::visit(
+                overload {
+                    [](std::monostate) -> doca_flow_fwd {
+                        return {
+                            .type = DOCA_FLOW_FWD_NONE,
+                            .target = nullptr
+                        };
+                    },
+                    [](doca_flow_fwd dff) -> doca_flow_fwd {
+                        return dff;
+                    },
+                    [](flow_resource_rss_cfg const &rss_cfg) -> doca_flow_fwd {
+                        return {
+                            .type = DOCA_FLOW_FWD_RSS,
+                            .rss_type = rss_cfg.resource_type(),
+                            .rss = rss_cfg.doca_cfg()
+                        };
+                    },
+                    [](flow_pipe const &pipe) -> doca_flow_fwd {
+                        return {
+                            .type = DOCA_FLOW_FWD_PIPE,
+                            .next_pipe = pipe.handle()
+                        };
+                    }
+                },
+                f
+            );
+        };
+
+        auto fwd_doca = docaify_fwd(fwd);
+        auto fwd_miss_doca = docaify_fwd(fwd_miss);
+
+        doca_flow_pipe *raw_handle;
+        enforce_success(doca_flow_pipe_create(
+            cfg.handle(),
+            &fwd_doca,
+            &fwd_miss_doca,
+            &raw_handle
+        )); 
+        handle_.reset(raw_handle);
     }
 }

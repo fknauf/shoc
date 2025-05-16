@@ -19,6 +19,7 @@ pkg_check_modules(
     doca-comch
     doca-dma
     doca-erasure-coding
+    doca-flow
     doca-rdma
     doca-sha
 )
@@ -186,3 +187,6 @@ target_link_libraries(erasure_encode shoc cxxopts::cxxopts)
 
 add_executable(erasure_recover progs/erasure_recover.cpp)
 target_link_libraries(erasure_recover shoc cxxopts::cxxopts)
+
+add_executable(flow_geneve_encap progs/flow_geneve_encap.cpp)
+target_link_libraries(flow_geneve_encap shoc cxxopts::cxxopts)
