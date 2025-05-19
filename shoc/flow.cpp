@@ -411,16 +411,12 @@ namespace shoc {
     // flow_pipe
     /////////////////////
 
-    flow_pipe::flow_pipe(
-        flow_pipe_cfg const &cfg,
-        flow_fwd fwd,
-        flow_fwd fwd_miss
-    ) {
-        auto docaify_fwd = [] (flow_fwd const &f) {
+    namespace {
+        auto docaify_fwd(flow_fwd const &f) {
             return std::visit(
                 overload {
                     [](std::monostate) -> doca_flow_fwd {
-                        return {
+                       return {
                             .type = DOCA_FLOW_FWD_NONE,
                             .target = nullptr
                         };
@@ -440,12 +436,18 @@ namespace shoc {
                             .type = DOCA_FLOW_FWD_PIPE,
                             .next_pipe = pipe.handle()
                         };
-                    }
+                    },
                 },
                 f
             );
-        };
+        }
+    }
 
+    flow_pipe::flow_pipe(
+        flow_pipe_cfg const &cfg,
+        flow_fwd fwd,
+        flow_fwd fwd_miss
+    ) {
         auto fwd_doca = docaify_fwd(fwd);
         auto fwd_miss_doca = docaify_fwd(fwd_miss);
 
@@ -457,5 +459,32 @@ namespace shoc {
             &raw_handle
         )); 
         handle_.reset(raw_handle);
+    }
+
+    auto flow_pipe::add_entry(
+        std::uint16_t pipe_queue,
+        doca_flow_match const &match,
+        std::optional<doca_flow_actions> actions,
+        std::optional<doca_flow_monitor> monitor,
+        flow_fwd fwd,
+        std::uint32_t flags,
+        void *usr_ctx
+    ) -> flow_pipe_entry {
+        doca_flow_pipe_entry *entry_handle;
+        auto fwd_doca = docaify_fwd(fwd);
+
+        enforce_success(doca_flow_pipe_add_entry(
+            pipe_queue,
+            handle(),
+            &match,
+            actions.has_value() ? &*actions : nullptr,
+            monitor.has_value() ? &*monitor : nullptr,
+            &fwd_doca,
+            flags,
+            usr_ctx,
+            &entry_handle
+        ));
+
+        return { entry_handle };
     }
 }
