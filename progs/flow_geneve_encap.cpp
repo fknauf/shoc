@@ -14,7 +14,7 @@ inline auto be_ipv4_addr(
     return htobe32((a << 24) | (b << 16) | (c << 8) | d);
 }
 
-auto create_match_pipe(shoc::flow_port const &src, std::uint16_t fwd_port_id) {
+auto create_match_pipe(shoc::flow::port const &src, std::uint16_t fwd_port_id) {
     doca_flow_match match = {};
     match.parser_meta.outer_l4_type = DOCA_FLOW_L4_META_TCP;
     match.parser_meta.outer_l3_type = DOCA_FLOW_L3_META_IPV4;
@@ -29,7 +29,7 @@ auto create_match_pipe(shoc::flow_port const &src, std::uint16_t fwd_port_id) {
     actions.meta.pkt_meta = std::numeric_limits<std::uint32_t>::max();
     doca_flow_actions *actions_index[] = { &actions };
 
-    return shoc::flow_pipe_cfg{ src }
+    return shoc::flow::pipe_cfg{ src }
         .set_name("MATCH_PIPE")
         .set_type(DOCA_FLOW_PIPE_BASIC)
         .set_is_root(true)
@@ -44,7 +44,7 @@ auto create_match_pipe(shoc::flow_port const &src, std::uint16_t fwd_port_id) {
         );
 }
 
-auto add_match_pipe_entries(shoc::flow_pipe &pipe) {
+auto add_match_pipe_entries(shoc::flow::pipe &pipe) {
     doca_flow_match match = {};
     match.outer.ip4.dst_ip = be_ipv4_addr(8, 8, 8, 8);
     match.outer.ip4.src_ip = be_ipv4_addr(1, 2, 3, 4);
@@ -69,7 +69,7 @@ auto add_match_pipe_entries(shoc::flow_pipe &pipe) {
     pipe.add_entry(0, match, actions, std::nullopt, std::monostate{}, 0, nullptr);
 };
 
-auto create_geneve_encap_pipe(shoc::flow_port &port, std::uint16_t fwd_port_id) {
+auto create_geneve_encap_pipe(shoc::flow::port &port, std::uint16_t fwd_port_id) {
     doca_flow_match match = {};
     doca_flow_match match_mask = {};
     match_mask.meta.pkt_meta = std::numeric_limits<std::uint32_t>::max();
@@ -119,7 +119,7 @@ auto create_geneve_encap_pipe(shoc::flow_port &port, std::uint16_t fwd_port_id) 
         &actions[3]
     };
 
-    return shoc::flow_pipe_cfg{ port }
+    return shoc::flow::pipe_cfg{ port }
         .set_name("GENEVE_ENCAP_PIPE")
         .set_type(DOCA_FLOW_PIPE_BASIC)
         .set_is_root(true)
@@ -135,7 +135,7 @@ auto create_geneve_encap_pipe(shoc::flow_port &port, std::uint16_t fwd_port_id) 
         );
 }
 
-auto add_geneve_encap_entries(shoc::flow_pipe &pipe) {
+auto add_geneve_encap_entries(shoc::flow::pipe &pipe) {
     doca_be32_t encap_dst_ip_addr = be_ipv4_addr(81, 81, 81, 81);
     doca_be32_t encap_src_ip_addr = be_ipv4_addr(11, 21, 31, 41);
     std::uint8_t encap_ttl = 17;
@@ -209,7 +209,7 @@ auto main(
     [[maybe_unused]] int argc,
     [[maybe_unused]] char *argv[]
 ) -> int {
-    auto flow_lib = shoc::flow_cfg{}
+    auto flow_lib = shoc::flow::global_cfg{}
         .set_default_rss({
             0, 0, { 0, 1, 2, 3 }, DOCA_FLOW_RSS_HASH_FUNCTION_SYMMETRIC_TOEPLITZ
         })
@@ -230,7 +230,7 @@ auto main(
         .build();
 
     auto create_port = [&](std::uint16_t port_id) {
-        return shoc::flow_port_cfg{}
+        return shoc::flow::port_cfg{}
             //.set_dev(...)
             .set_port_id(port_id)
             .set_operation_state(DOCA_FLOW_PORT_OPERATION_STATE_ACTIVE)
@@ -254,4 +254,7 @@ auto main(
 
     add_geneve_encap_entries(tun_pipe0);
     add_geneve_encap_entries(tun_pipe1);
+
+    port0.process_entries(0, std::chrono::microseconds(10000), 4);
+    port1.process_entries(0, std::chrono::microseconds(10000), 4);
 }
