@@ -29,7 +29,7 @@ auto create_match_pipe(shoc::flow::port const &src, std::uint16_t fwd_port_id) {
     actions.meta.pkt_meta = std::numeric_limits<std::uint32_t>::max();
     doca_flow_actions *actions_index[] = { &actions };
 
-    return shoc::flow::pipe_cfg{ src }
+    return shoc::flow::pipe::config { src }
         .set_name("MATCH_PIPE")
         .set_type(DOCA_FLOW_PIPE_BASIC)
         .set_is_root(true)
@@ -119,7 +119,7 @@ auto create_geneve_encap_pipe(shoc::flow::port &port, std::uint16_t fwd_port_id)
         &actions[3]
     };
 
-    return shoc::flow::pipe_cfg{ port }
+    return shoc::flow::pipe::config{ port }
         .set_name("GENEVE_ENCAP_PIPE")
         .set_type(DOCA_FLOW_PIPE_BASIC)
         .set_is_root(true)
@@ -209,12 +209,12 @@ auto main(
     [[maybe_unused]] int argc,
     [[maybe_unused]] char *argv[]
 ) -> int {
-    auto flow_lib = shoc::flow::global_cfg{}
+    auto flow_lib = shoc::flow::library_scope::config{}
         .set_default_rss({
             0, 0, { 0, 1, 2, 3 }, DOCA_FLOW_RSS_HASH_FUNCTION_SYMMETRIC_TOEPLITZ
         })
         .set_pipe_queues(4)
-        .set_mode_args("vnf, hw")
+        .set_mode_args("vnf,hws")
         .set_nr_counters(0)
         .set_nr_meters(0)
         //.set_cb_entry_process(...)

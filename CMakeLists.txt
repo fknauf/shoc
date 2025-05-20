@@ -188,5 +188,8 @@ target_link_libraries(erasure_encode shoc cxxopts::cxxopts)
 add_executable(erasure_recover progs/erasure_recover.cpp)
 target_link_libraries(erasure_recover shoc cxxopts::cxxopts)
 
-add_executable(flow_geneve_encap progs/flow_geneve_encap.cpp)
+add_executable(flow_geneve_encap progs/flow/geneve_encap.cpp)
 target_link_libraries(flow_geneve_encap shoc cxxopts::cxxopts)
+
+add_executable(flow_acl progs/flow/acl.cpp)
+target_link_libraries(flow_acl shoc cxxopts::cxxopts)

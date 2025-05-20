@@ -120,6 +120,8 @@ namespace shoc::flow {
     auto destroy() -> void;
 
     struct library_scope {
+        using config = global_cfg;
+
         library_scope(global_cfg const &cfg) {
             init(cfg);
         }
@@ -165,6 +167,8 @@ namespace shoc::flow {
 
     class port {
     public:
+        using config = port_cfg;
+
         port() = default;
         port(port_cfg const &cfg);
 
@@ -335,6 +339,8 @@ namespace shoc::flow {
 
     class pipe {
     public:
+        using config = pipe_cfg;
+
         pipe(
             pipe_cfg const &cfg,
             flow_fwd fwd,
@@ -352,7 +358,17 @@ namespace shoc::flow {
             std::optional<doca_flow_monitor> monitor,
             flow_fwd fwd,
             std::uint32_t flags,
-            void *usr_ctx
+            void *usr_ctx = nullptr
+        ) -> pipe_entry;
+
+        auto acl_add_entry(
+            std::uint16_t pipe_queue,
+            doca_flow_match const &match,
+            std::optional<doca_flow_match> const &match_mask,
+            std::uint32_t priority,
+            flow_fwd fwd,
+            doca_flow_flags_type flags,
+            void *usr_ctx = nullptr
         ) -> pipe_entry;
 
         auto update_entry(

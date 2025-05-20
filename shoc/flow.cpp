@@ -499,4 +499,31 @@ namespace shoc::flow {
 
         return { entry_handle };
     }
+
+    auto pipe::acl_add_entry(
+        std::uint16_t pipe_queue,
+        doca_flow_match const &match,
+        std::optional<doca_flow_match> const &match_mask,
+        std::uint32_t priority,
+        flow_fwd fwd,
+        doca_flow_flags_type flags,
+        void *usr_ctx
+    ) -> pipe_entry {
+        doca_flow_pipe_entry *entry_handle;
+        auto fwd_doca = docaify_fwd(fwd);
+
+        enforce_success(doca_flow_pipe_acl_add_entry(
+            pipe_queue,
+            handle(),
+            &match,
+            match_mask.has_value() ? &*match_mask : nullptr,
+            priority,
+            &fwd_doca,
+            flags,
+            usr_ctx,
+            &entry_handle
+        ));
+
+        return { entry_handle };
+    }
 }
