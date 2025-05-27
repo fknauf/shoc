@@ -1,6 +1,11 @@
-project(shoc)
-
 cmake_minimum_required(VERSION 3.22)
+
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
+    include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
+endif()
+
+project(shoc)
 
 set(CMAKE_CXX_STANDARD 20)
 # Remove when DOCA base images come with gcc > 11 preinstalled
@@ -23,9 +28,6 @@ pkg_check_modules(
     doca-rdma
     doca-sha
 )
-
-file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
-include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
 
 find_package(Boost CONFIG REQUIRED COMPONENTS cobalt)
 find_package(cxxopts CONFIG REQUIRED)
@@ -193,3 +195,6 @@ target_link_libraries(flow_geneve_encap shoc cxxopts::cxxopts)
 
 add_executable(flow_acl progs/flow/acl.cpp)
 target_link_libraries(flow_acl shoc cxxopts::cxxopts)
+
+add_executable(flow_add_to_meta progs/flow/add_to_meta.cpp)
+target_link_libraries(flow_add_to_meta shoc cxxopts::cxxopts)
