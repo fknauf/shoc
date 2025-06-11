@@ -3,6 +3,7 @@
 #include <endian.h>
 
 #include <chrono>
+#include <iostream>
 #include <thread>
 
 inline auto be_ipv4_addr(
@@ -45,13 +46,7 @@ auto create_acl_pipe(
         .set_domain(DOCA_FLOW_PIPE_DOMAIN_DEFAULT)
         .set_match(match)
         .set_actions(actions_idx)
-        .build(
-            (doca_flow_fwd) {
-                .type = DOCA_FLOW_FWD_DROP,
-                .port_id = 0
-            },
-            std::monostate{}
-        );
+        .build(shoc::flow::fwd_drop{}, std::monostate{});
 }
 
 auto add_acl_specific_entry(
@@ -66,7 +61,7 @@ auto add_acl_specific_entry(
     doca_be16_t src_port_mask,
     doca_be16_t dst_port_mask,
     std::uint16_t priority,
-    std::optional<std::uint16_t> fwd_port_id, // nullopt for deny
+    shoc::flow::flow_fwd fwd, // nullopt for deny
     doca_flow_flags_type flag
 ) {
     doca_flow_match match_mask = {};
@@ -96,21 +91,12 @@ auto add_acl_specific_entry(
         match.outer.udp.l4_port.dst_port = dst_port;
     }
 
-    doca_flow_fwd fwd = {};
-
-    if(fwd_port_id.has_value()) {
-        fwd.type = DOCA_FLOW_FWD_PORT;
-        fwd.port_id = *fwd_port_id;
-    } else {
-        fwd.type = DOCA_FLOW_FWD_DROP;
-    }
-
     return pipe.acl_add_entry(0, match, match_mask, priority, fwd, flag, nullptr);
 }
 
 auto add_acl_pipe_entries(
     shoc::flow::pipe &pipe,
-    std::uint16_t fwd_port_id
+    shoc::flow::port &fwd_port
 ) {
     add_acl_specific_entry(
         pipe,
@@ -124,7 +110,7 @@ auto add_acl_pipe_entries(
         htobe16(0),
         htobe16(0),
         10,
-        std::nullopt,
+        shoc::flow::fwd_drop{},
         DOCA_FLOW_WAIT_FOR_BATCH
     );
 
@@ -140,7 +126,7 @@ auto add_acl_pipe_entries(
         htobe16(0),
         htobe16(3000),
         50,
-        fwd_port_id,
+        fwd_port,
         DOCA_FLOW_WAIT_FOR_BATCH
     );
 
@@ -156,7 +142,7 @@ auto add_acl_pipe_entries(
         htobe16(1234),
         htobe16(0),
         40,
-        fwd_port_id,
+        fwd_port,
         DOCA_FLOW_WAIT_FOR_BATCH
     );
 
@@ -172,7 +158,7 @@ auto add_acl_pipe_entries(
         htobe16(0xffff),
         htobe16(80),
         20,
-        fwd_port_id,
+        fwd_port,
         DOCA_FLOW_NO_WAIT
     );
 }
@@ -180,7 +166,8 @@ auto add_acl_pipe_entries(
 auto main(
     [[maybe_unused]] int argc,
     [[maybe_unused]] char *argv[]
-) -> int {
+) -> int
+try {
     auto flow_lib = shoc::flow::library_scope::config{}
         .set_default_rss({
             0, 0, { 0, 1, 2, 3 }, DOCA_FLOW_RSS_HASH_FUNCTION_SYMMETRIC_TOEPLITZ
@@ -207,8 +194,8 @@ auto main(
     auto acl_pipe0 = create_acl_pipe(port0);
     auto acl_pipe1 = create_acl_pipe(port1);
 
-    add_acl_pipe_entries(acl_pipe0, 1);
-    add_acl_pipe_entries(acl_pipe1, 0);
+    add_acl_pipe_entries(acl_pipe0, port1);
+    add_acl_pipe_entries(acl_pipe1, port0);
 
     using namespace std::chrono_literals;    
 
@@ -216,4 +203,6 @@ auto main(
     port1.process_entries(0, 10ms, 4);
 
     std::this_thread::sleep_for(50s);
+} catch(shoc::doca_exception &e) {
+    std::cerr << e.what() << std::endl;
 }

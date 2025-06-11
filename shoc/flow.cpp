@@ -106,6 +106,7 @@ namespace shoc::flow {
 
     auto port_cfg::set_port_id(std::uint16_t port_id) -> port_cfg& {
         enforce_success(doca_flow_port_cfg_set_port_id(safe_handle(), port_id));
+        port_id_ = port_id;
         return *this;
     }
 
@@ -162,7 +163,9 @@ namespace shoc::flow {
     // port
     ////////////////
 
-    port::port(port_cfg const &cfg) {
+    port::port(port_cfg const &cfg):
+        port_id_ { cfg.port_id() }
+    {
         doca_flow_port *raw_handle;
         enforce_success(doca_flow_port_start(cfg.handle(), &raw_handle));
         handle_.reset(raw_handle);
@@ -420,6 +423,20 @@ namespace shoc::flow {
     }
 
     /////////////////////
+    // pipe_entry
+    /////////////////////
+
+    auto pipe_entry::status() const -> doca_flow_entry_status {
+        return doca_flow_pipe_entry_get_status(handle());
+    }
+
+    auto pipe_entry::query() const -> doca_flow_resource_query {
+        doca_flow_resource_query query;
+        enforce_success(doca_flow_resource_query_entry(handle(), &query));
+        return query;
+    }
+
+    /////////////////////
     // pipe
     /////////////////////
 
@@ -436,6 +453,12 @@ namespace shoc::flow {
                     [](doca_flow_fwd dff) -> doca_flow_fwd {
                         return dff;
                     },
+                    [](fwd_drop) -> doca_flow_fwd {
+                        return {
+                            .type = DOCA_FLOW_FWD_DROP,
+                            .port_id = 0
+                        };
+                    },
                     [](resource_rss_cfg const &rss_cfg) -> doca_flow_fwd {
                         return {
                             .type = DOCA_FLOW_FWD_RSS,
@@ -443,12 +466,18 @@ namespace shoc::flow {
                             .rss = rss_cfg.doca_cfg()
                         };
                     },
-                    [](pipe const &pipe) -> doca_flow_fwd {
+                    [](pipe const &p) -> doca_flow_fwd {
                         return {
                             .type = DOCA_FLOW_FWD_PIPE,
-                            .next_pipe = pipe.handle()
+                            .next_pipe = p.handle()
                         };
                     },
+                    [](port const &p) -> doca_flow_fwd {
+                        return {
+                            .type = DOCA_FLOW_FWD_PORT,
+                            .port_id = p.id()
+                        };
+                    }
                 },
                 f
             );
@@ -525,5 +554,21 @@ namespace shoc::flow {
         ));
 
         return { entry_handle };
+    }
+
+    auto remove_entry(
+        std::uint16_t pipe_queue,
+        std::uint32_t flags,
+        pipe_entry entry
+    ) -> doca_error_t {
+        return doca_flow_pipe_remove_entry(pipe_queue, flags, entry.handle());
+    }
+
+    auto pipe::query_pipe_miss() const -> doca_flow_resource_query {
+        doca_flow_resource_query query;
+
+        enforce_success(doca_flow_resource_query_pipe_miss(handle(), &query));
+
+        return query;
     }
 }

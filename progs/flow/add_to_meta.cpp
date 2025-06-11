@@ -28,7 +28,7 @@ auto create_port(std::uint16_t port_id) {
 
 auto create_match_meta_pipe(
     shoc::flow::port &src,
-    std::uint16_t fwd_port_id
+    shoc::flow::port &fwd_port
 ) {
     doca_flow_match match_mask = {};
     doca_flow_match match = {};
@@ -43,13 +43,7 @@ auto create_match_meta_pipe(
         .set_is_root(false)
         .set_match(match, match_mask)
         .set_actions(actions_idx)
-        .build(
-            (doca_flow_fwd) {
-                .type = DOCA_FLOW_FWD_PORT,
-                .port_id = fwd_port_id
-            },
-            std::monostate{}
-        );
+        .build(fwd_port, std::monostate{});
 }
 
 auto add_match_meta_pipe_entry(
@@ -161,8 +155,8 @@ auto main() -> int try {
     auto port0 = create_port(0);
     auto port1 = create_port(1);
 
-    auto match_pipe0 = create_match_meta_pipe(port0, 1);
-    auto match_pipe1 = create_match_meta_pipe(port1, 0);
+    auto match_pipe0 = create_match_meta_pipe(port0, port1);
+    auto match_pipe1 = create_match_meta_pipe(port1, port0);
 
     add_match_meta_pipe_entry(match_pipe0);
     add_match_meta_pipe_entry(match_pipe1);

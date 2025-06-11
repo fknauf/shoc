@@ -157,12 +157,14 @@ namespace shoc::flow {
         auto set_service_threads_core(std::uint32_t core) -> port_cfg&;
         auto set_service_threads_cycle(std::uint32_t cycle_ms) -> port_cfg&;
 
+        auto port_id() const { return port_id_; }
         auto build() const -> port;
 
     private:
         auto ensure_handle_exists() -> void;
 
         unique_handle<doca_flow_port_cfg, doca_flow_port_cfg_destroy> handle_;
+        std::uint16_t port_id_ = 65535;
     };
 
     class port {
@@ -189,9 +191,12 @@ namespace shoc::flow {
             std::chrono::microseconds timeout_us,
             std::uint32_t max_processed_entries
         ) -> doca_error_t;
+
+        auto id() const noexcept { return port_id_; }
     
     private:
         unique_handle<doca_flow_port, doca_flow_port_stop> handle_;
+        std::uint16_t port_id_ = 65535;
     };
 
     struct extended_actions {
@@ -222,11 +227,15 @@ namespace shoc::flow {
 
     class pipe;
 
+    struct fwd_drop {};
+
     using flow_fwd = std::variant<
         std::monostate,
         doca_flow_fwd,
+        fwd_drop,
         std::reference_wrapper<resource_rss_cfg const>,
-        std::reference_wrapper<pipe const>
+        std::reference_wrapper<pipe const>,
+        std::reference_wrapper<port const>
     >;
 
     class pipe_cfg {
@@ -385,6 +394,8 @@ namespace shoc::flow {
             std::uint32_t flags,
             pipe_entry entry
         ) -> doca_error_t;
+
+        auto query_pipe_miss() const -> doca_flow_resource_query;
 
     private:
         unique_handle<doca_flow_pipe, doca_flow_pipe_destroy> handle_;

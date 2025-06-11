@@ -14,7 +14,10 @@ inline auto be_ipv4_addr(
     return htobe32((a << 24) | (b << 16) | (c << 8) | d);
 }
 
-auto create_match_pipe(shoc::flow::port const &src, std::uint16_t fwd_port_id) {
+auto create_match_pipe(
+    shoc::flow::port const &src,
+    shoc::flow::port const &fwd_port
+) {
     doca_flow_match match = {};
     match.parser_meta.outer_l4_type = DOCA_FLOW_L4_META_TCP;
     match.parser_meta.outer_l3_type = DOCA_FLOW_L3_META_IPV4;
@@ -35,13 +38,7 @@ auto create_match_pipe(shoc::flow::port const &src, std::uint16_t fwd_port_id) {
         .set_is_root(true)
         .set_match(match)
         .set_actions(actions_index)
-        .build(
-            (doca_flow_fwd) {
-                .type = DOCA_FLOW_FWD_PORT,
-                .port_id = fwd_port_id
-            },
-            std::monostate{}
-        );
+        .build(fwd_port, std::monostate{});
 }
 
 auto add_match_pipe_entries(shoc::flow::pipe &pipe) {
@@ -69,7 +66,10 @@ auto add_match_pipe_entries(shoc::flow::pipe &pipe) {
     pipe.add_entry(0, match, actions, std::nullopt, std::monostate{}, 0, nullptr);
 };
 
-auto create_geneve_encap_pipe(shoc::flow::port &port, std::uint16_t fwd_port_id) {
+auto create_geneve_encap_pipe(
+    shoc::flow::port &port,
+    shoc::flow::port &fwd_port
+) {
     doca_flow_match match = {};
     doca_flow_match match_mask = {};
     match_mask.meta.pkt_meta = std::numeric_limits<std::uint32_t>::max();
@@ -126,13 +126,7 @@ auto create_geneve_encap_pipe(shoc::flow::port &port, std::uint16_t fwd_port_id)
         .set_domain(DOCA_FLOW_PIPE_DOMAIN_EGRESS)
         .set_match(match, match_mask)
         .set_actions(actions_idx)
-        .build(
-            (doca_flow_fwd) {
-                .type = DOCA_FLOW_FWD_PORT,
-                .port_id = fwd_port_id
-            },
-            std::monostate{}
-        );
+        .build(fwd_port, std::monostate{});
 }
 
 auto add_geneve_encap_entries(shoc::flow::pipe &pipe) {
@@ -243,14 +237,14 @@ auto main(
 
     port0.pair(port1);
 
-    auto match_pipe0 = create_match_pipe(port0, 1);
-    auto match_pipe1 = create_match_pipe(port1, 0);
+    auto match_pipe0 = create_match_pipe(port0, port1);
+    auto match_pipe1 = create_match_pipe(port1, port0);
 
     add_match_pipe_entries(match_pipe0);
     add_match_pipe_entries(match_pipe1);
 
-    auto tun_pipe0 = create_geneve_encap_pipe(port1, 1);
-    auto tun_pipe1 = create_geneve_encap_pipe(port0, 0);
+    auto tun_pipe0 = create_geneve_encap_pipe(port1, port1);
+    auto tun_pipe1 = create_geneve_encap_pipe(port0, port0);
 
     add_geneve_encap_entries(tun_pipe0);
     add_geneve_encap_entries(tun_pipe1);
