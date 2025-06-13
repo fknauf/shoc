@@ -22,7 +22,8 @@ namespace shoc::coro {
      * stored here.
      *
      * used by value_awaitable.
-     */    template<typename Payload>
+     */ 
+    template<typename Payload>
     class value_receptable:
         public error_receptable
     {

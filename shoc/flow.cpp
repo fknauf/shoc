@@ -2,6 +2,7 @@
 
 #include "common/overload.hpp"
 #include "error.hpp"
+#include "eth_rxq.hpp"
 
 #include <boost/container/small_vector.hpp>
 
