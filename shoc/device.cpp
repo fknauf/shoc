@@ -7,6 +7,7 @@
 #include <doca_comch_producer.h>
 #include <doca_dma.h>
 #include <doca_erasure_coding.h>
+#include <doca_eth_rxq.h>
 #include <doca_rdma.h>
 #include <doca_sha.h>
 #include <doca_sync_event.h>
@@ -138,6 +139,12 @@ namespace shoc {
                         && doca_ec_cap_task_update_is_supported(dev) == DOCA_SUCCESS
                         && doca_ec_cap_task_recover_is_supported(dev) == DOCA_SUCCESS
                         ;
+                case device_capability::eth_rxq_cpu_cyclic:
+                    return doca_eth_rxq_cap_is_type_supported(dev, DOCA_ETH_RXQ_TYPE_CYCLIC, DOCA_ETH_RXQ_DATA_PATH_TYPE_CPU) == DOCA_SUCCESS;
+                case device_capability::eth_rxq_cpu_managed_mempool:
+                    return doca_eth_rxq_cap_is_type_supported(dev, DOCA_ETH_RXQ_TYPE_MANAGED_MEMPOOL, DOCA_ETH_RXQ_DATA_PATH_TYPE_CPU) == DOCA_SUCCESS;
+                case device_capability::eth_rxq_cpu_regular:
+                    return doca_eth_rxq_cap_is_type_supported(dev, DOCA_ETH_RXQ_TYPE_REGULAR, DOCA_ETH_RXQ_DATA_PATH_TYPE_CPU) == DOCA_SUCCESS;
                 default:
                     return false;
             }

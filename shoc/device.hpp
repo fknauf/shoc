@@ -21,7 +21,10 @@ namespace shoc {
         aes_gcm,
         sha,
         sync_event_pci,
-        erasure_coding
+        erasure_coding,
+        eth_rxq_cpu_cyclic,
+        eth_rxq_cpu_managed_mempool,
+        eth_rxq_cpu_regular,
     };
 
     /**

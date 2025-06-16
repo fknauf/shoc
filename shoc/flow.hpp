@@ -228,11 +228,13 @@ namespace shoc::flow {
     class pipe;
 
     struct fwd_drop {};
+    struct fwd_kernel {};
 
     using flow_fwd = std::variant<
         std::monostate,
         doca_flow_fwd,
         fwd_drop,
+        fwd_kernel,
         std::reference_wrapper<resource_rss_cfg const>,
         std::reference_wrapper<pipe const>,
         std::reference_wrapper<port const>

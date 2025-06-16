@@ -15,6 +15,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <span>
 
 namespace shoc {
     struct eth_rxq_packet_buffer {

@@ -1,10 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
 
-if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
-    include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
-endif()
-
 project(shoc)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -24,10 +19,14 @@ pkg_check_modules(
     doca-comch
     doca-dma
     doca-erasure-coding
+    doca-eth
     doca-flow
     doca-rdma
     doca-sha
 )
+
+file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
+include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
 
 find_package(Boost CONFIG REQUIRED COMPONENTS cobalt)
 find_package(cxxopts CONFIG REQUIRED)
@@ -113,6 +112,7 @@ add_shoc_demo_executable(flow_geneve_encap       progs/flow/geneve_encap.cpp)
 add_shoc_demo_executable(flow_acl                progs/flow/acl.cpp)
 add_shoc_demo_executable(flow_add_to_meta        progs/flow/add_to_meta.cpp)
 add_shoc_demo_executable(flow_aging              progs/flow/aging.cpp)
+add_shoc_demo_executable(eth_rxq_managed         progs/eth_rxq/managed.cpp)
 
 add_executable(generate_testdata tools/generate_testdata.cpp)
 

@@ -460,6 +460,15 @@ namespace shoc::flow {
                             .port_id = 0
                         };
                     },
+                    [](fwd_kernel) -> doca_flow_fwd {
+                        doca_flow_target *kernel_target;
+                        enforce_success(doca_flow_get_target(DOCA_FLOW_TARGET_KERNEL, &kernel_target));
+
+                        return {
+                            .type = DOCA_FLOW_FWD_TARGET,
+                            .target = kernel_target
+                        };
+                    },
                     [](resource_rss_cfg const &rss_cfg) -> doca_flow_fwd {
                         return {
                             .type = DOCA_FLOW_FWD_RSS,
