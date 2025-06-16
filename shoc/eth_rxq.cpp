@@ -70,8 +70,12 @@ namespace shoc {
                 pkt_buf->length
             ));
         }
+    }
 
-        enforce_success(doca_eth_rxq_get_flow_queue_id(handle(), &flow_queue_id_));
+    auto eth_rxq_base::flow_queue_id() const -> std::uint16_t {
+        std::uint16_t id;
+        enforce_success(doca_eth_rxq_get_flow_queue_id(handle(), &id));
+        return id;
     }
 
     auto eth_rxq_base::flow_target(
@@ -79,6 +83,8 @@ namespace shoc {
         std::uint32_t inner_flags,
         doca_flow_rss_hash_function rss_hash_func
     ) -> doca_flow_fwd {
+        flow_queue_id_ = flow_queue_id();
+
         return (doca_flow_fwd) {
             .type = DOCA_FLOW_FWD_RSS,
             .rss_type = DOCA_FLOW_RESOURCE_TYPE_NON_SHARED,

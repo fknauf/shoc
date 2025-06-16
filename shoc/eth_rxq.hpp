@@ -55,9 +55,7 @@ namespace shoc {
         );
 
     public:
-        auto flow_queue_id() const {
-            return flow_queue_id_;
-        }
+        auto flow_queue_id() const -> std::uint16_t;
 
         auto flow_target(
             std::uint32_t outer_flags = 0,

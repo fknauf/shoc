@@ -1,15 +1,39 @@
 #include "../env.hpp"
 
 #include <shoc/shoc.hpp>
+#include <boost/asio.hpp>
 #include <boost/cobalt.hpp>
+#include <cppcodec/hex_lower.hpp>
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
+
+using timer = boost::cobalt::use_op_t::as_default_on_t<boost::asio::steady_timer>;
+
+auto handle_packets(
+    [[maybe_unused]] shoc::progress_engine_lease engine,
+    shoc::shared_scoped_context<shoc::eth_rxq_managed> rss
+) -> boost::cobalt::promise<void> try {
+    for(;;) {
+        auto buf = co_await rss->receive();
+
+        std::cout << cppcodec::hex_lower::encode(buf.data()) << '\n';
+    }
+} catch(shoc::doca_exception &e) {
+    shoc::logger->info("stopped handling packets: {}", e.what());
+}
 
 auto do_network_stuff(
     shoc::progress_engine_lease engine,
     char const *ibdev_name
 ) -> boost::cobalt::detached {
+    auto flow_lib = shoc::flow::library_scope::config{}
+        .set_mode_args("vnf,isolated")
+        .set_pipe_queues(1)
+        .set_nr_counters(1 << 19)
+        .build();
+
     auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::eth_rxq_cpu_managed_mempool);
 
     auto cfg = shoc::eth_rxq_config {
@@ -17,15 +41,11 @@ auto do_network_stuff(
         .max_packet_size = 1600
     };
 
-    auto packet_memory = std::vector<std::byte>(1 << 28);
-    auto packet_mmap = shoc::memory_map { dev, packet_memory, DOCA_ACCESS_FLAG_LOCAL_READ_WRITE };
-    auto packet_buffer = shoc::eth_rxq_packet_buffer { packet_mmap, 0, static_cast<std::uint32_t>(packet_memory.size()) };
+    auto packet_memory = shoc::aligned_memory { 1 << 28 };
+    auto packet_mmap = shoc::memory_map { dev, packet_memory.as_writable_bytes(), DOCA_ACCESS_FLAG_LOCAL_READ_WRITE };
+    auto packet_buffer = shoc::eth_rxq_packet_buffer { packet_mmap, 0, static_cast<std::uint32_t>(packet_memory.as_bytes().size()) };
 
     auto rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, cfg, packet_buffer);
-
-    auto flow_lib = shoc::flow::library_scope::config{}
-        .set_mode_args("vnf,isolated,hws")
-        .build();
 
     auto ingress = shoc::flow::port::config{}
         .set_port_id(0)
@@ -56,13 +76,22 @@ auto do_network_stuff(
         .set_actions(actions_idx)
         .build(rss->flow_target(), shoc::flow::fwd_kernel{});
 
-    co_return;
+    auto packet_coro = handle_packets(engine, rss);
+
+    auto tim = timer { co_await boost::cobalt::this_coro::executor };
+    tim.expires_after(std::chrono::seconds(30));
+    co_await tim.async_wait();
+
+    co_await rss->stop();
 }
 
 auto co_main(
     [[maybe_unused]] int argc,
     [[maybe_unused]] char *argv[]
 ) -> boost::cobalt::main {
+    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    shoc::logger->set_level(spdlog::level::debug);
+
     auto engine = shoc::progress_engine{};
     auto env = bluefield_env{};
 
