@@ -30,8 +30,8 @@ namespace shoc {
         std::optional<std::uint8_t> metadata_num = std::nullopt;
         bool enable_flow_tag = false;
         bool enable_rx_hash = false;
-        std::optional<std::uint16_t> packet_headroom = std::nullopt;
-        std::optional<std::uint16_t> packet_tailroom = std::nullopt;
+        std::uint16_t packet_headroom = 0;
+        std::uint16_t packet_tailroom = 0;
         bool enable_timestamp = false;
         std::optional<std::uint32_t> max_recv_buf_list_len = std::nullopt;
     };

@@ -41,15 +41,8 @@ namespace shoc {
 
         enforce_success(doca_eth_rxq_set_flow_tag(handle(), cfg.enable_flow_tag));
         enforce_success(doca_eth_rxq_set_rx_hash(handle(), cfg.enable_rx_hash));
-
-        if(cfg.packet_headroom) {
-            enforce_success(doca_eth_rxq_set_packet_headroom(handle(), *cfg.packet_headroom));
-        }
-
-        if(cfg.packet_tailroom) {
-            enforce_success(doca_eth_rxq_set_packet_tailroom(handle(), *cfg.packet_tailroom));
-        }
-
+        enforce_success(doca_eth_rxq_set_packet_headroom(handle(), cfg.packet_headroom));
+        enforce_success(doca_eth_rxq_set_packet_tailroom(handle(), cfg.packet_tailroom));
         enforce_success(doca_eth_rxq_set_timestamp(handle(), cfg.enable_timestamp));
 
         if(cfg.max_recv_buf_list_len) {

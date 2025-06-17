@@ -29,16 +29,24 @@ auto do_network_stuff(
     char const *ibdev_name
 ) -> boost::cobalt::detached {
     auto flow_lib = shoc::flow::library_scope::config{}
-        .set_mode_args("vnf,isolated")
         .set_pipe_queues(1)
+        .set_mode_args("vnf,isolated")
         .set_nr_counters(1 << 19)
         .build();
+
+    shoc::logger->info("Flow-Lib initialized, starting RSS...");
 
     auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::eth_rxq_cpu_managed_mempool);
 
     auto cfg = shoc::eth_rxq_config {
         .max_burst_size = 256,
-        .max_packet_size = 1600
+        .max_packet_size = 1600,
+        .metadata_num = 1,
+        .enable_flow_tag = true,
+        .enable_rx_hash = true,
+        .packet_headroom = 0,
+        .packet_tailroom = 0,
+        .enable_timestamp = false
     };
 
     auto packet_memory = shoc::aligned_memory { 1 << 28 };
@@ -47,11 +55,15 @@ auto do_network_stuff(
 
     auto rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, cfg, packet_buffer);
 
+    shoc::logger->info("RSS started, creating ingress port...");
+
     auto ingress = shoc::flow::port::config{}
         .set_port_id(0)
         .set_operation_state(DOCA_FLOW_PORT_OPERATION_STATE_ACTIVE)
         .set_actions_mem_size(4096)
         .build();
+
+    shoc::logger->info("ingress port created, setting up filter pipe...");
 
     doca_flow_match match = {};
     match.parser_meta.outer_l4_type = DOCA_FLOW_L4_META_TCP;
@@ -75,6 +87,8 @@ auto do_network_stuff(
         .set_match(match)
         .set_actions(actions_idx)
         .build(rss->flow_target(), shoc::flow::fwd_kernel{});
+
+    shoc::logger->info("Filter pipe created, will start handling packets now.");
 
     auto packet_coro = handle_packets(engine, rss);
 
