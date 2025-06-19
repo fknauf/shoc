@@ -5,6 +5,7 @@
 #include <boost/cobalt.hpp>
 #include <cppcodec/hex_lower.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <vector>
@@ -28,15 +29,24 @@ auto do_network_stuff(
     shoc::progress_engine_lease engine,
     char const *ibdev_name
 ) -> boost::cobalt::detached {
+    using namespace std::literals::chrono_literals;
+
+    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::eth_rxq_cpu_managed_mempool);
+
     auto flow_lib = shoc::flow::library_scope::config{}
         .set_pipe_queues(1)
         .set_mode_args("vnf,isolated")
         .set_nr_counters(1 << 19)
         .build();
 
-    shoc::logger->info("Flow-Lib initialized, starting RSS...");
+    shoc::logger->info("Flow-Lib initialized, setting up ingress port...");
 
-    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::eth_rxq_cpu_managed_mempool);
+    auto ingress = shoc::flow::port::config{}
+        .set_port_id(0)
+        .set_dev(dev)
+        .build();
+
+    shoc::logger->info("ingress port created, setting up RSS...");
 
     auto cfg = shoc::eth_rxq_config {
         .max_burst_size = 256,
@@ -55,38 +65,34 @@ auto do_network_stuff(
 
     auto rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, cfg, packet_buffer);
 
-    shoc::logger->info("RSS started, creating ingress port...");
+    shoc::logger->info("RSS started, creating filter pipe...");
 
-    auto ingress = shoc::flow::port::config{}
-        .set_port_id(0)
-        .set_operation_state(DOCA_FLOW_PORT_OPERATION_STATE_ACTIVE)
-        .set_actions_mem_size(4096)
-        .build();
-
-    shoc::logger->info("ingress port created, setting up filter pipe...");
-
-    doca_flow_match match = {};
-    match.parser_meta.outer_l4_type = DOCA_FLOW_L4_META_TCP;
-    match.parser_meta.outer_l3_type = DOCA_FLOW_L3_META_IPV4;
-    match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
-    match.outer.l3_type = DOCA_FLOW_L3_TYPE_IP4;
-    match.outer.ip4.src_ip = 0xffffffff;
-    match.outer.ip4.dst_ip = 0xffffffff;
-    match.outer.tcp.l4_port.src_port = 0xffff;
-    match.outer.tcp.l4_port.dst_port = 12345;
+    doca_flow_match all_match = {};
+    //all_match.parser_meta.outer_l4_type = DOCA_FLOW_L4_META_TCP;
+    //all_match.parser_meta.outer_l3_type = DOCA_FLOW_L3_META_IPV4;
+    //all_match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
+    //all_match.outer.l3_type = DOCA_FLOW_L3_TYPE_IP4;
+    //all_match.outer.ip4.src_ip = 0xffffffff;
+    //all_match.outer.ip4.dst_ip = 0xffffffff;
+    //all_match.outer.tcp.l4_port.src_port = 0xffff;
+    //all_match.outer.tcp.l4_port.dst_port = 12345;
 
     doca_flow_actions actions = {};
+    actions.meta.pkt_meta = htobe32(1234);
+    actions.meta.mark = htobe32(5678);
     doca_flow_actions *actions_idx[] = { &actions };
 
     auto filter = shoc::flow::pipe::config { ingress }
-        .set_name("ROOT")
+        .set_name("ROOT_PIPE")
         .set_type(DOCA_FLOW_PIPE_BASIC)
         .set_is_root(true)
-        .set_nr_entries(10)
         .set_domain(DOCA_FLOW_PIPE_DOMAIN_DEFAULT)
-        .set_match(match)
+        .set_match(all_match)
         .set_actions(actions_idx)
-        .build(rss->flow_target(), shoc::flow::fwd_kernel{});
+        .build(rss->flow_target(), shoc::flow::fwd_drop{});
+    
+    filter.add_entry(0, all_match, actions, std::nullopt, std::monostate{}, 0, nullptr);
+    ingress.process_entries(0, 10ms, 4);
 
     shoc::logger->info("Filter pipe created, will start handling packets now.");
 
