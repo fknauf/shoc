@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aligned_memory.hpp"
 #include "common/accepter_queues.hpp"
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
@@ -22,6 +23,35 @@ namespace shoc {
         std::reference_wrapper<memory_map> mmap;
         std::uint32_t offset;
         std::uint32_t length;
+    };
+
+    class eth_rxq_packet_memory {
+    public:
+        eth_rxq_packet_memory(
+            std::uint32_t size,
+            device dev,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
+        ):
+            memory_ { size },
+            mmap_ { dev, memory_.as_writable_bytes(), permissions }
+        { }
+
+        eth_rxq_packet_memory(
+            std::uint32_t size,
+            std::initializer_list<device> devs,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
+        ):
+            memory_ { size },
+            mmap_ { devs, memory_.as_writable_bytes(), permissions }
+        { }
+
+        auto as_buffer() -> eth_rxq_packet_buffer {
+            return { mmap_, 0, static_cast<std::uint32_t>(memory_.as_bytes().size()) };
+        }
+
+    private:
+        aligned_memory memory_;
+        memory_map mmap_;
     };
 
     struct eth_rxq_config {

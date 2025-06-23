@@ -193,6 +193,11 @@ namespace shoc::flow {
         ) -> doca_error_t;
 
         auto id() const noexcept { return port_id_; }
+
+        auto shared_resources_bind(
+            doca_flow_shared_resource_type type,
+            std::span<std::uint32_t> resources
+        ) -> doca_error_t;
     
     private:
         unique_handle<doca_flow_port, doca_flow_port_stop> handle_;
@@ -227,12 +232,14 @@ namespace shoc::flow {
 
     class pipe;
 
+    struct fwd_none {};
     struct fwd_drop {};
     struct fwd_kernel {};
 
     using flow_fwd = std::variant<
         std::monostate,
         doca_flow_fwd,
+        fwd_none,
         fwd_drop,
         fwd_kernel,
         std::reference_wrapper<resource_rss_cfg const>,
@@ -249,8 +256,8 @@ namespace shoc::flow {
         }
 
         [[nodiscard]] auto build(
-            flow_fwd fwd,
-            flow_fwd fwd_miss
+            flow_fwd fwd = std::monostate{},
+            flow_fwd fwd_miss = std::monostate{}
         ) const -> pipe;
 
         auto set_match(
@@ -360,6 +367,11 @@ namespace shoc::flow {
 
         [[nodiscard]] auto handle() const { return handle_.get(); }
 
+        auto shared_resources_bind(
+            doca_flow_shared_resource_type type,
+            std::span<std::uint32_t> resources
+        ) -> doca_error_t;
+
         //auto resize(...);
 
         auto add_entry(
@@ -369,6 +381,20 @@ namespace shoc::flow {
             std::optional<doca_flow_monitor> monitor,
             flow_fwd fwd,
             std::uint32_t flags,
+            void *usr_ctx = nullptr
+        ) -> pipe_entry;
+
+        auto control_add_entry(
+            std::uint16_t pipe_queue,
+            std::uint32_t priority,
+            doca_flow_match const &match,
+            std::optional<doca_flow_match> const &match_mask,
+            std::optional<doca_flow_match_condition> const &condition,
+            std::optional<doca_flow_actions> const &actions,
+            std::optional<doca_flow_actions> const &actions_mask,
+            std::optional<doca_flow_action_descs> const &action_descs,
+            std::optional<doca_flow_monitor> const &monitor,
+            flow_fwd fwd,
             void *usr_ctx = nullptr
         ) -> pipe_entry;
 

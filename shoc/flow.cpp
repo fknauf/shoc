@@ -11,6 +11,18 @@
 #include <utility>
 
 namespace shoc::flow {
+    namespace {
+        template<typename T>
+        auto unpack_single(std::optional<T> const &opt) -> T const* {
+            return opt.has_value() ? &*opt : nullptr;
+        }
+
+        template<typename T>
+        auto unpack_span(std::optional<std::span<T>> const &opt) -> T const* {
+            return opt.has_value() ? opt->data() : nullptr;
+        }
+    }
+
     /////////////////////
     // global_cfg
     /////////////////////
@@ -203,6 +215,13 @@ namespace shoc::flow {
         return doca_flow_entries_process(handle(), pipe_queue, timeout.count(), max_processed_entries);
     }
 
+    auto port::shared_resources_bind(
+        doca_flow_shared_resource_type type,
+        std::span<std::uint32_t> resources
+    ) -> doca_error_t {
+        return doca_flow_shared_resources_bind(type, resources.data(), static_cast<std::uint32_t>(resources.size()), handle());
+    }
+
     /////////////////////////
     // extended_actions
     /////////////////////////
@@ -253,7 +272,7 @@ namespace shoc::flow {
         enforce_success(doca_flow_pipe_cfg_set_match(
             handle(),
             &match,
-            match_mask.has_value() ? &*match_mask : nullptr
+            unpack_single(match_mask)
         ));
         return *this;
     }
@@ -269,8 +288,8 @@ namespace shoc::flow {
         enforce_success(doca_flow_pipe_cfg_set_actions(
             handle(),
             actions.data(),
-            actions_masks.has_value() ? actions_masks->data() : nullptr,
-            action_descs.has_value() ? action_descs->data() : nullptr,
+            unpack_span(actions_masks),
+            unpack_span(action_descs),
             actions.size()
         ));
         return *this;
@@ -442,55 +461,63 @@ namespace shoc::flow {
     /////////////////////
 
     namespace {
-        auto docaify_fwd(flow_fwd const &f) {
-            return std::visit(
-                overload {
-                    [](std::monostate) -> doca_flow_fwd {
-                       return {
-                            .type = DOCA_FLOW_FWD_NONE,
-                            .target = nullptr
-                        };
-                    },
-                    [](doca_flow_fwd dff) -> doca_flow_fwd {
-                        return dff;
-                    },
-                    [](fwd_drop) -> doca_flow_fwd {
-                        return {
-                            .type = DOCA_FLOW_FWD_DROP,
-                            .port_id = 0
-                        };
-                    },
-                    [](fwd_kernel) -> doca_flow_fwd {
-                        doca_flow_target *kernel_target;
-                        enforce_success(doca_flow_get_target(DOCA_FLOW_TARGET_KERNEL, &kernel_target));
+        struct fwd_docaification_visitor {
+            doca_flow_fwd &fwd_obj;
 
-                        return {
-                            .type = DOCA_FLOW_FWD_TARGET,
-                            .target = kernel_target
-                        };
-                    },
-                    [](resource_rss_cfg const &rss_cfg) -> doca_flow_fwd {
-                        return {
-                            .type = DOCA_FLOW_FWD_RSS,
-                            .rss_type = rss_cfg.resource_type(),
-                            .rss = rss_cfg.doca_cfg()
-                        };
-                    },
-                    [](pipe const &p) -> doca_flow_fwd {
-                        return {
-                            .type = DOCA_FLOW_FWD_PIPE,
-                            .next_pipe = p.handle()
-                        };
-                    },
-                    [](port const &p) -> doca_flow_fwd {
-                        return {
-                            .type = DOCA_FLOW_FWD_PORT,
-                            .port_id = p.id()
-                        };
-                    }
-                },
-                f
-            );
+            auto operator()(std::monostate) -> doca_flow_fwd* {
+                return nullptr;
+            }
+
+            auto operator()(fwd_none) -> doca_flow_fwd* {
+                fwd_obj.type = DOCA_FLOW_FWD_NONE;
+                fwd_obj.target = nullptr;
+                return &fwd_obj;
+            }
+
+            auto operator()(doca_flow_fwd &dff) -> doca_flow_fwd* {
+                return &dff;
+            }
+
+            auto operator()(fwd_drop) -> doca_flow_fwd* {
+                fwd_obj.type = DOCA_FLOW_FWD_DROP;
+                fwd_obj.port_id = 0;
+                return &fwd_obj;
+            }
+
+            auto operator()(fwd_kernel) -> doca_flow_fwd* {
+                doca_flow_target *kernel_target;
+                enforce_success(doca_flow_get_target(DOCA_FLOW_TARGET_KERNEL, &kernel_target));
+                
+                fwd_obj.type = DOCA_FLOW_FWD_TARGET;
+                fwd_obj.target = kernel_target;
+                return &fwd_obj;
+            }
+
+            auto operator()(resource_rss_cfg const &rss_cfg) -> doca_flow_fwd* {
+                fwd_obj.type = DOCA_FLOW_FWD_RSS;
+                fwd_obj.rss_type = rss_cfg.resource_type();
+                fwd_obj.rss = rss_cfg.doca_cfg();
+                return &fwd_obj;
+            }
+
+            auto operator()(pipe const &p) -> doca_flow_fwd* {
+                fwd_obj.type = DOCA_FLOW_FWD_PIPE;
+                fwd_obj.next_pipe = p.handle();
+                return &fwd_obj;
+            }
+
+            auto operator()(port const &p) -> doca_flow_fwd* {
+                fwd_obj.type = DOCA_FLOW_FWD_PORT;
+                fwd_obj.port_id = p.id();
+                return &fwd_obj;
+            }
+        };
+
+        auto docaify_fwd(
+            flow_fwd &fwd,
+            doca_flow_fwd &doca_buffer
+        ) -> doca_flow_fwd* {
+            return std::visit(fwd_docaification_visitor { doca_buffer }, fwd);
         }
     }
 
@@ -499,14 +526,14 @@ namespace shoc::flow {
         flow_fwd fwd,
         flow_fwd fwd_miss
     ) {
-        auto fwd_doca = docaify_fwd(fwd);
-        auto fwd_miss_doca = docaify_fwd(fwd_miss);
-
+        doca_flow_fwd fwd_doca;
+        doca_flow_fwd fwd_miss_doca;
         doca_flow_pipe *raw_handle;
+
         enforce_success(doca_flow_pipe_create(
             cfg.handle(),
-            &fwd_doca,
-            &fwd_miss_doca,
+            docaify_fwd(fwd, fwd_doca),
+            docaify_fwd(fwd_miss, fwd_miss_doca),
             &raw_handle
         )); 
         handle_.reset(raw_handle);
@@ -521,16 +548,16 @@ namespace shoc::flow {
         std::uint32_t flags,
         void *usr_ctx
     ) -> pipe_entry {
+        doca_flow_fwd fwd_doca;
         doca_flow_pipe_entry *entry_handle;
-        auto fwd_doca = docaify_fwd(fwd);
 
         enforce_success(doca_flow_pipe_add_entry(
             pipe_queue,
             handle(),
             &match,
-            actions.has_value() ? &*actions : nullptr,
-            monitor.has_value() ? &*monitor : nullptr,
-            &fwd_doca,
+            unpack_single(actions),
+            unpack_single(monitor),
+            docaify_fwd(fwd, fwd_doca),
             flags,
             usr_ctx,
             &entry_handle
@@ -549,15 +576,15 @@ namespace shoc::flow {
         void *usr_ctx
     ) -> pipe_entry {
         doca_flow_pipe_entry *entry_handle;
-        auto fwd_doca = docaify_fwd(fwd);
+        doca_flow_fwd fwd_doca;
 
         enforce_success(doca_flow_pipe_acl_add_entry(
             pipe_queue,
             handle(),
             &match,
-            match_mask.has_value() ? &*match_mask : nullptr,
+            unpack_single(match_mask),
             priority,
-            &fwd_doca,
+            docaify_fwd(fwd, fwd_doca),
             flags,
             usr_ctx,
             &entry_handle
@@ -566,7 +593,43 @@ namespace shoc::flow {
         return { entry_handle };
     }
 
-    auto remove_entry(
+    auto pipe::control_add_entry(
+        std::uint16_t pipe_queue,
+        std::uint32_t priority,
+        doca_flow_match const &match,
+        std::optional<doca_flow_match> const &match_mask,
+        std::optional<doca_flow_match_condition> const &condition,
+        std::optional<doca_flow_actions> const &actions,
+        std::optional<doca_flow_actions> const &actions_mask,
+        std::optional<doca_flow_action_descs> const &action_descs,
+        std::optional<doca_flow_monitor> const &monitor,
+        flow_fwd fwd,
+        void *usr_ctx
+    ) -> pipe_entry {
+        doca_flow_pipe_entry *entry_handle;
+        doca_flow_fwd fwd_doca;
+
+        enforce_success(doca_flow_pipe_control_add_entry(
+            pipe_queue,
+            priority,
+            handle(),
+            &match,
+            unpack_single(match_mask),
+            unpack_single(condition),
+            unpack_single(actions),
+            unpack_single(actions_mask),
+            unpack_single(action_descs),
+            unpack_single(monitor),
+            docaify_fwd(fwd, fwd_doca),
+            usr_ctx,
+            &entry_handle
+        ));
+
+        return { entry_handle };
+    }
+
+
+    auto pipe::remove_entry(
         std::uint16_t pipe_queue,
         std::uint32_t flags,
         pipe_entry entry
@@ -580,5 +643,12 @@ namespace shoc::flow {
         enforce_success(doca_flow_resource_query_pipe_miss(handle(), &query));
 
         return query;
+    }
+
+    auto pipe::shared_resources_bind(
+        doca_flow_shared_resource_type type,
+        std::span<std::uint32_t> resources
+    ) -> doca_error_t {
+        return doca_flow_shared_resources_bind(type, resources.data(), static_cast<std::uint32_t>(resources.size()), handle());
     }
 }
