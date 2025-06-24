@@ -8,6 +8,7 @@
 #include <doca_dma.h>
 #include <doca_erasure_coding.h>
 #include <doca_eth_rxq.h>
+#include <doca_eth_txq.h>
 #include <doca_rdma.h>
 #include <doca_sha.h>
 #include <doca_sync_event.h>
@@ -145,6 +146,12 @@ namespace shoc {
                     return doca_eth_rxq_cap_is_type_supported(dev, DOCA_ETH_RXQ_TYPE_MANAGED_MEMPOOL, DOCA_ETH_RXQ_DATA_PATH_TYPE_CPU) == DOCA_SUCCESS;
                 case device_capability::eth_rxq_cpu_regular:
                     return doca_eth_rxq_cap_is_type_supported(dev, DOCA_ETH_RXQ_TYPE_REGULAR, DOCA_ETH_RXQ_DATA_PATH_TYPE_CPU) == DOCA_SUCCESS;
+                case device_capability::eth_txq_cpu_regular:
+                    return doca_eth_txq_cap_is_type_supported(dev, DOCA_ETH_TXQ_TYPE_REGULAR, DOCA_ETH_TXQ_DATA_PATH_TYPE_CPU) == DOCA_SUCCESS;
+                case device_capability::eth_txq_l3_chksum_offload:
+                    return doca_eth_txq_cap_is_l3_chksum_offload_supported(dev) == DOCA_SUCCESS;
+                case device_capability::eth_txq_l4_chksum_offload:
+                    return doca_eth_txq_cap_is_l4_chksum_offload_supported(dev) == DOCA_SUCCESS;
                 default:
                     return false;
             }

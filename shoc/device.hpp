@@ -25,6 +25,9 @@ namespace shoc {
         eth_rxq_cpu_cyclic,
         eth_rxq_cpu_managed_mempool,
         eth_rxq_cpu_regular,
+        eth_txq_cpu_regular,
+        eth_txq_l3_chksum_offload,
+        eth_txq_l4_chksum_offload,
     };
 
     /**
