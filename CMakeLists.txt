@@ -117,6 +117,7 @@ add_shoc_demo_executable(flow_aging              progs/flow/aging.cpp)
 add_shoc_demo_executable(eth_rxq_managed         progs/eth_rxq/managed.cpp)
 add_shoc_demo_executable(eth_rxq_proto_splitter  progs/eth_rxq/proto_splitter.cpp)
 add_shoc_demo_executable(eth_rxq_kernel_fwd      progs/eth_rxq/kernel_fwd.cpp)
+add_shoc_demo_executable(eth_udp_echo            progs/eth_udp_echo.cpp)
 
 add_executable(generate_testdata tools/generate_testdata.cpp)
 

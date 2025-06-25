@@ -18,7 +18,11 @@ namespace shoc {
         }
     {
         enforce_success(doca_eth_txq_set_max_send_buf_list_len(handle(), cfg.max_send_buf_list_len));
-        enforce_success(doca_eth_txq_set_metadata_num(handle(), cfg.metadata_num));
+        
+        if(cfg.metadata_num != 0) {
+            enforce_success(doca_eth_txq_set_metadata_num(handle(), cfg.metadata_num));
+        }
+
         enforce_success(doca_eth_txq_set_mss(handle(), cfg.mss));
         enforce_success(doca_eth_txq_set_max_lso_header_size(handle(), cfg.max_lso_header_size));
         enforce_success(doca_eth_txq_set_type(handle(), cfg.type));
