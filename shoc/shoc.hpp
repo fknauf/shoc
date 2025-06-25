@@ -23,6 +23,7 @@
 #include "erasure_coding.hpp"
 #include "error.hpp"
 #include "eth_rxq.hpp"
+#include "eth_txq.hpp"
 #include "flow.hpp"
 #include "logger.hpp"
 #include "memory_map.hpp"

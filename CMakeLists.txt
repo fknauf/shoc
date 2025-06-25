@@ -82,6 +82,7 @@ add_executable(test-shoc
     tests/group_dma.cpp
     tests/group_engine.cpp
     tests/group_erasure_coding.cpp
+    tests/group_eth_frame.cpp
     tests/group_sha.cpp
 )
 target_link_libraries(test-shoc shoc GTest::gtest GTest::gtest_main)
