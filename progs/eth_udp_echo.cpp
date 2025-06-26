@@ -45,15 +45,20 @@ auto handle_packets(
         auto src_ip = packet->source_address();
         auto dst_ip = packet->destination_address();
 
-        segment
-            ->source_port(dst_port)
-            ->destination_port(src_port)
-            ->checksum(0);
+        std::ranges::swap_ranges(
+            frame->source_mac(),
+            frame->destination_mac()
+        );
+
         packet
             ->source_address(dst_ip)
             ->destination_address(src_ip)
             ->update_header_checksum();
-        std::ranges::swap_ranges(frame->source_mac(), frame->destination_mac());
+
+        segment
+            ->source_port(dst_port)
+            ->destination_port(src_port)
+            ->update_checksum(*packet);
 
         auto send_status = co_await txq->send(buf);
 

@@ -5,7 +5,7 @@
 #include <cppcodec/hex_lower.hpp>
 
 TEST(docapp_eth_frame, ipv4_udp) {
-    auto buffer = cppcodec::hex_lower::decode<std::vector<std::uint8_t>>("02d1cf1110511070fdb33a0f08004500002122d240004011cdcdc0a86401c0a864da8dc33039000d5749663030310a00000000000000000000000000");
+    auto buffer = cppcodec::hex_lower::decode<std::vector<std::uint8_t>>("02d1cf1110511070fdb33a0f080045000021de3b400040111264c0a86401c0a864dacee43039000d1628663030310a00000000000000000000000000");
     auto frame = reinterpret_cast<shoc::eth_frame*>(buffer.data());
 
     ASSERT_EQ(frame->destination_mac().size(), 6);
@@ -33,13 +33,15 @@ TEST(docapp_eth_frame, ipv4_udp) {
     EXPECT_EQ(packet->dscp(), 0);
     EXPECT_EQ(packet->ecn(), 0);
     EXPECT_EQ(packet->total_length(), 0x0021);
-    EXPECT_EQ(packet->identification(), 0x22d2);
+    EXPECT_EQ(packet->identification(), 0xde3b);
     EXPECT_EQ(packet->flags(), 2);
     EXPECT_EQ(packet->fragment_offset(), 0);
     EXPECT_EQ(packet->ttl(), 0x40);
     EXPECT_EQ(packet->protocol(), 0x11);
-    EXPECT_EQ(packet->header_checksum(), 0xcdcd);
+    EXPECT_EQ(packet->header_checksum(), 0x1264);
     EXPECT_EQ(packet->header_checksum(), packet->calculate_header_checksum());
+    packet->update_header_checksum();
+    EXPECT_EQ(packet->header_checksum(), 0x1264);
     EXPECT_EQ(packet->source_address(), 0xc0a86401);
     EXPECT_EQ(packet->destination_address(), 0xc0a864da);
 
@@ -47,10 +49,11 @@ TEST(docapp_eth_frame, ipv4_udp) {
 
     auto segment = packet->udp_payload();
 
-    EXPECT_EQ(segment->source_port(), 0x8dc3);
+    EXPECT_EQ(segment->source_port(), 0xcee4);
     EXPECT_EQ(segment->destination_port(), 0x3039);
     EXPECT_EQ(segment->length(), 13);
-    EXPECT_EQ(segment->checksum(), 0x5749);
+    EXPECT_EQ(segment->checksum(), 0x1628);
+    EXPECT_EQ(segment->calculate_checksum(*packet), segment->checksum());
 
     auto data = segment->data();
 

@@ -54,6 +54,7 @@ add_library(
     shoc/device.cpp
     shoc/dma.cpp
     shoc/erasure_coding.cpp
+    shoc/eth_frame.cpp
     shoc/eth_rxq.cpp
     shoc/eth_txq.cpp
     shoc/flow.cpp

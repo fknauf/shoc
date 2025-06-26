@@ -54,6 +54,9 @@ namespace shoc {
 //        }
 //    } __attribute__((packed));
 
+    class ipv4_packet;
+    class ipv6_packet;
+
     class udp_segment {
     public:
         [[nodiscard]] auto source_port     () const -> std::uint16_t { return be16toh(raw_source_port); }
@@ -74,13 +77,21 @@ namespace shoc {
             return { raw_data, static_cast<std::size_t>(length() - 8) };
         }
 
+        auto calculate_checksum(ipv4_packet const &wrapper) const -> std::uint16_t;
+        auto calculate_checksum(ipv6_packet const &wrapper) const -> std::uint16_t;
+
+        auto update_checksum(ipv4_packet const &wrapper) -> udp_segment*;
+        auto update_checksum(ipv6_packet const &wrapper) -> udp_segment*;
+
     private:
+        auto calculate_checksum(doca_be16_t pseudoheader_part) const -> std::uint16_t;
+
         doca_be16_t raw_source_port;
         doca_be16_t raw_destination_port;
         doca_be16_t raw_length;
         doca_be16_t raw_checksum;
         std::byte   raw_data[0];
-    } __attribute__((packed));
+    } __attribute__((packed)) __attribute__((aligned(2)));
 
     inline auto octets_to_ipv4_addr(
         std::uint8_t a,
@@ -194,30 +205,20 @@ namespace shoc {
             return this;
         }
 
-        auto calculate_header_checksum() -> std::uint16_t {
-            std::uint32_t word_sum = 0;
+        auto calculate_header_checksum() const -> std::uint16_t {
+            auto base_ptr = reinterpret_cast<doca_be16_t const*>(this);
+            auto words = std::span<doca_be16_t const> { base_ptr, static_cast<std::size_t>(ihl() * 2) };
 
-            word_sum += raw_version_ihl << 8 | raw_dscp_ecn;
-            word_sum += total_length();
-            word_sum += identification();
-            word_sum += be16toh(raw_flags_fragment_offset);
-            word_sum += raw_ttl << 8 | raw_protocol;
-            word_sum += source_address() >> 16;
-            word_sum += source_address() & 0xffff;
-            word_sum += destination_address() >> 16;
-            word_sum += destination_address() & 0xffff;
+            std::uint32_t word_sum = -raw_header_checksum;
 
-            for(doca_be32_t opt : options()) {
-                word_sum += be32toh(opt) >> 16;
-                word_sum += be32toh(opt) & 0xffff;
+            for(auto w : words) {
+                word_sum += w;
             }
-            
-            auto carry_bits = word_sum >> 16;
-            word_sum = (word_sum & 0xffff) + carry_bits;
-            carry_bits = word_sum >> 16;
-            word_sum = (word_sum & 0xffff) + carry_bits;
 
-            return ~word_sum & 0xffff;
+            word_sum = (word_sum & 0xffff) + (word_sum >> 16);
+            word_sum = (word_sum & 0xffff) + (word_sum >> 16);
+
+            return be16toh(~word_sum & 0xffff);
         }
 
         auto update_header_checksum() {
@@ -239,7 +240,7 @@ namespace shoc {
 
         doca_be32_t raw_source_address;
         doca_be32_t raw_destination_address;
-    } __attribute__((packed));
+    } __attribute__((packed)) __attribute__((aligned(2)));
 
     class ipv6_packet {
     public:
@@ -305,7 +306,7 @@ namespace shoc {
         std::byte raw_destination_address[16];
 
         std::byte payload[];
-    } __attribute__((packed));
+    } __attribute__((packed)) __attribute__((aligned(2)));
 
     class eth_frame {
     public:
@@ -325,9 +326,9 @@ namespace shoc {
         std::byte raw_source_mac[6];
         doca_be16_t raw_ethertype;
 
-        union {
+        union __attribute__((aligned(2))) {
             ipv4_packet ipv4;
             ipv6_packet ipv6;
-        } __attribute__((packed));
-    } __attribute__((packed));
+        } __attribute__((packed)) ;
+    } __attribute__((packed)) __attribute__((aligned(2)));
 }
