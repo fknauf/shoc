@@ -45,15 +45,24 @@ auto handle_packets(
         auto src_ip = packet->source_address();
         auto dst_ip = packet->destination_address();
 
-        segment->source_port(dst_port).destination_port(src_port);
-        packet->source_address(dst_ip).destination_address(src_ip);
+        segment
+            ->source_port(dst_port)
+            ->destination_port(src_port)
+            ->checksum(0);
+        packet
+            ->source_address(dst_ip)
+            ->destination_address(src_ip)
+            ->update_header_checksum();
         std::ranges::swap_ranges(frame->source_mac(), frame->destination_mac());
-        segment->checksum(0);
-        packet->header_checksum(0);
 
-        co_await txq->send(buf);
+        auto send_status = co_await txq->send(buf);
 
-        shoc::logger->info("sent response. ip4 header chksum = {}, udp chksum = {}", packet->header_checksum(), segment->checksum());
+        shoc::logger->info(
+            "sent response. status = {}, ip4 header chksum = {}, udp chksum = {}",
+            doca_error_get_descr(send_status),
+            packet->header_checksum(),
+            segment->checksum()
+        );
         std::cout << cppcodec::hex_lower::encode(buf.data()) << '\n';
     }
 } catch(shoc::doca_exception &e) {
