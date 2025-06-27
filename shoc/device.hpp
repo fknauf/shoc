@@ -5,6 +5,7 @@
 
 #include <doca_dev.h>
 
+#include <array>
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
@@ -61,6 +62,13 @@ namespace shoc {
         [[nodiscard]] static auto find_by_capabilities(device_capability required_cap) -> device {
             return find_by_capabilities({ required_cap });
         }
+
+        [[nodiscard]] auto get_mac_addr() const -> std::array<std::byte, DOCA_DEVINFO_MAC_ADDR_SIZE>;
+        [[nodiscard]] auto get_ipv4_addr() const -> std::array<std::byte, DOCA_DEVINFO_IPV4_ADDR_SIZE>;
+        [[nodiscard]] auto get_ipv6_addr() const -> std::array<std::byte, DOCA_DEVINFO_IPV6_ADDR_SIZE>;
+        [[nodiscard]] auto get_pci_addr_str() const -> std::string;
+        [[nodiscard]] auto get_iface_name() const -> std::string;
+        [[nodiscard]] auto get_ibdev_name() const -> std::string;
 
     private:
         device(doca_dev *doca_handle);

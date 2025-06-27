@@ -302,4 +302,62 @@ namespace shoc {
         throw doca_exception(DOCA_ERROR_NOT_FOUND);
     }
 
+    auto device::get_mac_addr() const -> std::array<std::byte, DOCA_DEVINFO_MAC_ADDR_SIZE> {
+        std::array<std::byte, DOCA_DEVINFO_MAC_ADDR_SIZE> result;
+        enforce_success(doca_devinfo_get_mac_addr(
+            as_devinfo(),
+            reinterpret_cast<std::uint8_t*>(result.data()),
+            result.size()
+        ));
+        return result;
+    }
+
+    auto device::get_ipv4_addr() const -> std::array<std::byte, DOCA_DEVINFO_IPV4_ADDR_SIZE> {
+        std::array<std::byte, DOCA_DEVINFO_IPV4_ADDR_SIZE> result;
+        enforce_success(doca_devinfo_get_ipv4_addr(
+            as_devinfo(),
+            reinterpret_cast<std::uint8_t*>(result.data()),
+            result.size()
+        ));
+        return result;
+    }
+
+    auto device::get_ipv6_addr() const -> std::array<std::byte, DOCA_DEVINFO_IPV6_ADDR_SIZE> {
+        std::array<std::byte, DOCA_DEVINFO_IPV6_ADDR_SIZE> result;
+        enforce_success(doca_devinfo_get_ipv6_addr(
+            as_devinfo(),
+            reinterpret_cast<std::uint8_t*>(result.data()),
+            result.size()
+        ));
+        return result;
+    }
+
+    auto device::get_pci_addr_str() const -> std::string {
+        char buf[DOCA_DEVINFO_PCI_ADDR_SIZE];
+        enforce_success(doca_devinfo_get_pci_addr_str(
+            as_devinfo(),
+            buf
+        ));
+        return buf;
+    }
+
+    auto device::get_iface_name() const -> std::string {
+        char buf[DOCA_DEVINFO_IFACE_NAME_SIZE];
+        enforce_success(doca_devinfo_get_iface_name(
+            as_devinfo(),
+            buf,
+            sizeof buf
+        ));
+        return buf;
+    }
+
+    auto device::get_ibdev_name() const -> std::string {
+        char buf[DOCA_DEVINFO_IBDEV_NAME_SIZE];
+        enforce_success(doca_devinfo_get_ibdev_name(
+            as_devinfo(),
+            buf,
+            sizeof buf
+        ));
+        return buf;
+    }
 }

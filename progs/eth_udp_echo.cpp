@@ -53,6 +53,7 @@ auto handle_packets(
         packet
             ->source_address(dst_ip)
             ->destination_address(src_ip)
+            ->identification(packet->identification() + 1)
             ->update_header_checksum();
 
         segment
@@ -63,7 +64,7 @@ auto handle_packets(
         auto send_status = co_await txq->send(buf);
 
         shoc::logger->info(
-            "sent response. status = {}, ip4 header chksum = {}, udp chksum = {}",
+            "sent response. status = {}, ip4 header chksum = {:x}, udp chksum = {:x}",
             doca_error_get_descr(send_status),
             packet->header_checksum(),
             segment->checksum()
@@ -124,8 +125,8 @@ auto partial_tap(
 
     auto txq_cfg = shoc::eth_txq_config {
         .max_burst_size = 256,
-        .l3_chksum_offload = true,
-        .l4_chksum_offload = true
+        //.l3_chksum_offload = true,
+        //.l4_chksum_offload = true
     };
 
     auto txq = co_await engine->create_context<shoc::eth_txq>(dev, 16, txq_cfg);
