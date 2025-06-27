@@ -57,7 +57,7 @@ namespace shoc {
     class ipv4_packet;
     class ipv6_packet;
 
-    class udp_segment {
+    class udp_segment final {
     public:
         [[nodiscard]] auto source_port     () const -> std::uint16_t { return be16toh(raw_source_port); }
         [[nodiscard]] auto destination_port() const -> std::uint16_t { return be16toh(raw_destination_port); }
@@ -106,7 +106,7 @@ namespace shoc {
             static_cast<std::uint32_t>(d);
     }
 
-    class ipv4_packet {
+    class ipv4_packet final {
     public:
         [[nodiscard]] auto version            () const -> std::uint8_t  { return raw_version_ihl >> 4; }
         [[nodiscard]] auto ihl                () const -> std::uint8_t  { return raw_version_ihl & 0x0f; }
@@ -242,7 +242,7 @@ namespace shoc {
         doca_be32_t raw_destination_address;
     } __attribute__((packed)) __attribute__((aligned(2)));
 
-    class ipv6_packet {
+    class ipv6_packet final {
     public:
         [[nodiscard]] auto version            () const -> std::uint8_t                   { return static_cast<std::uint8_t>(be32toh(raw_version_traffic_class_flow_label) >> 28); }
         [[nodiscard]] auto traffic_class      () const -> std::uint8_t                   { return static_cast<std::uint8_t>(be32toh(raw_version_traffic_class_flow_label) >> 20 & 0xff);}
@@ -308,7 +308,7 @@ namespace shoc {
         std::byte payload[];
     } __attribute__((packed)) __attribute__((aligned(2)));
 
-    class eth_frame {
+    class eth_frame final {
     public:
         auto ethertype      () const -> std::uint16_t                 { return be16toh(raw_ethertype); }
         auto destination_mac()       -> std::span<std::byte      , 6> { return raw_destination_mac; }

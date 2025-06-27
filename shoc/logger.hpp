@@ -7,5 +7,8 @@
 namespace shoc {
     extern std::shared_ptr<spdlog::logger> const logger;
 
+    /**
+     * Set DOCA SDK internal log level
+     */
     auto set_sdk_log_level(doca_log_level level) -> void;
 }

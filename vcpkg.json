@@ -5,6 +5,7 @@
   "builtin-baseline": "df8bfe519564ae001903e5cdd32af0999531ef71",
   "dependencies": [
     "boost-cobalt",
+    "boost-container",
     "cppcodec",
     "cxxopts",
     "fmt",

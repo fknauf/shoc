@@ -14,6 +14,12 @@
 #include <string>
 #include <string_view>
 
+/**
+ * DOCA Comch client side, see https://docs.nvidia.com/doca/sdk/doca+comch/index.html
+ *
+ * These classes allow a SHOC program to connect to a comch server, exchange messages with it, and
+ * set up consumers or producers for the exchange of data buffers through the fast path.
+ */
 namespace shoc::comch {
     struct client_limits {
         std::uint32_t num_send_tasks = 1024;
@@ -22,11 +28,12 @@ namespace shoc::comch {
     };
 
     /**
-     * comch client. This is conceptually almost the same as a server_connection, except that we're the ones
-     * asking for it.
+     * comch client. This is conceptually almost the same as a server_connection, except
+     * that we're the ones asking for it.
      *
-     * When the client is started, it is associated with a connection, and all messages, child consumers and producers
-     * are likewise associated with that connection.
+     * When the client is started, it is associated with a connection, and all messages,
+     * child consumers and producers  are likewise associated with that connection. That
+     * is to say: Unlike a server, a client only ever has/is one connection.
      */
     class client:
         public context<

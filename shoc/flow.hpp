@@ -13,7 +13,22 @@
 #include <variant>
 #include <vector>
 
+/**
+ * Wrappers for DOCA Flow functionality, see https://docs.nvidia.com/doca/sdk/doca+flow/index.html
+ *
+ * Unlike most other things in SHOC, little here is asynchronous or related to coroutines; rather it's
+ * for the configuration and setup of flow pipes. Mostly what's added here is automatic resource management
+ * a la C++'s RAII idiom and a fluent API for the configuration objects.
+ *
+ * The whole thing interfaces with eth_rxq as a forwarding target for RSS pipes.
+ */
 namespace shoc::flow {
+    /**
+     * Configuration for an RSS target, i.e. to load-balance packets between multiple eth_rxq. WIP,
+     * currently not in use, API may change.
+     *
+     * TODO: Finish this.
+     */
     class resource_rss_cfg {
     public:
         resource_rss_cfg(
@@ -54,6 +69,19 @@ namespace shoc::flow {
 
     class [[nodiscard]] library_scope;
 
+    /**
+     * Global configuration options for the whole DOCA FLow library.
+     * See /opt/mellanox/doca/include/doca_flow.h for more information.
+     * Not all functionality supported yet (callbacks in particular)
+     *
+     * This is intended as a builder for a library scope object and follows
+     * a fluent API style, i.e. to be used as
+     *
+     * auto lib_scope = global_cfg{}.set_option1(...).set_option2(...).build();
+     *
+     * That'll initialize the library and uninitialize it when lib_scope goes
+     * out of scope.
+     */
     class global_cfg {
     public:
         [[nodiscard]] auto handle() const {
@@ -116,9 +144,22 @@ namespace shoc::flow {
         shared_handle<doca_flow_cfg, doca_flow_cfg_destroy> handle_;
     };
 
+    /**
+     * Manual init/deinit API: initialize the library from a global_cfg object.
+     * Requires manual library teardown at the end of the program.
+     */
     auto init(global_cfg const &cfg) -> doca_error_t;
+
+    /**
+     * Manual library teardown
+     */
     auto destroy() -> void;
 
+    /**
+     * RAII anchor object for automatic library teardown, i.e. destroy() is called
+     * when this goes out of scope. When global_cfg is used as a builder, this is
+     * what's built.
+     */
     struct library_scope {
         using config = global_cfg;
 
@@ -138,6 +179,14 @@ namespace shoc::flow {
 
     class port;
 
+    /**
+     * Configuration for a DOCA Flow Port, which is where we get packets.
+     * At least port and device should be set for this to function.
+     * 
+     * Follows a fluent api to implement a builder pattern, i.e.
+     *
+     * auto my_port = port_cfg{}.set_port_id(0).set_dev(dev).build();
+     */
     class port_cfg {
     public:
         [[nodiscard]] auto handle() const { return handle_.get(); }
@@ -167,6 +216,12 @@ namespace shoc::flow {
         std::uint16_t port_id_ = 65535;
     };
 
+    /**
+     * Flow port object to obtain or send out packets. Describes a hardware port or VF.
+     *
+     * Can be used as a source for packets in the ingress domain or a target in the egress
+     * domain.
+     */
     class port {
     public:
         using config = port_cfg;
@@ -186,6 +241,15 @@ namespace shoc::flow {
         auto pipes_flush() -> void;
         auto pipes_dump(FILE *f) -> void;
 
+        /**
+         * After entries are slated to be added to pipes connected to this port, this function
+         * must be called to batch-process them. Will only process entries submitted to the same
+         * pipe queue; the idea there is that each CPU core should have a pipe queue of its own.
+         *
+         * @param pipe_queue ID of the pipe queue whose entries should be processed.
+         * @param timeout timeout until failure is declared
+         * @param max_processed_entries maximum number of entries to process
+         */
         auto process_entries(
             std::uint16_t pipe_queue,
             std::chrono::microseconds timeout_us,
@@ -204,6 +268,7 @@ namespace shoc::flow {
         std::uint16_t port_id_ = 65535;
     };
 
+    // Experimental
     struct extended_actions {
     public:
         extended_actions(
@@ -236,6 +301,10 @@ namespace shoc::flow {
     struct fwd_drop {};
     struct fwd_kernel {};
 
+    /**
+     * Variant type for possible Forwarding-Targets, largely for convenience. Backend library has
+     * logic to convert its members to doca_flow_fwd.
+     */
     using flow_fwd = std::variant<
         std::monostate,
         doca_flow_fwd,
@@ -247,6 +316,9 @@ namespace shoc::flow {
         std::reference_wrapper<port const>
     >;
 
+    /**
+     * Configuration object for a flow pipe, again as a fluent builder.
+     */
     class pipe_cfg {
     public:
         pipe_cfg(port const &port);
@@ -340,6 +412,9 @@ namespace shoc::flow {
         unique_handle<doca_flow_pipe_cfg, doca_flow_pipe_cfg_destroy> handle_;
     };
 
+    /**
+     * Handle to a pipe entry
+     */
     class pipe_entry {
     public:
         pipe_entry() = default;
@@ -355,6 +430,14 @@ namespace shoc::flow {
         doca_flow_pipe_entry *handle_ = nullptr;
     };
 
+    /**
+     * Handle to a flow pipe.
+     *
+     * Right now, all pipe types are maanged through the same C++ type; this may change pending experience.
+     *
+     * User must take care to call the correct *_add_entry function for the pipe type, e.g. control_add_pipe
+     * only makes sense if the pipe is a control pipe.
+     */
     class pipe {
     public:
         using config = pipe_cfg;

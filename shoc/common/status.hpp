@@ -22,6 +22,18 @@ namespace shoc {
         using deduce_as_task_arg_type_t = typename deduce_as_task_arg_type<AsTask>::type;
     }
 
+    /**
+     * Plain-vanilla task completion callback template
+     *
+     * Most offloaded tasks report only a status code and have the actual return data as
+     * side effects in memory buffers that are attached to the task. In that case, completion
+     * callbacks all do the same thing, so we've extracted it here.
+     *
+     * @param AsTask function to convert the actual task type to doca_task*
+     * @param task task object as task-specific DOCA type
+     * @param task_user_data User data attached to the task, i.e. a pointer to the status receptable
+     * @param ctx_user_data User data attached to the context, i.e. a pointer to the SHOC context object
+     */
     template<auto AsTask>
     auto plain_status_callback(
         detail::deduce_as_task_arg_type_t<AsTask> *task,

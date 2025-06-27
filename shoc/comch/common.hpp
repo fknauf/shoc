@@ -20,4 +20,6 @@ namespace shoc::comch {
         DISCONNECTING,
         DISCONNECTED
     };
+
+    static constexpr std::size_t MAX_IMMEDIATE_DATA_SIZE = 32;
 }

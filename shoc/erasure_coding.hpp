@@ -11,6 +11,9 @@
 
 #include <string>
 
+/**
+ * Erasure coding functionality, see https://docs.nvidia.com/doca/sdk/doca+erasure+coding/index.html
+ */
 namespace shoc {
     class ec_context;
 

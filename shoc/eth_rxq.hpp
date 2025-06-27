@@ -18,13 +18,32 @@
 #include <optional>
 #include <span>
 
+/**
+ * DOCA Ethernet, receiver queue, see https://docs.nvidia.com/doca/sdk/doca+ethernet/index.html
+ *
+ * Typically this will be used in conjunction with a flow pipe setup, i.e. one of the rxq classes
+ * here will be a RSS forwarding target for a flow pipe. That enables the handling of raw
+ * ethernet frames coming through that pipe.
+ *
+ * We currently split the underlying doca_eth_rxq context into three context classes here, depending
+ * on who does the memory management and whether packets are to be processed in batches or not. This
+ * is not finalized yet and may be unified in the future.
+ *
+ * TODO: Work out what's most sensible.
+ */
 namespace shoc {
+    /**
+     * Buffer (using an external memory map) to store incoming ethernet frames
+     */
     struct eth_rxq_packet_buffer {
         std::reference_wrapper<memory_map> mmap;
         std::uint32_t offset;
         std::uint32_t length;
     };
 
+    /**
+     * Buffer (using internal memory and memory map) to store incoming ethernet frames
+     */
     class eth_rxq_packet_memory {
     public:
         eth_rxq_packet_memory(
@@ -54,6 +73,9 @@ namespace shoc {
         memory_map mmap_;
     };
 
+    /**
+     * Configuration options for an eth_rxq context, taken directly from DOCA Ethernet
+     */
     struct eth_rxq_config {
         std::uint32_t max_burst_size;
         std::uint32_t max_packet_size;
@@ -68,6 +90,9 @@ namespace shoc {
 
     // TODO: Add support for metadata (flow tag, rx hash, etc)
 
+    /**
+     * Base context for ethernet frame receiver queues
+     */
     class eth_rxq_base:
         public context<
             doca_eth_rxq,
@@ -85,8 +110,18 @@ namespace shoc {
         );
 
     public:
+        /**
+         * Flow queue ID for use in DOCA Flow
+         */
         auto flow_queue_id() const -> std::uint16_t;
 
+        /**
+         * Construct forwarding target for DOCA Flow
+         * 
+         * @param outer_flags flags for the outer packet header
+         * @param inner_flags flags for the inner packet header (if packet is part of a tunnel, as in GRE, IPSec)
+         * @param rss_hash_func hash function for RSS
+         */
         auto flow_target(
             std::uint32_t outer_flags = 0,
             std::uint32_t inner_flags = 0,
@@ -98,6 +133,9 @@ namespace shoc {
         std::uint16_t flow_queue_id_ = std::numeric_limits<std::uint16_t>::max();
     };
 
+    /**
+     * plain, single-packet eth_rxq context with user-supplied destination buffer
+     */
     class eth_rxq:
         public eth_rxq_base
     {
@@ -111,9 +149,18 @@ namespace shoc {
             std::optional<eth_rxq_packet_buffer> pkt_buf = std::nullopt
         );
 
+        /**
+         * Receive a single ethernet frame in the supplied destination buffer
+         */
         auto receive(buffer &dest) const -> coro::status_awaitable<>;
     };
 
+    /**
+     * single-packet receiver queue with library-managed memory buffers
+     *
+     * received buffers should be returned to the library in a reasonable time frame so they can be reused
+     * for newer frames.
+     */
     class eth_rxq_managed:
         public eth_rxq_base
     {
@@ -125,6 +172,9 @@ namespace shoc {
             eth_rxq_packet_buffer pkt_buf
         );
 
+        /**
+         * Receive a single ethernet frame. Memory is managed by DOCA.
+         */
         auto receive() -> coro::value_awaitable<buffer>;
 
     private:
@@ -137,6 +187,12 @@ namespace shoc {
         accepter_queues<buffer> managed_queues_;
     };
 
+    /**
+     * eth_rxq queue for batch reception with library-managed memory
+     *
+     * received buffers should be returned to the library in a reasonable time frame so they can be reused
+     * for newer frames.
+     */
     class eth_rxq_batch_managed:
         public eth_rxq_base
     {
@@ -150,7 +206,9 @@ namespace shoc {
             doca_event_batch_events_number events_number_min = DOCA_EVENT_BATCH_EVENTS_NUMBER_1
         );
 
-        // for managed receive
+        /**
+         * Receive a batch of ethernet frames. Memory is handled by DOCA
+         */
         auto batch_receive() -> coro::value_awaitable<std::vector<buffer>>;
 
     private:

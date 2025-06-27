@@ -177,6 +177,14 @@ namespace shoc {
         std::coroutine_handle<> coro_stop_;
     };
 
+    /**
+     * Base class template for concrete context classes. Takes care of common context concerns such as the
+     * signaling between child and parent contexts on state changes
+     *
+     * @param DocaHandle wrapped plain-DOCA context handle type
+     * @param HandleDestroy function that destroys a DocaHandle
+     * @param HandleAsCtx function that converts a pointer to DocaHandle to a doca_ctx*
+     */
     template<
         typename DocaHandle,
         auto HandleDestroy,
@@ -186,11 +194,17 @@ namespace shoc {
         public context_base
     {
     public:
+        /**
+         * @return the underlying plain-DOCA context handle
+         */
         [[nodiscard]]
         auto handle() const noexcept {
             return handle_.get();
         }
 
+        /**
+         * @return this context as doca_ctx*
+         */
         [[nodiscard]]
         auto as_ctx() const noexcept -> doca_ctx* override {
             return HandleAsCtx(handle());
@@ -319,6 +333,9 @@ namespace shoc {
         std::shared_ptr<ConcreteContext> ctx_ = nullptr;
     };
 
+    /**
+     * reference-counted context handle for shared ownership between fibers.
+     */
     template<std::derived_from<context_base> ConcreteContext>
     class shared_scoped_context {
     public:

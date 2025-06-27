@@ -28,7 +28,7 @@ pkg_check_modules(
 file(READ $ENV{HOME}/.vcpkg/vcpkg.path.txt VCPKG_DIR)
 include(${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS cobalt)
+find_package(Boost CONFIG REQUIRED COMPONENTS cobalt container)
 find_package(cxxopts CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -70,6 +70,7 @@ target_link_libraries(
     shoc
     PUBLIC
     Boost::cobalt
+    Boost::container
     spdlog::spdlog
     fmt::fmt
     ${DOCA_LIBRARIES}

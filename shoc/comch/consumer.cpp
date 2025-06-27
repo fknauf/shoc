@@ -56,7 +56,7 @@ namespace shoc::comch {
         auto imm_end = imm_start + imm_size;
 
         auto result = consumer_recv_result {
-            .immediate = std::vector(imm_start, imm_end),
+            .immediate = boost::container::static_vector<std::byte, MAX_IMMEDIATE_DATA_SIZE>(imm_start, imm_end),
             .producer_id = doca_comch_consumer_task_post_recv_get_producer_id(task),
             .status = doca_task_get_status(base_task)
         };
