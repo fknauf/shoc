@@ -40,7 +40,7 @@ link_directories(${DOCA_LIBRARY_DIRS})
 
 add_library(
     shoc
-    STATIC
+    SHARED
     shoc/aes_gcm.cpp
     shoc/buffer.cpp
     shoc/buffer_inventory.cpp
