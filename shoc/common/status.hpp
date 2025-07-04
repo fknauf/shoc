@@ -8,6 +8,8 @@
 #include <doca_error.h>
 #include <doca_pe.h>
 
+#include <boost/asio/defer.hpp>
+
 namespace shoc {
     namespace detail {
         template<auto AsTask>
@@ -34,7 +36,7 @@ namespace shoc {
      * @param task_user_data User data attached to the task, i.e. a pointer to the status receptable
      * @param ctx_user_data User data attached to the context, i.e. a pointer to the SHOC context object
      */
-    template<auto AsTask>
+    template<auto AsTask, bool deferred = false>
     auto plain_status_callback(
         detail::deduce_as_task_arg_type_t<AsTask> *task,
         doca_data task_user_data,
@@ -49,6 +51,11 @@ namespace shoc {
         doca_task_free(base_task);
 
         dest->set_value(std::move(status));
-        dest->resume();
+
+        if(deferred) {
+            boost::asio::defer([dest] { dest->resume(); });
+        } else {
+            dest->resume();
+        }
     }
 }

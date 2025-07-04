@@ -1,6 +1,7 @@
 #include "eth_txq.hpp"
 
 #include "progress_engine.hpp"
+#include <boost/asio/defer.hpp>
 
 namespace shoc {
     eth_txq::eth_txq(
@@ -35,8 +36,8 @@ namespace shoc {
 
         enforce_success(doca_eth_txq_task_send_set_conf(
             handle(),
-            plain_status_callback<doca_eth_txq_task_send_as_doca_task>,
-            plain_status_callback<doca_eth_txq_task_send_as_doca_task>,
+            plain_status_callback<doca_eth_txq_task_send_as_doca_task, true>,
+            plain_status_callback<doca_eth_txq_task_send_as_doca_task, true>,
             max_tasks
         ));
 

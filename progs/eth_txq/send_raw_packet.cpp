@@ -36,8 +36,6 @@ auto send_packet(
     auto status = co_await txq->send(buf);
 
     shoc::logger->info("Packet sent, status = {}", doca_error_get_descr(status));
-
-    co_await engine->yield();
 }
 
 auto co_main(
