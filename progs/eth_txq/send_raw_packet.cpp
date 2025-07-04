@@ -51,7 +51,7 @@ auto co_main(
     auto options = cxxopts::Options("shoc-send-raw-packet", "Raw packet sender utility");
 
     options.add_options()
-        ("p,packet", "packet string (hex)", cxxopts::value<std::string>()->default_value("1070fdb33a0f02d1cf111051080045000021ff8c40004011f112c0a864dac0a8640130393039000db4d3663030310a"))
+        ("p,packet", "packet string (hex)", cxxopts::value<std::string>()->default_value("1070fdb3513f02d1cf111051080045000020f29840004011fdd3c0a864dac0a864358dff3039000c21c3666f6f0a0000000000000000000000000000"))
         ("d,device", "device (ibdev name)", cxxopts::value<std::string>()->default_value(env.ibdev_name))
         ("c,calculate-checksums", "calculate L3 and L4 checksums?", cxxopts::value<bool>()->default_value("false"));
         ;

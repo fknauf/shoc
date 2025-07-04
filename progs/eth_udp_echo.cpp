@@ -62,6 +62,7 @@ auto handle_packets(
             ->update_checksum(*packet);
 
         auto send_status = co_await txq->send(buf);
+        co_await engine->yield();
 
         shoc::logger->info(
             "sent response. status = {}, ip4 header chksum = {:x}, udp chksum = {:x}",
@@ -125,8 +126,8 @@ auto partial_tap(
 
     auto txq_cfg = shoc::eth_txq_config {
         .max_burst_size = 256,
-        //.l3_chksum_offload = true,
-        //.l4_chksum_offload = true
+        .l3_chksum_offload = true,
+        .l4_chksum_offload = true
     };
 
     auto txq = co_await engine->create_context<shoc::eth_txq>(dev, 16, txq_cfg);
@@ -158,19 +159,39 @@ auto partial_tap(
         .set_type(DOCA_FLOW_PIPE_BASIC)
         .set_is_root(true)
         .set_match(all_match)
-        .build(filter_pipe, shoc::flow::fwd_drop{});
+        .build(filter_pipe, shoc::flow::fwd_drop{});    
 
     root_pipe.add_entry(0, all_match, std::nullopt, std::nullopt, filter_pipe, 0);
 
-    ingress.process_entries(0, 10ms, 4);
+    shoc::logger->info("Filter pipe created, setting up exit pipe...");
 
-    shoc::logger->info("Filter pipe created, will start handling packets now.");
+    doca_flow_monitor exit_monitor = {};
+    exit_monitor.counter_type = DOCA_FLOW_RESOURCE_TYPE_NON_SHARED;
+
+    auto exit_pipe = shoc::flow::pipe::config { ingress }
+        .set_name("EXIT_PIPE")
+        .set_type(DOCA_FLOW_PIPE_BASIC)
+        .set_domain(DOCA_FLOW_PIPE_DOMAIN_EGRESS)
+        .set_is_root(true)
+        .set_match(all_match)
+        .set_monitor(exit_monitor)
+        .build(ingress, shoc::flow::fwd_drop{});
+
+    auto exit_entry = exit_pipe.add_entry(0, all_match, std::nullopt, exit_monitor, ingress, 0);
+
+    ingress.process_entries(0, 10ms, 5);
+
+    shoc::logger->info("Exit pipe created, will start handling packets now.");
 
     auto packet_coro = handle_packets(engine, rss, txq);
 
     auto tim = timer { co_await boost::cobalt::this_coro::executor };
     tim.expires_after(std::chrono::seconds(30));
     co_await tim.async_wait();
+
+    auto query = exit_entry.query();
+
+    shoc::logger->info("sent {} packets totaling {} bytes", query.counter.total_pkts, query.counter.total_bytes);
 
     co_await rss->stop();
 }

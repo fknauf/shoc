@@ -8,8 +8,8 @@
 namespace {
     char const *const DEFAULT_HOST_PCI = "e1:00.0";
     char const *const DEFAULT_DPU_PCI = "03:00.0";
-    char const *const DEFAULT_HOST_IBDEV_NAME = "mlx5_3";
-    char const *const DEFAULT_DPU_IBDEV_NAME = "mlx5_1";
+    char const *const DEFAULT_HOST_IBDEV_NAME = "mlx5_1";
+    char const *const DEFAULT_DPU_IBDEV_NAME = "mlx5_3";
 }
 
 inline auto get_envvar_with_default(char const *name, char const *default_value) {
