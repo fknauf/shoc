@@ -1,6 +1,5 @@
 #include "rdma.hpp"
 
-#include "common/status.hpp"
 #include "logger.hpp"
 #include "progress_engine.hpp"
 

@@ -4,7 +4,6 @@
 #include "consumer.hpp"
 #include "producer.hpp"
 
-#include <shoc/common/status.hpp>
 #include <shoc/context.hpp>
 #include <shoc/coro/value_awaitable.hpp>
 #include <shoc/device.hpp>

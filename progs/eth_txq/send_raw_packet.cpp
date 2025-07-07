@@ -6,6 +6,7 @@
 #include <cppcodec/hex_lower.hpp>
 
 #include <string>
+#include <fmt/std.h>
 
 auto send_packet(
     shoc::progress_engine_lease engine,
@@ -22,20 +23,25 @@ auto send_packet(
         }
     );
 
+    auto mmap = shoc::memory_map { dev, packet, DOCA_ACCESS_FLAG_LOCAL_READ_WRITE };
+    auto bufinv = shoc::buffer_inventory { 1 };
+    auto buf = bufinv.buf_get_by_data(mmap, packet);
+
     auto txq_cfg = shoc::eth_txq_config {
         .max_burst_size = 256,
         .l3_chksum_offload = calculate_checksums,
         .l4_chksum_offload = calculate_checksums
     };
 
-    auto mmap = shoc::memory_map { dev, packet, DOCA_ACCESS_FLAG_LOCAL_READ_WRITE };
-    auto bufinv = shoc::buffer_inventory { 1 };
-    auto buf = bufinv.buf_get_by_data(mmap, packet);
+    shoc::logger->info("[{}] creating txq context", std::this_thread::get_id());
 
     auto txq = co_await engine->create_context<shoc::eth_txq>(dev, 16, txq_cfg);
+
+    shoc::logger->info("[{}] context created, sending packet", std::this_thread::get_id());
+
     auto status = co_await txq->send(buf);
 
-    shoc::logger->info("Packet sent, status = {}", doca_error_get_descr(status));
+    shoc::logger->info("[{}] Packet sent, status = {}", std::this_thread::get_id(), doca_error_get_descr(status));
 }
 
 auto co_main(

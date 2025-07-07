@@ -1,7 +1,6 @@
 #include "server.hpp"
 
 #include <shoc/common/raw_memory.hpp>
-#include <shoc/common/status.hpp>
 #include <shoc/logger.hpp>
 
 #include <doca_pe.h>

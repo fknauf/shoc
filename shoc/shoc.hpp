@@ -12,7 +12,6 @@
 #include "common/accepter_queues.hpp"
 #include "common/overload.hpp"
 #include "common/raw_memory.hpp"
-#include "common/status.hpp"
 #include "compress.hpp"
 #include "context.hpp"
 #include "coro/error_receptable.hpp"

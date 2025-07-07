@@ -25,6 +25,7 @@ namespace shoc {
         boost::cobalt::executor executor
     ):
         cfg_ { std::move(cfg) },
+        executor_ { executor },
         notifier_ { std::move(executor) }
     {
         doca_pe *pe;
@@ -86,11 +87,9 @@ namespace shoc {
 
         while(registered_fibers_ > 0 || !connected_contexts_.empty()) {
             if(cfg_.polling == polling_mode::busy) {
-                co_await yield();
-
                 while(doca_pe_progress(handle()) > 0) {
-                    // do nothing; doca_pe_progress calls the event handlers.
-                }    
+                    // intentionally left blank. doca_pe_prograss calls event handlers.
+                }
             } else {
                 request_notification();
                 logger->debug("progress engine: waiting for notification");
@@ -102,7 +101,6 @@ namespace shoc {
                 clear_notification();
 
                 while(doca_pe_progress(handle()) > 0) {
-                    // do nothing; doca_pe_progress calls the event handlers.
                 }
 
                 if(ec == boost::asio::error::operation_aborted) {
@@ -114,6 +112,12 @@ namespace shoc {
                     break;
                 }
             }
+
+            // yield before re-checking fiber states is necessary because some
+            // fiber resumptions are deferred and handled by the cobalt engine.
+            // this happens because some operations complain when they are
+            // done directly from a callback (esp. eth_txq)
+            co_await yield();
         }
 
         active_ = false;

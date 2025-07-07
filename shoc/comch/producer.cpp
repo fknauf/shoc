@@ -1,7 +1,7 @@
 #include "producer.hpp"
 
-#include <shoc/common/status.hpp>
 #include <shoc/logger.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <cassert>
 

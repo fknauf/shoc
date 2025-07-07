@@ -1,6 +1,5 @@
 #include "aes_gcm.hpp"
 
-#include "common/status.hpp"
 #include "error.hpp"
 #include "progress_engine.hpp"
 

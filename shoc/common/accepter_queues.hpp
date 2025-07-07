@@ -1,6 +1,5 @@
 #pragma once
 
-#include <shoc/common/status.hpp>
 #include <shoc/coro/value_awaitable.hpp>
 
 #include <optional>

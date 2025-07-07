@@ -1,7 +1,6 @@
 #include "dma.hpp"
 #include "error.hpp"
 
-#include <shoc/common/status.hpp>
 #include <shoc/progress_engine.hpp>
 
 #include <doca_pe.h>

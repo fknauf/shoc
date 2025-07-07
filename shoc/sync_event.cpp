@@ -1,6 +1,5 @@
 #include "sync_event.hpp"
 
-#include "common/status.hpp"
 #include "progress_engine.hpp"
 
 namespace shoc {
