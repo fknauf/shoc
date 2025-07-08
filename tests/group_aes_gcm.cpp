@@ -37,7 +37,7 @@ TEST(docapp_aes_gcm, single_shot) {
 
             shoc::logger->info("starting fiber");
 
-            auto dev = shoc::device::find_by_capabilities(shoc::device_capability::aes_gcm);
+            auto dev = shoc::device::find(shoc::device_capability::aes_gcm);
 
             shoc::logger->info("device found");
 

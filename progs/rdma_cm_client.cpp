@@ -20,11 +20,11 @@
 
 auto rdma_cm_client(
     shoc::progress_engine_lease engine,
-    std::string const &ibdev_name,
+    shoc::ibdev_name ibdev_name,
     std::string const &server_address,
     std::uint16_t port
 ) -> boost::cobalt::detached try {
-    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::rdma);
+    auto dev = shoc::device::find(ibdev_name, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
 
     auto addr = shoc::rdma_address(DOCA_RDMA_ADDR_TYPE_IPv4, server_address.c_str(), port);

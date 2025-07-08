@@ -43,10 +43,10 @@ struct cache_aligned_storage {
 
 auto receive_blocks(
     shoc::progress_engine_lease engine,
-    char const *pci_addr,
+    shoc::pci_address pci_addr,
     bool skip_verify
 ) -> boost::cobalt::detached {
-    auto dev = shoc::device::find_by_pci_addr(pci_addr, shoc::device_capability::comch_client);
+    auto dev = shoc::device::find(pci_addr, shoc::device_capability::comch_client);
 
     auto client = co_await engine->create_context<shoc::comch::client>("shoc-data-test", dev);
     auto geometry_message = co_await client->msg_recv();

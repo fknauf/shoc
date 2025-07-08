@@ -37,7 +37,7 @@ TEST(docapp_sha, hash) {
 
             shoc::logger->info("starting fiber");
 
-            auto dev = shoc::device::find_by_capabilities(shoc::device_capability::sha);
+            auto dev = shoc::device::find(shoc::device_capability::sha);
 
             shoc::logger->info("device found");
 

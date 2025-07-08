@@ -33,7 +33,7 @@ TEST(docapp_compress, single_shot) {
         try {
             *report = "";
 
-            auto dev = shoc::device::find_by_capabilities(shoc::device_capability::compress_deflate);
+            auto dev = shoc::device::find(shoc::device_capability::compress_deflate);
 
             auto buf_inv = shoc::buffer_inventory { 3 };
 

@@ -19,12 +19,10 @@ auto sync_event_remote(
     auto msg = std::string{};
 
 #ifdef DOCA_ARCH_DPU
-    auto dev = shoc::device::find_by_pci_addr(
+    auto dev = shoc::device::find(
         env.dev_pci,
-        { 
-            shoc::device_capability::sync_event_pci,
-            shoc::device_capability::comch_server
-        }
+        shoc::device_capability::sync_event_pci,
+        shoc::device_capability::comch_server
     );
     auto rep = shoc::device_representor::find_by_pci_addr(dev, env.rep_pci);
 

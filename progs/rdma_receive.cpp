@@ -40,9 +40,9 @@ auto rdma_exchange_connection_details(
 
 auto rdma_receive(
     shoc::progress_engine_lease engine,
-    std::string const &ibdev_name
+    shoc::ibdev_name ibdev_name
 ) -> boost::cobalt::detached try {
-    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::rdma);
+    auto dev = shoc::device::find(ibdev_name, shoc::device_capability::rdma);
     auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
     auto conn = rdma->export_connection();
 

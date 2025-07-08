@@ -96,11 +96,11 @@ auto handle_connection(
 
 auto dma_serve(
     shoc::progress_engine_lease engine,
-    char const *dev_pci,
+    shoc::pci_address dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached {
     auto data = test_data { 256, 1 << 20 };
-    auto dev = shoc::device::find_by_pci_addr(dev_pci, { shoc::device_capability::dma, shoc::device_capability::comch_server });
+    auto dev = shoc::device::find(dev_pci, shoc::device_capability::dma, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr ( dev, rep_pci );
 
     auto server = co_await engine->create_context<shoc::comch::server>("dma-test", dev, rep);

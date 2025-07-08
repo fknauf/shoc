@@ -24,7 +24,7 @@ auto encrypt(
     std::span<std::byte const> keybytes,
     std::span<std::byte const> iv
 ) -> boost::cobalt::detached {
-    auto dev = shoc::device::find_by_capabilities(shoc::device_capability::aes_gcm);
+    auto dev = shoc::device::find(shoc::device_capability::aes_gcm);
     auto ctx = co_await engine->create_context<shoc::aes_gcm_context>(dev, 16);
 
     auto blocksize = std::size_t { 1 << 20 };

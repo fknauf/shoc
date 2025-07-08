@@ -33,7 +33,7 @@ TEST(docapp_dma, local_copy) {
         try {
             *report = "";
 
-            auto dev = shoc::device::find_by_capabilities(shoc::device_capability::dma);
+            auto dev = shoc::device::find(shoc::device_capability::dma);
             auto ctx = co_await engine->create_context<shoc::dma_context>(dev, 1);
 
             CO_ASSERT_EQ(shoc::context_state::running, ctx->state(), "state not running after acquiry");

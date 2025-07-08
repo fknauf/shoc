@@ -1,5 +1,7 @@
 #include "device.hpp"
 
+#include "common/overload.hpp"
+
 #include <doca_aes_gcm.h>
 #include <doca_compress.h>
 #include <doca_comch.h>
@@ -31,54 +33,6 @@ namespace shoc {
                 doca_dev_rep_close(handle);
             }
         }
-
-        class device_list {
-        public:
-            using tasks_check = auto (doca_devinfo const *) -> doca_error_t;
-
-            device_list() {
-                enforce_success(doca_devinfo_create_list(&dev_list, &nb_devs));
-            }
-
-            ~device_list() {
-                if(dev_list != nullptr) {
-                    doca_devinfo_destroy_list(dev_list);
-                }
-            }
-
-            device_list(device_list const &) = delete;
-            device_list &operator=(device_list const &) = delete;
-
-            [[nodiscard]] auto begin() const { return dev_list; }
-            [[nodiscard]] auto end() const { return dev_list + nb_devs; }
-
-        private:
-            doca_devinfo **dev_list = nullptr;
-            std::uint32_t nb_devs = 0;
-        };
-
-        class device_rep_list {
-        public:
-            device_rep_list(device const &dev, doca_devinfo_rep_filter filter = DOCA_DEVINFO_REP_FILTER_ALL) {
-                enforce_success(doca_devinfo_rep_create_list(dev.handle(), filter, &rep_list, &nb_devs));
-            }
-
-            ~device_rep_list() {
-                if(rep_list != nullptr) {
-                    doca_devinfo_rep_destroy_list(rep_list);
-                }
-            }
-
-            device_rep_list(device_rep_list const &) = delete;
-            device_rep_list &operator=(device_rep_list const &) = delete;
-
-            [[nodiscard]] auto begin() const { return rep_list; }
-            [[nodiscard]] auto end() const { return rep_list + nb_devs; }
-
-        private:
-            doca_devinfo_rep **rep_list = nullptr;
-            std::uint32_t nb_devs = 0;
-        };
 
         auto devinfo_has_capability(
             doca_devinfo *dev,
@@ -167,6 +121,94 @@ namespace shoc {
         }
     }
 
+    auto devinfo_matches(
+        doca_devinfo *dev,
+        device_capability cap
+    ) -> bool {
+        return devinfo_has_capability(dev, cap);
+    }
+
+    auto devinfo_matches(
+        doca_devinfo *dev,
+        pci_address const &pci
+    ) -> bool {
+        std::uint8_t is_addr_equal = 0;
+        auto err = doca_devinfo_is_equal_pci_addr(dev, pci.addr.c_str(), &is_addr_equal);
+        return err == DOCA_SUCCESS && is_addr_equal;
+    }
+
+    auto devinfo_matches(
+        doca_devinfo *dev,
+        ibdev_name const &ibdev
+    ) -> bool {
+        char dev_name[DOCA_DEVINFO_IBDEV_NAME_SIZE];
+        auto err = doca_devinfo_get_ibdev_name(dev, dev_name, sizeof dev_name);
+        return err == DOCA_SUCCESS && dev_name == ibdev.name;
+    }
+
+    auto devinfo_matches(
+        doca_devinfo *dev,
+        doca_error_t (*has_cap_fn)(doca_devinfo *)
+    ) -> bool {
+        return has_cap_fn(dev) == DOCA_SUCCESS;
+    }
+
+    device_list::device_list() {
+        enforce_success(doca_devinfo_create_list(&dev_list, &nb_devs));
+    }
+
+    device_list::~device_list() {
+        clear();
+    }
+
+    device_list::device_list(device_list &&other) {
+        *this = std::move(other);
+    }
+
+    auto device_list::operator=(device_list &&other) -> device_list& {
+        clear();
+        dev_list = std::exchange(other.dev_list, nullptr);
+        nb_devs = std::exchange(other.nb_devs, 0);
+        return *this;
+    }
+
+    auto device_list::clear() -> void {
+        if(dev_list != nullptr) {
+            doca_devinfo_destroy_list(dev_list);
+            dev_list = nullptr;
+            nb_devs = 0;
+        }
+    }
+
+    device_rep_list::device_rep_list(
+        device const &dev,
+        doca_devinfo_rep_filter filter
+    ) {
+        enforce_success(doca_devinfo_rep_create_list(dev.handle(), filter, &rep_list, &nb_devs));
+    }
+
+    device_rep_list::~device_rep_list() {
+        clear();
+    }
+
+    device_rep_list::device_rep_list(device_rep_list &&other) { 
+        *this = std::move(other);
+    }
+
+    auto device_rep_list::operator=(device_rep_list &&other) -> device_rep_list& {
+        clear();
+        rep_list = std::exchange(other.rep_list, nullptr);
+        nb_devs = std::exchange(other.nb_devs, 0);
+        return *this;
+    } 
+
+    auto device_rep_list::clear() -> void {
+        if(rep_list != nullptr) {
+            doca_devinfo_rep_destroy_list(rep_list);
+            rep_list = nullptr;
+        }
+    }
+
     device::device(doca_dev *doca_handle)
     {
         if(doca_handle == nullptr) {
@@ -186,70 +228,6 @@ namespace shoc {
 
     auto device::has_capabilities(std::initializer_list<device_capability> required_caps) const noexcept -> bool {
         return devinfo_has_capabilities(as_devinfo(), required_caps);
-    }
-
-    auto device::find_by_pci_addr(
-        std::string const &pci_addr,
-        std::initializer_list<device_capability> required_caps
-    ) -> device {
-        for(auto dev : device_list{}) {
-            std::uint8_t is_addr_equal = 0;
-            auto err = doca_devinfo_is_equal_pci_addr(dev, pci_addr.c_str(), &is_addr_equal);
-
-            if(
-                err == DOCA_SUCCESS &&
-                is_addr_equal &&
-                devinfo_has_capabilities(dev, required_caps)
-            ) {
-                doca_dev *dev_handle = nullptr;
-
-                if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
-                    return device { dev_handle };
-                }
-            }
-        }
-
-        throw doca_exception(DOCA_ERROR_NOT_FOUND);
-    }
-
-    auto device::find_by_ibdev_name(
-        std::string const &requested_name,
-        std::initializer_list<device_capability> required_caps
-    ) -> device {
-        char dev_name[DOCA_DEVINFO_IBDEV_NAME_SIZE];
-
-        for(auto dev : device_list {}) {
-            auto err = doca_devinfo_get_ibdev_name(dev, dev_name, sizeof dev_name);
-
-            if(
-                err == DOCA_SUCCESS &&
-                dev_name == requested_name &&
-                devinfo_has_capabilities(dev, required_caps)
-            ) {
-                doca_dev *dev_handle = nullptr;
-                if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
-                    return device { dev_handle };
-                }
-            }
-        }
-
-        throw doca_exception(DOCA_ERROR_NOT_FOUND);
-    }
-
-    auto device::find_by_capabilities(std::initializer_list<device_capability> required_caps) -> device {
-        for(auto dev : device_list()) {
-            if(!devinfo_has_capabilities(dev, required_caps)) {
-                continue;
-            }
-
-            doca_dev *dev_handle = nullptr;
-
-            if(DOCA_SUCCESS == doca_dev_open(dev, &dev_handle)) {
-                return device { dev_handle };
-            }
-        }
-
-        throw doca_exception(DOCA_ERROR_NOT_FOUND);
     }
 
     device_representor::device_representor(doca_dev_rep *doca_handle) {

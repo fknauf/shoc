@@ -15,12 +15,12 @@ struct stat shoc_stat_buffer;
 
 auto ping_pong(
     shoc::progress_engine_lease engine,
-    char const *dev_pci
+    shoc::pci_address dev_pci
 ) -> boost::cobalt::detached {
     auto executor = co_await boost::cobalt::this_coro::executor;
 
     // get device from PCIe address
-    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_client);
+    auto dev = shoc::device::find(dev_pci, shoc::device_capability::comch_client);
 
     for([[maybe_unused]] auto i : std::ranges::views::iota(0, 4)) {
         // wait for connection to server, that is: create the context and ask the SDK to start

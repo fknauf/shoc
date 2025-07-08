@@ -75,10 +75,10 @@ auto send_blocks(
 
 auto serve(
     shoc::progress_engine_lease engine,
-    char const *dev_pci,
+    shoc::pci_address dev_pci,
     char const *rep_pci
 ) -> boost::cobalt::detached {
-    auto dev = shoc::device::find_by_pci_addr(dev_pci, shoc::device_capability::comch_server);
+    auto dev = shoc::device::find(dev_pci, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
     auto data = data_descriptor { 256, 1 << 20 };
     auto mmap = shoc::memory_map { dev, data.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };

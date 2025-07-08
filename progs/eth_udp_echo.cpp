@@ -78,18 +78,16 @@ auto handle_packets(
 
 auto partial_tap(
     shoc::progress_engine_lease engine,
-    char const *ibdev_name
+    shoc::ibdev_name ibdev_name
 ) -> boost::cobalt::detached {
     using namespace std::literals::chrono_literals;
 
-    auto dev = shoc::device::find_by_ibdev_name(
+    auto dev = shoc::device::find(
         ibdev_name, 
-        {
-            shoc::device_capability::eth_rxq_cpu_managed_mempool,
-            shoc::device_capability::eth_txq_cpu_regular,
-            shoc::device_capability::eth_txq_l3_chksum_offload,
-            shoc::device_capability::eth_txq_l4_chksum_offload
-        }
+        shoc::device_capability::eth_rxq_cpu_managed_mempool,
+        shoc::device_capability::eth_txq_cpu_regular,
+        shoc::device_capability::eth_txq_l3_chksum_offload,
+        shoc::device_capability::eth_txq_l4_chksum_offload
     );
 
     auto flow_lib = shoc::flow::library_scope::config{}

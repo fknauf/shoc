@@ -39,7 +39,7 @@ TEST(docapp_erasure_coding, create_and_recover) {
 
             shoc::logger->info("starting fiber");
 
-            auto dev = shoc::device::find_by_capabilities(shoc::device_capability::erasure_coding);
+            auto dev = shoc::device::find(shoc::device_capability::erasure_coding);
             shoc::logger->info("device found");
 
             auto ctx = co_await engine->create_context<shoc::ec_context>(dev, 2);

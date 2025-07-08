@@ -11,16 +11,14 @@
 auto send_packet(
     shoc::progress_engine_lease engine,
     std::vector<std::uint8_t> packet,
-    std::string device_name,
+    shoc::ibdev_name device_name,
     bool calculate_checksums
 ) -> boost::cobalt::detached {
-    auto dev = shoc::device::find_by_ibdev_name(
+    auto dev = shoc::device::find(
         device_name, 
-        {
-            shoc::device_capability::eth_txq_cpu_regular,
-            shoc::device_capability::eth_txq_l3_chksum_offload,
-            shoc::device_capability::eth_txq_l4_chksum_offload
-        }
+        shoc::device_capability::eth_txq_cpu_regular,
+        shoc::device_capability::eth_txq_l3_chksum_offload,
+        shoc::device_capability::eth_txq_l4_chksum_offload
     );
 
     auto mmap = shoc::memory_map { dev, packet, DOCA_ACCESS_FLAG_LOCAL_READ_WRITE };
@@ -56,7 +54,7 @@ auto co_main(
 
     options.add_options()
         ("p,packet", "packet string (hex)", cxxopts::value<std::string>()->default_value("1070fdb3513f02d1cf111051080045000020f29840004011fdd3c0a864dac0a864358dff3039000c21c3666f6f0a0000000000000000000000000000"))
-        ("d,device", "device (ibdev name)", cxxopts::value<std::string>()->default_value(env.ibdev_name))
+        ("d,device", "device (ibdev name)", cxxopts::value<std::string>()->default_value(env.ibdev_name.name))
         ("c,calculate-checksums", "calculate L3 and L4 checksums?", cxxopts::value<bool>()->default_value("false"));
         ;
 

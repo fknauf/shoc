@@ -27,11 +27,11 @@ auto handle_packets(
 
 auto do_network_stuff(
     shoc::progress_engine_lease engine,
-    char const *ibdev_name
+    shoc::ibdev_name ibdev_name
 ) -> boost::cobalt::detached {
     using namespace std::literals::chrono_literals;
 
-    auto dev = shoc::device::find_by_ibdev_name(ibdev_name, shoc::device_capability::eth_rxq_cpu_managed_mempool);
+    auto dev = shoc::device::find(ibdev_name, shoc::device_capability::eth_rxq_cpu_managed_mempool);
 
     auto flow_lib = shoc::flow::library_scope::config{}
         .set_pipe_queues(1)

@@ -49,15 +49,13 @@ struct data_extents {
 
 auto dma_receive(
     shoc::progress_engine_lease engine,
-    char const *pci_addr,
+    shoc::pci_address pci_addr,
     std::uint32_t parallelism
 ) -> boost::cobalt::detached {
-    auto dev = shoc::device::find_by_pci_addr(
+    auto dev = shoc::device::find(
         pci_addr,
-        {
-            shoc::device_capability::comch_client,
-            shoc::device_capability::dma
-        }
+        shoc::device_capability::comch_client,
+        shoc::device_capability::dma
     );
 
     auto client = co_await engine->create_context<shoc::comch::client>("dma-test", dev);

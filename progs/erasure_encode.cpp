@@ -79,7 +79,7 @@ auto encode_fiber(
     std::uint32_t blocksize,
     std::uint32_t rdnc_block_count
 ) -> boost::cobalt::detached try {
-    auto dev = shoc::device::find_by_capabilities(shoc::device_capability::erasure_coding);
+    auto dev = shoc::device::find(shoc::device_capability::erasure_coding);
     auto ctx = co_await engine->create_context<shoc::ec_context>(dev);
     auto bufinv = shoc::buffer_inventory { 2 };
 

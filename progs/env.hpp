@@ -1,5 +1,7 @@
 #pragma once
 
+#include <shoc/device.hpp>
+
 #include <doca_build_config.h>
 
 #include <string>
@@ -18,8 +20,8 @@ inline auto get_envvar_with_default(char const *name, char const *default_value)
 }
 
 struct bluefield_env_host {
-    char const *dev_pci;
-    char const *ibdev_name;
+    shoc::pci_address dev_pci;
+    shoc::ibdev_name ibdev_name;
 
     bluefield_env_host():
         dev_pci { get_envvar_with_default("DOCA_DEV_PCI", DEFAULT_HOST_PCI) },
@@ -28,9 +30,9 @@ struct bluefield_env_host {
 };
 
 struct bluefield_env_dpu {
-    char const *dev_pci;
+    shoc::pci_address dev_pci;
     char const *rep_pci;
-    char const *ibdev_name;
+    shoc::ibdev_name ibdev_name;
 
     bluefield_env_dpu():
         dev_pci { get_envvar_with_default("DOCA_DEV_PCI", DEFAULT_DPU_PCI) },

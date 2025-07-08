@@ -55,7 +55,7 @@ auto compress_file(
 
     in.read(src_data.data(), filesize);
 
-    auto dev = shoc::device::find_by_capabilities(shoc::device_capability::compress_deflate);
+    auto dev = shoc::device::find(shoc::device_capability::compress_deflate);
     auto mmap_src = shoc::memory_map { dev, src_data };
     auto mmap_dst = shoc::memory_map { dev, dst_data };
     auto buf_inv = shoc::buffer_inventory { 2 };
