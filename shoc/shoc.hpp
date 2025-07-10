@@ -17,6 +17,7 @@
 #include "coro/error_receptable.hpp"
 #include "coro/status_awaitable.hpp"
 #include "coro/value_awaitable.hpp"
+#include "devemu_pci.hpp"
 #include "device.hpp"
 #include "dma.hpp"
 #include "erasure_coding.hpp"

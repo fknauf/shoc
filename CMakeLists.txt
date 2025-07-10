@@ -17,6 +17,7 @@ pkg_check_modules(
     doca-common
     doca-compress
     doca-comch
+    doca-devemu
     doca-dma
     doca-erasure-coding
     doca-eth
@@ -52,6 +53,7 @@ add_library(
     shoc/compress.cpp
     shoc/context.cpp
     shoc/device.cpp
+    shoc/devemu_pci.cpp
     shoc/dma.cpp
     shoc/erasure_coding.cpp
     shoc/eth_frame.cpp
@@ -121,6 +123,7 @@ add_shoc_demo_executable(eth_rxq_proto_splitter  progs/eth_rxq/proto_splitter.cp
 add_shoc_demo_executable(eth_rxq_kernel_fwd      progs/eth_rxq/kernel_fwd.cpp)
 add_shoc_demo_executable(eth_txq_send_raw_packet progs/eth_txq/send_raw_packet.cpp)
 add_shoc_demo_executable(eth_udp_echo            progs/eth_udp_echo.cpp)
+add_shoc_demo_executable(devemu_pci_hotplug      progs/devemu/pci_hotplug.cpp)
 
 add_executable(generate_testdata tools/generate_testdata.cpp)
 

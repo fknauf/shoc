@@ -1,6 +1,7 @@
 #include "device.hpp"
 
 #include "common/overload.hpp"
+#include "devemu_pci.hpp"
 
 #include <doca_aes_gcm.h>
 #include <doca_compress.h>
@@ -22,18 +23,6 @@
 
 namespace shoc {
     namespace {
-        auto dev_cleanup(doca_dev *handle) noexcept -> void {
-            if(handle != nullptr) {
-                doca_dev_close(handle);
-            }
-        }
-
-        auto dev_rep_cleanup(doca_dev_rep *handle) noexcept -> void {
-            if(handle != nullptr) {
-                doca_dev_rep_close(handle);
-            }
-        }
-
         auto devinfo_has_capability(
             doca_devinfo *dev,
             device_capability required_cap
@@ -215,7 +204,7 @@ namespace shoc {
             throw doca_exception(DOCA_ERROR_NOT_FOUND);
         }
 
-        handle_.reset(doca_handle, dev_cleanup);
+        handle_.reset(doca_handle, detail::doca_destroyer<doca_dev_close>{});
     }
 
     auto device::as_devinfo() const -> doca_devinfo* {
@@ -228,10 +217,6 @@ namespace shoc {
 
     auto device::has_capabilities(std::initializer_list<device_capability> required_caps) const noexcept -> bool {
         return devinfo_has_capabilities(as_devinfo(), required_caps);
-    }
-
-    device_representor::device_representor(doca_dev_rep *doca_handle) {
-        handle_.reset(doca_handle, dev_rep_cleanup);
     }
 
     auto device_representor::find_by_pci_addr(
@@ -248,7 +233,7 @@ namespace shoc {
 
             if(err == DOCA_SUCCESS && is_addr_equal) {
                 enforce_success(doca_dev_rep_open(rep, &result));
-                return device_representor { result };
+                return device_representor { result, detail::doca_destroyer<doca_dev_rep_close>{} };
             }
         }
 
@@ -273,7 +258,7 @@ namespace shoc {
 
             if(vuid == vuid_buf) {
                 enforce_success(doca_dev_rep_open(rep, &result));
-                return device_representor { result };
+                return device_representor { result, detail::doca_destroyer<doca_dev_rep_close>{} };
             }
         }
 

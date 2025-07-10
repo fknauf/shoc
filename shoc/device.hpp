@@ -47,7 +47,7 @@ namespace shoc {
     auto devinfo_matches(doca_devinfo *dev, pci_address const &pci) -> bool;
     auto devinfo_matches(doca_devinfo *dev, ibdev_name const &ibdev) -> bool;
     auto devinfo_matches(doca_devinfo *dev, doca_error_t (*has_cap_fn)(doca_devinfo*)) -> bool;
-    auto devinfo_matches(doca_devinfo *dev, std::invocable<bool, doca_devinfo*> auto pred_fn) -> bool {
+    auto devinfo_matches(doca_devinfo *dev, std::predicate<doca_devinfo*> auto &&pred_fn) -> bool {
         return pred_fn(dev);
     }
 
@@ -55,7 +55,7 @@ namespace shoc {
     concept device_predicate = requires(T pred, doca_devinfo *dev) {
         { devinfo_matches(dev, pred) } -> std::same_as<bool>;
     };
-
+    
     class device;
 
     class device_list final {
@@ -157,6 +157,10 @@ namespace shoc {
     public:
         device_representor() = default;
 
+        device_representor(doca_dev_rep *doca_handle, auto deleter) {
+            handle_.reset(doca_handle, std::move(deleter));
+        }
+
         auto handle() const { return handle_.get(); }
 
         [[nodiscard]] static auto find_by_pci_addr(
@@ -172,7 +176,6 @@ namespace shoc {
         ) -> device_representor;
 
     private:
-        device_representor(doca_dev_rep *doca_handle);
 
         std::shared_ptr<doca_dev_rep> handle_;
     };
