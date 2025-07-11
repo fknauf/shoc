@@ -12,14 +12,12 @@ using stream_descriptor = boost::cobalt::use_op_t::as_default_on_t<boost::asio::
 auto hotplug_device(
     shoc::progress_engine_lease engine,
     shoc::pci_address pci_addr
-) -> boost::cobalt::detached {
+) -> boost::cobalt::detached try {
     auto my_executor = co_await boost::cobalt::this_coro::executor;
     auto async_stdin = stream_descriptor { my_executor };
     async_stdin.assign(STDIN_FILENO);
 
     auto dev_type = shoc::devemu::pci_type { "SHOC Sample Device" };
-
-    shoc::devinfo_matches(nullptr, dev_type.hotplug_device_predicate());
 
     auto phys_dev = shoc::device::find(
         pci_addr,
@@ -51,11 +49,13 @@ auto hotplug_device(
         << "hotplugged emulated device, status = " << emu_dev->hotplug_state() << "\n"
         << "press return to unplug" << std::endl;
 
-    [[maybe_unused]] char dummy_buffer[1024];
-    co_await async_stdin.async_read_until(boost::asio::buffer(dummy_buffer), '\n');
+    std::string dummy_buffer;
+    co_await async_read_until(async_stdin, boost::asio::dynamic_buffer(dummy_buffer), '\n');
     co_await emu_dev->hotunplug();
 
     std::cout << "unplugged emulated device, status = " << emu_dev->hotplug_state() << std::endl;
+} catch(shoc::doca_exception &e) {
+    shoc::logger->error(e.what());
 }
 
 auto co_main(

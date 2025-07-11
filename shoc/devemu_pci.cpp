@@ -17,26 +17,18 @@ namespace shoc::devemu {
         if(err != DOCA_SUCCESS) {
             logger->error("Stopping of PCI type in destructor failed: {}", doca_error_get_descr(err));
         }
-
-        if(handle() != nullptr) {
-            err = doca_devemu_pci_type_destroy(handle());
-
-            if(err != DOCA_SUCCESS) {
-                logger->error("Destruction of PCI type failed: {}", doca_error_get_descr(err));
-            }
-        }
     }
 
     auto pci_type::is_hotplug_supported(doca_devinfo *dev) const -> bool {
         std::uint8_t supported = 0;
-        enforce_success(doca_devemu_pci_cap_type_is_hotplug_supported(dev, handle(), &supported));
-        return supported != 0;
+        auto err = doca_devemu_pci_cap_type_is_hotplug_supported(dev, handle(), &supported);
+        return err == DOCA_SUCCESS && supported != 0;
     }
 
     auto pci_type::is_mgmt_supported(doca_devinfo *dev) const -> bool {
         std::uint8_t supported = 0;
-        enforce_success(doca_devemu_pci_cap_type_is_mgmt_supported(dev, handle(), &supported));
-        return supported != 0;
+        auto err = doca_devemu_pci_cap_type_is_mgmt_supported(dev, handle(), &supported);
+        return err == DOCA_SUCCESS && supported != 0;
     }
 
     auto pci_type::set_dev(device dev) -> pci_type & {
@@ -197,14 +189,13 @@ namespace shoc::devemu {
     }
 
     auto pci_type::stop() -> doca_error_t {
-        auto raw_handle = handle();
-        return raw_handle != nullptr ? doca_devemu_pci_type_stop(raw_handle) : DOCA_SUCCESS;
+        return is_started() ? doca_devemu_pci_type_stop(handle()) : DOCA_SUCCESS;
     }
 
     auto pci_type::is_started() -> bool {
         std::uint8_t started;
-        enforce_success(doca_devemu_pci_type_is_started(handle(), &started));
-        return started != 0;
+        auto err = doca_devemu_pci_type_is_started(handle(), &started);
+        return err == DOCA_SUCCESS && started != 0;
     }
 
     auto pci_type::create_representor() -> device_representor {
