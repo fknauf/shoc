@@ -61,7 +61,7 @@ auto hotplug_device(
 
     auto emu_dev = co_await engine->create_context<shoc::devemu::pci_dev>(dev_type, rep);
 
-    shoc::logger->info("Created device context, hottplugging...");
+    shoc::logger->info("Created device context (hotplug state = {}), hottplugging...", static_cast<int>(emu_dev->hotplug_state()));
 
     co_await emu_dev->hotplug();
 

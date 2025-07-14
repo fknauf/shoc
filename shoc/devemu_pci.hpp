@@ -112,7 +112,8 @@ namespace shoc::devemu {
         public context<
             doca_devemu_pci_dev,
             doca_devemu_pci_dev_destroy,
-            doca_devemu_pci_dev_as_ctx
+            doca_devemu_pci_dev_as_ctx,
+            true
         >
     {
     public:

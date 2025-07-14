@@ -188,7 +188,8 @@ namespace shoc {
     template<
         typename DocaHandle,
         auto HandleDestroy,
-        auto HandleAsCtx
+        auto HandleAsCtx,
+        bool HandleIsCreatedWithEngineConnection = false
     >
     class context:
         public context_base
@@ -223,7 +224,9 @@ namespace shoc {
             enforce_success(doca_ctx_set_user_data(ctx, ctx_user_data));
             enforce_success(doca_ctx_set_state_changed_cb(ctx, &context::state_changed_callback));
 
-            connect_to_engine();
+            if(!HandleIsCreatedWithEngineConnection) {
+                connect_to_engine();
+            }
         }
 
         template<auto HandleCreate, typename... Args>
