@@ -161,7 +161,8 @@ namespace shoc {
             handle_.reset(doca_handle, std::move(deleter));
         }
 
-        auto handle() const { return handle_.get(); }
+        [[nodiscard]] auto handle() const { return handle_.get(); }
+        [[nodiscard]] auto as_devinfo() const { return doca_dev_rep_as_devinfo(handle()); }
 
         [[nodiscard]] static auto find_by_pci_addr(
             device const &dev,
@@ -174,6 +175,9 @@ namespace shoc {
             std::string_view vuid,
             doca_devinfo_rep_filter filter = DOCA_DEVINFO_REP_FILTER_ALL
         ) -> device_representor;
+
+        [[nodiscard]]
+        auto get_vuid() -> std::string;
 
     private:
 

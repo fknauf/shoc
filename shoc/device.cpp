@@ -265,6 +265,12 @@ namespace shoc {
         throw doca_exception(DOCA_ERROR_NOT_FOUND);
     }
 
+    auto device_representor::get_vuid() -> std::string {
+        char buffer[DOCA_DEVINFO_VUID_SIZE];
+        enforce_success(doca_devinfo_rep_get_vuid(as_devinfo(), buffer, sizeof buffer));
+        return buffer;
+    }
+
     auto device::get_mac_addr() const -> std::array<std::byte, DOCA_DEVINFO_MAC_ADDR_SIZE> {
         std::array<std::byte, DOCA_DEVINFO_MAC_ADDR_SIZE> result;
         enforce_success(doca_devinfo_get_mac_addr(
