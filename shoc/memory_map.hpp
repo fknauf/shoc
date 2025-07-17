@@ -105,6 +105,18 @@ namespace shoc {
         );
 
         /**
+         * Construct a memory_map object form a raw DOCA handle. The new object assumes ownership
+         * of the raw handle. This is used by the devemu_pci subset.
+         *
+         * @param raw_handle Handle to an externally created DOCA memory mapping
+         * @param is_started true if the DOCA memory map is already started. If false, the constructor will start it.
+         */
+        memory_map(
+            unique_handle<doca_mmap, doca_mmap_destroy> &&raw_handle,
+            bool is_started = true
+        );
+
+        /**
          * @return the managed doca_mmap handle
          */
         [[nodiscard]] auto handle() const {

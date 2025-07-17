@@ -281,4 +281,27 @@ namespace shoc::devemu {
         hot_unplug_waiter_ = receptable;
         return result;
     }
+
+    auto pci_dev::remote_mmap(
+        std::initializer_list<device> devices,
+        std::span<std::byte> memory,
+        std::uint32_t permissions
+    ) -> memory_map {
+        doca_mmap *raw_mmap;
+        enforce_success(doca_devemu_pci_mmap_create(handle(), &raw_mmap));
+        unique_handle<doca_mmap, doca_mmap_destroy> mmap { raw_mmap };
+        raw_mmap = nullptr;
+        
+        enforce_success(doca_mmap_set_max_num_devices(mmap.get(), devices.size()));
+
+        for(auto &dev : devices) {
+            enforce_success(doca_mmap_add_dev(mmap.get(), dev.handle()));
+        }
+
+        enforce_success(doca_mmap_set_permissions(mmap.get(), permissions));
+        enforce_success(doca_mmap_set_memrange(mmap.get(), memory.data(), memory.size()));
+        enforce_success(doca_mmap_start(mmap.get()));
+
+        return { std::move(mmap), true };
+    }
 }

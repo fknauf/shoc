@@ -71,4 +71,20 @@ namespace shoc {
             .length = export_len
         };
     }
+
+    memory_map::memory_map(
+        unique_handle<doca_mmap, doca_mmap_destroy> &&raw_handle,
+        bool is_started
+    ):
+        handle_ { std::move(raw_handle) }
+    {
+        if(!is_started) {
+            enforce_success(doca_mmap_start(handle()));
+        }
+
+        void *range_base = nullptr;
+        std::size_t range_length = 0;
+        enforce_success(doca_mmap_get_memrange(handle(), &range_base, &range_length));
+        range_ = create_span<std::byte>(range_base, range_length);
+    }
 }

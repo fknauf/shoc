@@ -4,6 +4,7 @@
 #include "coro/status_awaitable.hpp"
 #include "coro/value_awaitable.hpp"
 #include "device.hpp"
+#include "memory_map.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_devemu_pci.h>
@@ -124,6 +125,20 @@ namespace shoc::devemu {
         );
 
         [[nodiscard]] auto hotplug_state() const -> doca_devemu_pci_hotplug_state;
+
+        [[nodiscard]] auto remote_mmap(
+            std::initializer_list<device> devices,
+            std::span<std::byte> memory,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
+        ) -> memory_map;
+
+        [[nodiscard]] auto remote_mmap(
+            device dev,
+            std::span<std::byte> memory,
+            std::uint32_t permissions = DOCA_ACCESS_FLAG_LOCAL_READ_WRITE
+        ) -> memory_map {
+            return remote_mmap({ dev }, memory, permissions);
+        }
 
         auto hotplug() -> coro::value_awaitable<doca_devemu_pci_hotplug_state>;
         auto hotunplug() -> coro::value_awaitable<doca_devemu_pci_hotplug_state>;

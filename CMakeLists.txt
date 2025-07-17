@@ -124,6 +124,8 @@ add_shoc_demo_executable(eth_rxq_kernel_fwd      progs/eth_rxq/kernel_fwd.cpp)
 add_shoc_demo_executable(eth_txq_send_raw_packet progs/eth_txq/send_raw_packet.cpp)
 add_shoc_demo_executable(eth_udp_echo            progs/eth_udp_echo.cpp)
 add_shoc_demo_executable(devemu_pci_hotplug      progs/devemu/pci_hotplug.cpp)
+add_shoc_demo_executable(devemu_pci_dma_dpu      progs/devemu/pci_dma/dpu.cpp)
+add_shoc_demo_executable(devemu_pci_dma_host     progs/devemu/pci_dma/host.cpp)
 
 add_executable(generate_testdata tools/generate_testdata.cpp)
 
