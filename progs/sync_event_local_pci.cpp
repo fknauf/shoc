@@ -23,7 +23,7 @@ auto sync_event_local(
         shoc::device_capability::sync_event_pci,
         shoc::device_capability::comch_server
     );
-    auto rep = shoc::device_representor::find(dev, env.rep_pci);
+    auto rep = shoc::device_representor::find_by_pci_addr(dev, env.rep_pci);
 
     auto sync = co_await engine->create_context<shoc::sync_event>(dev, shoc::sync_event::location_pci{}, 16);
     [[maybe_unused]] auto event_descriptor = sync->export_to_remote_pci(dev);
