@@ -128,6 +128,7 @@ add_shoc_demo_executable(devemu_pci_dma_dpu      samples/devemu/pci_dma/dpu.cpp)
 add_shoc_demo_executable(devemu_pci_dma_host     samples/devemu/pci_dma/host.cpp)
 
 add_executable(generate_testdata tools/generate_testdata.cpp)
+add_shoc_demo_executable(list_devices tools/list_devices.cpp)
 
 function(add_plain_doca_executable name)
     add_executable(${name} ${ARGN})
