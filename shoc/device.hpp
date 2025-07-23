@@ -111,6 +111,7 @@ namespace shoc {
     {
     public:
         device() = default;
+        device(doca_devinfo *dev);
 
         /**
          * Underlying handle for use in DOCA SDK functions. Mainly for library-internal use.

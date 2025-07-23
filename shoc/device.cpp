@@ -198,6 +198,17 @@ namespace shoc {
         }
     }
 
+    device::device(doca_devinfo *dev) {
+        doca_dev *doca_handle;
+        auto err = doca_dev_open(dev, &doca_handle);
+
+        if(err == DOCA_SUCCESS) {
+            handle_.reset(doca_handle, detail::doca_destroyer<doca_dev_close>{});
+        } else {
+            throw doca_exception(err);
+        }
+    }
+
     device::device(doca_dev *doca_handle)
     {
         if(doca_handle == nullptr) {
