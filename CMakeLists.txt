@@ -96,36 +96,36 @@ function(add_shoc_demo_executable name)
     target_link_libraries(${name} shoc cxxopts::cxxopts)
 endfunction()
 
-add_shoc_demo_executable(comch_client            progs/comch_client.cpp)
-add_shoc_demo_executable(comch_server            progs/comch_server.cpp)
-add_shoc_demo_executable(comch_server_singleshot progs/comch_server_singleshot.cpp)
-add_shoc_demo_executable(comch_data_client       progs/comch_data_client.cpp)
-add_shoc_demo_executable(comch_data_server       progs/comch_data_server.cpp)
-add_shoc_demo_executable(simple_compress         progs/simple_compress.cpp)
-add_shoc_demo_executable(parallel_compress       progs/parallel_compress.cpp)
-add_shoc_demo_executable(dma_client              progs/dma_client.cpp)
-add_shoc_demo_executable(dma_server              progs/dma_server.cpp)
-add_shoc_demo_executable(rdma_receive            progs/rdma_receive.cpp)
-add_shoc_demo_executable(rdma_send               progs/rdma_send.cpp)
-add_shoc_demo_executable(rdma_cm_server          progs/rdma_cm_server.cpp)
-add_shoc_demo_executable(rdma_cm_client          progs/rdma_cm_client.cpp)
-add_shoc_demo_executable(sync_event_local_pci    progs/sync_event_local_pci.cpp)
-add_shoc_demo_executable(sync_event_remote_pci   progs/sync_event_remote_pci.cpp)
-add_shoc_demo_executable(encrypt                 progs/encrypt.cpp)
-add_shoc_demo_executable(erasure_encode          progs/erasure_encode.cpp)
-add_shoc_demo_executable(erasure_recover         progs/erasure_recover.cpp)
-add_shoc_demo_executable(flow_geneve_encap       progs/flow/geneve_encap.cpp)
-add_shoc_demo_executable(flow_acl                progs/flow/acl.cpp)
-add_shoc_demo_executable(flow_add_to_meta        progs/flow/add_to_meta.cpp)
-add_shoc_demo_executable(flow_aging              progs/flow/aging.cpp)
-add_shoc_demo_executable(eth_rxq_managed         progs/eth_rxq/managed.cpp)
-add_shoc_demo_executable(eth_rxq_proto_splitter  progs/eth_rxq/proto_splitter.cpp)
-add_shoc_demo_executable(eth_rxq_kernel_fwd      progs/eth_rxq/kernel_fwd.cpp)
-add_shoc_demo_executable(eth_txq_send_raw_packet progs/eth_txq/send_raw_packet.cpp)
-add_shoc_demo_executable(eth_udp_echo            progs/eth_udp_echo.cpp)
-add_shoc_demo_executable(devemu_pci_hotplug      progs/devemu/pci_hotplug.cpp)
-add_shoc_demo_executable(devemu_pci_dma_dpu      progs/devemu/pci_dma/dpu.cpp)
-add_shoc_demo_executable(devemu_pci_dma_host     progs/devemu/pci_dma/host.cpp)
+add_shoc_demo_executable(comch_client            samples/comch_client.cpp)
+add_shoc_demo_executable(comch_server            samples/comch_server.cpp)
+add_shoc_demo_executable(comch_server_singleshot samples/comch_server_singleshot.cpp)
+add_shoc_demo_executable(comch_data_client       samples/comch_data_client.cpp)
+add_shoc_demo_executable(comch_data_server       samples/comch_data_server.cpp)
+add_shoc_demo_executable(simple_compress         samples/simple_compress.cpp)
+add_shoc_demo_executable(parallel_compress       samples/parallel_compress.cpp)
+add_shoc_demo_executable(dma_client              samples/dma_client.cpp)
+add_shoc_demo_executable(dma_server              samples/dma_server.cpp)
+add_shoc_demo_executable(rdma_receive            samples/rdma_receive.cpp)
+add_shoc_demo_executable(rdma_send               samples/rdma_send.cpp)
+add_shoc_demo_executable(rdma_cm_server          samples/rdma_cm_server.cpp)
+add_shoc_demo_executable(rdma_cm_client          samples/rdma_cm_client.cpp)
+add_shoc_demo_executable(sync_event_local_pci    samples/sync_event_local_pci.cpp)
+add_shoc_demo_executable(sync_event_remote_pci   samples/sync_event_remote_pci.cpp)
+add_shoc_demo_executable(encrypt                 samples/encrypt.cpp)
+add_shoc_demo_executable(erasure_encode          samples/erasure_encode.cpp)
+add_shoc_demo_executable(erasure_recover         samples/erasure_recover.cpp)
+add_shoc_demo_executable(flow_geneve_encap       samples/flow/geneve_encap.cpp)
+add_shoc_demo_executable(flow_acl                samples/flow/acl.cpp)
+add_shoc_demo_executable(flow_add_to_meta        samples/flow/add_to_meta.cpp)
+add_shoc_demo_executable(flow_aging              samples/flow/aging.cpp)
+add_shoc_demo_executable(eth_rxq_managed         samples/eth_rxq/managed.cpp)
+add_shoc_demo_executable(eth_rxq_proto_splitter  samples/eth_rxq/proto_splitter.cpp)
+add_shoc_demo_executable(eth_rxq_kernel_fwd      samples/eth_rxq/kernel_fwd.cpp)
+add_shoc_demo_executable(eth_txq_send_raw_packet samples/eth_txq/send_raw_packet.cpp)
+add_shoc_demo_executable(eth_udp_echo            samples/eth_udp_echo.cpp)
+add_shoc_demo_executable(devemu_pci_hotplug      samples/devemu/pci_hotplug.cpp)
+add_shoc_demo_executable(devemu_pci_dma_dpu      samples/devemu/pci_dma/dpu.cpp)
+add_shoc_demo_executable(devemu_pci_dma_host     samples/devemu/pci_dma/host.cpp)
 
 add_executable(generate_testdata tools/generate_testdata.cpp)
 
@@ -134,40 +134,40 @@ function(add_plain_doca_executable name)
     target_link_libraries(${name} ${DOCA_LIBRARIES})
 endfunction()
 
-add_plain_doca_executable(doca_simple_compress   progs/plain_doca/simple_compress.c)
-add_plain_doca_executable(doca_parallel_compress progs/plain_doca/parallel_compress.c)
-add_plain_doca_executable(doca_comch_server      progs/plain_doca/comch_server.c)
-add_plain_doca_executable(doca_comch_client      progs/plain_doca/comch_client.c)
+add_plain_doca_executable(doca_simple_compress   samples/plain_doca/simple_compress.c)
+add_plain_doca_executable(doca_parallel_compress samples/plain_doca/parallel_compress.c)
+add_plain_doca_executable(doca_comch_server      samples/plain_doca/comch_server.c)
+add_plain_doca_executable(doca_comch_client      samples/plain_doca/comch_client.c)
 
 add_plain_doca_executable(
     doca_comch_data_server
-    progs/plain_doca/comch_data_server/connection.c
-    progs/plain_doca/comch_data_server/main.c
-    progs/plain_doca/comch_data_server/memory.c
-    progs/plain_doca/comch_data_server/server.c
+    samples/plain_doca/comch_data_server/connection.c
+    samples/plain_doca/comch_data_server/main.c
+    samples/plain_doca/comch_data_server/memory.c
+    samples/plain_doca/comch_data_server/server.c
 )
 
 add_plain_doca_executable(
     doca_comch_data_client
-    progs/plain_doca/comch_data_client/client.c
-    progs/plain_doca/comch_data_client/consumer.c
-    progs/plain_doca/comch_data_client/main.c
-    progs/plain_doca/comch_data_client/memory.c
+    samples/plain_doca/comch_data_client/client.c
+    samples/plain_doca/comch_data_client/consumer.c
+    samples/plain_doca/comch_data_client/main.c
+    samples/plain_doca/comch_data_client/memory.c
 )
 
 add_plain_doca_executable(
     doca_dma_server
-    progs/plain_doca/dma_server/main.c
-    progs/plain_doca/dma_server/memory.c
-    progs/plain_doca/dma_server/server.c
+    samples/plain_doca/dma_server/main.c
+    samples/plain_doca/dma_server/memory.c
+    samples/plain_doca/dma_server/server.c
 )
 
 add_plain_doca_executable(
     doca_dma_client
-    progs/plain_doca/dma_client/comch.c
-    progs/plain_doca/dma_client/common.c
-    progs/plain_doca/dma_client/dma.c
-    progs/plain_doca/dma_client/main.c
+    samples/plain_doca/dma_client/comch.c
+    samples/plain_doca/dma_client/common.c
+    samples/plain_doca/dma_client/dma.c
+    samples/plain_doca/dma_client/main.c
 )
 
 add_plain_doca_executable(
