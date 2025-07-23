@@ -13,7 +13,7 @@ using stream_descriptor = boost::cobalt::use_op_t::as_default_on_t<boost::asio::
 auto devemu_dma_demo(
     shoc::progress_engine_lease engine,
     shoc::pci_address pci_addr,
-    std::string const &vuid,
+    std::string vuid,
     std::span<std::byte> remote_iova,
     std::string write_data
 ) -> boost::cobalt::detached try {
@@ -21,7 +21,7 @@ auto devemu_dma_demo(
 
     auto dev_type = shoc::devemu::pci_type { "SHOC Sample Device" };
 
-    shoc::logger->info("Looking for suitable host device...");
+    shoc::logger->info("Looking for suitable host device (PCI {})...", pci_addr.addr);
 
     auto phys_dev = shoc::device::find(
         pci_addr,
@@ -55,7 +55,9 @@ auto devemu_dma_demo(
 
     shoc::logger->info("started PCI device type, finding representor (VUID = {})...", vuid);
 
-    auto rep = shoc::device_representor::find_by_vuid(phys_dev, vuid, DOCA_DEVINFO_REP_FILTER_EMULATED);
+    auto rep = vuid == ""
+        ? dev_type.create_representor()
+        : shoc::device_representor::find_by_vuid(phys_dev, vuid, DOCA_DEVINFO_REP_FILTER_EMULATED);
 
     shoc::logger->info("Found device representor (VUID = {}), creating emulated device context...", rep.get_vuid());
 
@@ -108,6 +110,10 @@ auto co_main(
 
     options.add_options()
         (
+            "h,help",
+            "Print Usage"
+        )
+        (
             "p,pci-addr",
             "Host Device PCI address",
             cxxopts::value<std::string>()->default_value(env.dev_pci.addr)
@@ -115,7 +121,7 @@ auto co_main(
         (
             "u,vuid",
             "Emulated Device VUID",
-            cxxopts::value<std::string>()
+            cxxopts::value<std::string>()->default_value("")
         )
         (
             "a,addr",
@@ -130,6 +136,12 @@ auto co_main(
         ;
 
     auto cmdline = options.parse(argc, argv);
+
+    if(cmdline.count("help") > 0) {
+        std::cout << options.help() << std::endl;
+        co_return 0;
+    }
+
     auto vuid = cmdline["vuid"].as<std::string>();
     auto pci_addr = cmdline["pci-addr"].as<std::string>();
     auto remote_iova_baseptr = reinterpret_cast<std::byte*>(cmdline["addr"].as<std::uint64_t>());
@@ -138,10 +150,12 @@ auto co_main(
 
     auto engine = shoc::progress_engine{};
 
+    std::cout << pci_addr << std::endl;
+
     devemu_dma_demo(
         &engine,
-        vuid,
         pci_addr,
+        vuid,
         remote_iova,
         write_data
     );
