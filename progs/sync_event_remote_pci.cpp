@@ -24,7 +24,7 @@ auto sync_event_remote(
         shoc::device_capability::sync_event_pci,
         shoc::device_capability::comch_server
     );
-    auto rep = shoc::device_representor::find(dev, env.rep_pci);
+    auto rep = shoc::device_representor::find_by_pci_addr(dev, env.rep_pci);
 
     auto server = co_await engine->create_context<shoc::comch::server>("shoc-sync-event-test", dev, rep);
     auto conn = co_await server->accept();
