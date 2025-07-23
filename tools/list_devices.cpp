@@ -16,8 +16,10 @@
 }
 
 auto main() -> int {
+    std::cout << "Devices\n";
+
     for(auto dev : shoc::device_list{}) try {
-        char char_buf[1024];
+        char char_buf[1024] = "";
         std::array<std::uint8_t, DOCA_DEVINFO_MAC_ADDR_SIZE>  mac_buf;
         std::array<std::uint8_t, DOCA_DEVINFO_IPV4_ADDR_SIZE> ipv4_buf;
         std::array<std::uint8_t, DOCA_DEVINFO_IPV6_ADDR_SIZE> ipv6_buf;
@@ -56,16 +58,61 @@ auto main() -> int {
 
         std::cout << 
             "---\n"
-            "  PCI:   " << pci_address   << "\n"
-            "  Iface: " << iface_name    << "\n"
-            "  IBDev: " << ibdev_name    << "\n"
-            "  MAC:   " << mac_address   << "\n"
-            "  IPv4:  " << ipv4_address  << "\n"
-            "  IPv6:  " << ipv6_address  << "\n"
-            "  LID:   " << rendered_lid  << "\n"
-            "  VHCA:  " << rendered_vhca << "\n"
-            "  ARate: " << rendered_ar   << " bits/s\n"
+            "PCI:   " << pci_address   << "\n"
+            "Iface: " << iface_name    << "\n"
+            "IBDev: " << ibdev_name    << "\n"
+            "MAC:   " << mac_address   << "\n"
+            "IPv4:  " << ipv4_address  << "\n"
+            "IPv6:  " << ipv6_address  << "\n"
+            "LID:   " << rendered_lid  << "\n"
+            "VHCA:  " << rendered_vhca << "\n"
+            "ARate: " << rendered_ar   << " bits/s\n"
             ;
+
+#ifdef DOCA_ARCH_DPU
+
+        auto shocdev = shoc::device{dev};
+        std::cout <<
+            "Representors\n"
+            "    ---\n";
+
+        for(auto rep : shoc::device_rep_list{shocdev}) {
+            char char_buf[1024] = "";
+            doca_pci_func_type func_type;
+            std::uint8_t is_hotplug;
+            std::uint16_t vhca_id;
+            doca_error_t err;
+
+            err = doca_devinfo_rep_get_vuid(rep, char_buf, sizeof char_buf);
+            auto vuid = display_content(err, char_buf);
+
+            err = doca_devinfo_rep_get_pci_addr_str(rep, char_buf);
+            auto pci_address = display_content(err, char_buf);
+
+            char const *type_names[] = { "PF", "VF", "SF" };
+            err = doca_devinfo_rep_get_pci_func_type(rep, &func_type);
+            auto rendered_ftype = display_content(err, type_names[func_type]);
+
+            err = doca_devinfo_rep_get_is_hotplug(rep, &is_hotplug);
+            auto rendered_hotplug = display_content(err, fmt::format("{:d}", is_hotplug));
+
+            err = doca_devinfo_rep_get_iface_name(rep, char_buf, sizeof char_buf);
+            auto iface_name = display_content(err, char_buf);
+
+            err = doca_devinfo_rep_get_vhca_id(rep, &vhca_id);
+            auto rendered_vhca = display_content(err, fmt::format("{:d}", vhca_id));
+
+            std::cout <<
+                "    PCI:   " << pci_address << "\n"
+                "    Iface: " << iface_name << "\n"
+                "    VUID:  " << vuid << "\n"
+                "    Type:  " << rendered_ftype << "\n"
+                "    Hotp:  " << rendered_hotplug << "\n"
+                "    ---\n";
+        }
+
+#endif
+
     } catch(shoc::doca_exception &e) {
         shoc::logger->warn("Error when reading device: {}", e.what());
     }
