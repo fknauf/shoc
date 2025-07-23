@@ -271,7 +271,10 @@ namespace shoc {
 
         if(deferred) {
             auto ctx = static_cast<context_base*>(ctx_user_data.ptr);
-            boost::asio::post(ctx->engine()->executor(), [dest] { dest->resume(); });
+            boost::asio::post(
+                ctx->engine()->executor(),
+                [dest] { dest->resume(); }
+            );
         } else {
             dest->resume();
         }

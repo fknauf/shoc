@@ -68,7 +68,11 @@ namespace shoc::coro {
 
         auto resume() const {
             if(waiter_) {
-                waiter_.resume();
+                try {
+                    waiter_.resume();
+                } catch(std::exception &e) {
+                    logger->warn("Client fiber threw exception: {}", e.what());
+                }
             }
         }
 
