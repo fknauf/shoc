@@ -8,7 +8,7 @@
 #include <cstdlib>
 
 namespace {
-    char const *const DEFAULT_HOST_PCI = "e1:00.0";
+    char const *const DEFAULT_HOST_PCI = "e3:00.0";
     char const *const DEFAULT_DPU_PCI = "03:00.0";
     char const *const DEFAULT_HOST_IBDEV_NAME = "mlx5_1";
     char const *const DEFAULT_DPU_IBDEV_NAME = "mlx5_3";

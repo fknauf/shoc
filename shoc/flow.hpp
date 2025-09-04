@@ -239,7 +239,6 @@ namespace shoc::flow {
         auto calc_entropy(doca_flow_entropy_format &header) -> std::uint16_t;
 
         auto pipes_flush() -> void;
-        auto pipes_dump(FILE *f) -> void;
 
         /**
          * After entries are slated to be added to pipes connected to this port, this function
@@ -388,10 +387,6 @@ namespace shoc::flow {
             bool is_resizable
         ) -> pipe_cfg&;
 
-        auto set_dir_info(
-            doca_flow_direction_info dir_info
-        ) -> pipe_cfg &;
-
         auto set_miss_counter(
             bool miss_counter
         ) -> pipe_cfg&;
@@ -507,6 +502,7 @@ namespace shoc::flow {
         ) -> doca_error_t;
 
         auto query_pipe_miss() const -> doca_flow_resource_query;
+        auto dump(FILE *f) const -> void;
 
     private:
         unique_handle<doca_flow_pipe, doca_flow_pipe_destroy> handle_;

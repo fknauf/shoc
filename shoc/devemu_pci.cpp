@@ -200,8 +200,8 @@ namespace shoc::devemu {
 
     auto pci_type::create_representor() -> device_representor {
         doca_dev_rep *rep;
-        enforce_success(doca_devemu_pci_dev_create_rep(handle(), &rep));
-        return { rep, detail::doca_destroyer<doca_devemu_pci_dev_destroy_rep>{} };
+        enforce_success(doca_devemu_pci_type_create_rep(handle(), &rep));
+        return { rep, detail::doca_destroyer<doca_devemu_pci_type_destroy_rep>{} };
     }
 
     pci_dev::pci_dev(

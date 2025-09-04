@@ -104,6 +104,7 @@ namespace shoc {
         eth_rxq_base(
             context_parent *parent,
             device dev,
+            std::uint16_t queue_id,
             eth_rxq_config const &cfg,
             doca_eth_rxq_type type,
             std::optional<eth_rxq_packet_buffer> pkt_buf
@@ -143,6 +144,7 @@ namespace shoc {
         eth_rxq(
             context_parent *parent,
             device dev,
+            std::uint16_t queue_id,
             std::uint32_t max_tasks,
             eth_rxq_config const &cfg,
             doca_eth_rxq_type type = DOCA_ETH_RXQ_TYPE_REGULAR,
@@ -168,6 +170,7 @@ namespace shoc {
         eth_rxq_managed(
             context_parent *parent,
             device dev,
+            std::uint16_t queue_id,
             eth_rxq_config const &cfg,
             eth_rxq_packet_buffer pkt_buf
         );
@@ -200,6 +203,7 @@ namespace shoc {
         eth_rxq_batch_managed(
             context_parent *parent,
             device dev,
+            std::uint16_t queue_id,
             eth_rxq_config const &cfg,
             eth_rxq_packet_buffer pkt_buf,
             doca_event_batch_events_number events_number_max = DOCA_EVENT_BATCH_EVENTS_NUMBER_128,

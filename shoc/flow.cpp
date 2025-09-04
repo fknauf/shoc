@@ -203,10 +203,6 @@ namespace shoc::flow {
         doca_flow_port_pipes_flush(handle());
     }
 
-    auto port::pipes_dump(FILE *dest) -> void {
-        doca_flow_port_pipes_dump(handle(), dest);
-    }
-
     auto port::process_entries(
         std::uint16_t pipe_queue,
         std::chrono::microseconds timeout,
@@ -388,16 +384,6 @@ namespace shoc::flow {
         enforce_success(doca_flow_pipe_cfg_set_is_resizable(
             handle(),
             is_resizable
-        ));
-        return *this;
-    }
-
-    auto pipe_cfg::set_dir_info(
-        doca_flow_direction_info dir_info
-    ) -> pipe_cfg & {
-        enforce_success(doca_flow_pipe_cfg_set_dir_info(
-            handle(),
-            dir_info
         ));
         return *this;
     }
@@ -650,5 +636,9 @@ namespace shoc::flow {
         std::span<std::uint32_t> resources
     ) -> doca_error_t {
         return doca_flow_shared_resources_bind(type, resources.data(), static_cast<std::uint32_t>(resources.size()), handle());
+    }
+
+    auto pipe::dump(FILE *fd) const -> void {
+        doca_flow_pipe_dump(handle(), fd);
     }
 }

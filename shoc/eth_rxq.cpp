@@ -20,6 +20,7 @@ namespace shoc {
     eth_rxq_base::eth_rxq_base(
         context_parent *parent,
         device dev,
+        std::uint16_t queue_id,
         eth_rxq_config const &cfg,
         doca_eth_rxq_type type,
         std::optional<eth_rxq_packet_buffer> pkt_buf
@@ -32,12 +33,14 @@ namespace shoc {
                 cfg.max_packet_size
             )
         },
-        dev_ { dev }
+        dev_ { dev },
+        flow_queue_id_ { queue_id }
     {
         if(cfg.metadata_num) {
             enforce_success(doca_eth_rxq_set_metadata_num(handle(), *cfg.metadata_num));
         }
 
+        enforce_success(doca_eth_rxq_apply_queue_id(handle(), queue_id));
         enforce_success(doca_eth_rxq_set_flow_tag(handle(), cfg.enable_flow_tag));
         enforce_success(doca_eth_rxq_set_rx_hash(handle(), cfg.enable_rx_hash));
         enforce_success(doca_eth_rxq_set_packet_headroom(handle(), cfg.packet_headroom));
@@ -65,9 +68,7 @@ namespace shoc {
     }
 
     auto eth_rxq_base::flow_queue_id() const -> std::uint16_t {
-        std::uint16_t id;
-        enforce_success(doca_eth_rxq_get_flow_queue_id(handle(), &id));
-        return id;
+        return flow_queue_id_;
     }
 
     auto eth_rxq_base::flow_target(
@@ -75,8 +76,6 @@ namespace shoc {
         std::uint32_t inner_flags,
         doca_flow_rss_hash_function rss_hash_func
     ) -> doca_flow_fwd {
-        flow_queue_id_ = flow_queue_id();
-
         return (doca_flow_fwd) {
             .type = DOCA_FLOW_FWD_RSS,
             .rss_type = DOCA_FLOW_RESOURCE_TYPE_NON_SHARED,
@@ -93,12 +92,13 @@ namespace shoc {
     eth_rxq::eth_rxq(
         context_parent *parent,
         device dev,
+        std::uint16_t queue_id,
         std::uint32_t max_tasks,
         eth_rxq_config const &cfg,
         doca_eth_rxq_type type,
         std::optional<eth_rxq_packet_buffer> pkt_buf
     ):
-        eth_rxq_base { parent, dev, cfg, type, pkt_buf }
+        eth_rxq_base { parent, dev, queue_id, cfg, type, pkt_buf }
     {
         enforce_success(doca_eth_rxq_task_recv_set_conf(
             handle(),
@@ -125,10 +125,11 @@ namespace shoc {
     eth_rxq_managed::eth_rxq_managed(
         context_parent *parent,
         device dev,
+        std::uint16_t queue_id,
         eth_rxq_config const &cfg,
         eth_rxq_packet_buffer pkt_buf
     ):
-        eth_rxq_base { parent, dev, cfg, DOCA_ETH_RXQ_TYPE_MANAGED_MEMPOOL, pkt_buf }
+        eth_rxq_base { parent, dev, queue_id, cfg, DOCA_ETH_RXQ_TYPE_MANAGED_MEMPOOL, pkt_buf }
     {
         doca_data event_user_data = {
             .ptr = this
@@ -160,12 +161,13 @@ namespace shoc {
     eth_rxq_batch_managed::eth_rxq_batch_managed(
         context_parent *parent,
         device dev,
+        std::uint16_t queue_id,
         eth_rxq_config const &cfg,
         eth_rxq_packet_buffer pkt_buf,
         doca_event_batch_events_number events_number_max,
         doca_event_batch_events_number events_number_min
     ):
-        eth_rxq_base { parent, dev, cfg, DOCA_ETH_RXQ_TYPE_MANAGED_MEMPOOL, pkt_buf }
+        eth_rxq_base { parent, dev, queue_id, cfg, DOCA_ETH_RXQ_TYPE_MANAGED_MEMPOOL, pkt_buf }
     {
         enforce_success(doca_eth_rxq_event_batch_managed_recv_register(
             handle(),
