@@ -30,30 +30,20 @@ namespace shoc::comch {
         shared_remote_consumer const &destination
     ) -> coro::status_awaitable<> {
         if(destination->expired()) {
+            shoc::logger->debug("producer cannot send, remote consumer is expired");
             return coro::status_awaitable<>::from_value(DOCA_ERROR_NOT_CONNECTED);
         }
 
-        doca_comch_producer_task_send *task = nullptr;
-
-        auto result = coro::status_awaitable<>::create_space();
-        auto receptable = result.receptable_ptr();
-
-        doca_data task_user_data = { .ptr = receptable };
-
-        enforce_success(doca_comch_producer_task_send_alloc_init(
+        return detail::plain_status_offload<
+            doca_comch_producer_task_send_alloc_init,
+            doca_comch_producer_task_send_as_task
+        >(
+            engine(),
             handle(),
             buf.handle(),
             immediate_data.data(),
             immediate_data.size(),
-            destination->id(),
-            &task
-        ));
-
-        auto base_task = doca_comch_producer_task_send_as_task(task);
-        doca_task_set_user_data(base_task, task_user_data);
-
-        engine()->submit_task(base_task, receptable);
-
-        return result;
+            destination->id()
+        );
     }
 }

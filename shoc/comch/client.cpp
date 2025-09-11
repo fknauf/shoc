@@ -100,21 +100,22 @@ namespace shoc::comch {
         }
 
         doca_comch_connection *connection;
-        doca_comch_task_send *task;
+        auto err = doca_comch_client_get_connection(handle(), &connection);
 
-        auto result = coro::status_awaitable<>::create_space();
-        auto receptable = result.receptable_ptr();
+        if(err != DOCA_SUCCESS) {
+            return coro::status_awaitable<>::from_value(err);
+        }
 
-        doca_data task_user_data = { .ptr = receptable };
-
-        enforce_success(doca_comch_client_get_connection(handle(), &connection));
-        enforce_success(doca_comch_client_task_send_alloc_init(handle(), connection, message.data(), message.size(), &task));
-        doca_task_set_user_data(doca_comch_task_send_as_task(task), task_user_data);
-
-        auto base_task = doca_comch_task_send_as_task(task);
-        engine()->submit_task(base_task, receptable);
-
-        return result;
+        return detail::plain_status_offload<
+            doca_comch_client_task_send_alloc_init,
+            doca_comch_task_send_as_task
+        >(
+            engine(),
+            handle(),
+            connection,
+            message.data(),
+            message.size()
+        );
     }
 
     auto client::msg_recv() -> message_awaitable {

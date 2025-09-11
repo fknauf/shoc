@@ -67,12 +67,18 @@ namespace shoc::coro {
         }
 
         auto resume() const {
-            if(waiter_) {
+            shoc::logger->trace("attempting to resume coroutine");
+
+            if(waiter_ != nullptr) {
                 try {
+                    shoc::logger->trace("resuming coro {}", waiter_.address());
+
                     waiter_.resume();
                 } catch(std::exception &e) {
                     logger->warn("Client fiber threw exception: {}", e.what());
                 }
+            } else {
+                shoc::logger->trace("no coroutine is waiting yet.");
             }
         }
 

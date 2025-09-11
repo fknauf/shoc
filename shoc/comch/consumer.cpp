@@ -28,12 +28,15 @@ namespace shoc::comch {
     auto consumer::post_recv(buffer &dest) -> consumer_recv_awaitable {
         doca_comch_consumer_task_post_recv *task;
 
+        auto err = doca_comch_consumer_task_post_recv_alloc_init(handle(), dest.handle(), &task);
+
+        if(err != DOCA_SUCCESS) {
+            return consumer_recv_awaitable::from_error(err);
+        }
+
         auto result = consumer_recv_awaitable::create_space();
         auto receptable = result.receptable_ptr();
-
         doca_data task_user_data = { .ptr = receptable };
-
-        enforce_success(doca_comch_consumer_task_post_recv_alloc_init(handle(), dest.handle(), &task));
         auto base_task = doca_comch_consumer_task_post_recv_as_task(task);
         doca_task_set_user_data(base_task, task_user_data);
 

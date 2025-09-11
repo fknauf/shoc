@@ -55,27 +55,16 @@ namespace shoc::comch {
             return coro::status_awaitable<>::from_value(DOCA_ERROR_NOT_CONNECTED);
         }
 
-        doca_comch_task_send *send_task;
-
-        auto result = coro::status_awaitable<>::create_space();
-        auto receptable = result.receptable_ptr();
-
-        doca_data task_user_data = { .ptr = receptable };
-
-        enforce_success(doca_comch_server_task_send_alloc_init(
+        return detail::plain_status_offload<
+            doca_comch_server_task_send_alloc_init,
+            doca_comch_task_send_as_task
+        >(
+            engine(),
             ctx_->handle(),
             handle_,
             message.data(),
-            message.size(),
-            &send_task
-        ));
-
-        auto task = doca_comch_task_send_as_task(send_task);
-        doca_task_set_user_data(task, task_user_data);
-
-        engine()->submit_task(task, receptable);
-
-        return result;
+            message.size()
+        );
     }
 
     auto server_connection::msg_recv() -> message_awaitable {
@@ -279,6 +268,8 @@ namespace shoc::comch {
         [[maybe_unused]] doca_comch_connection *comch_connection,
         [[maybe_unused]] std::uint8_t change_successful
     ) -> void {
+        logger->trace("comch::server: new connection");
+
         if(!change_successful) {
             logger->warn("comch::server: unsuccessful connection");
             return;

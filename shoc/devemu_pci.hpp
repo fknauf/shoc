@@ -22,6 +22,8 @@ namespace shoc::devemu {
 
     class pci_type;
 
+    auto cap_is_mmap_add_dev_supported(doca_devinfo *dev) -> bool;
+
     class pci_type {
     public:
         pci_type(char const *name);

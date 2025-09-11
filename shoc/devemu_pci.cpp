@@ -3,6 +3,12 @@
 #include "progress_engine.hpp"
 
 namespace shoc::devemu {
+    auto cap_is_mmap_add_dev_supported(doca_devinfo *dev) -> bool {
+        std::uint8_t supported = 0;
+        auto err = doca_devemu_pci_cap_is_mmap_add_dev_supported(dev, &supported);
+        return err == DOCA_SUCCESS && supported != 0;
+    }
+
     pci_type::pci_type(
         char const *name
     ) {
@@ -32,6 +38,7 @@ namespace shoc::devemu {
     }
 
     auto pci_type::set_dev(device dev) -> pci_type & {
+        dev_ = dev;
         enforce_success(doca_devemu_pci_type_set_dev(handle(), dev.handle()));
         return *this;
     }

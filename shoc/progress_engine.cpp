@@ -87,9 +87,12 @@ namespace shoc {
 
         while(registered_fibers_ > 0 || !connected_contexts_.empty()) {
             if(cfg_.polling == polling_mode::busy) {
-                while(doca_pe_progress(handle()) > 0) {
-                    // intentionally left blank. doca_pe_prograss calls event handlers.
-                }
+                std::uint8_t num_popped;
+
+                do {
+                    num_popped = doca_pe_progress(handle());
+                    //logger->trace("processed {} doca tasks", num_popped);
+                } while(num_popped > 0);
             } else {
                 request_notification();
                 logger->debug("progress engine: waiting for notification");
@@ -175,6 +178,9 @@ namespace shoc {
         do {
             timer.expires_after(interval);
             co_await timer.async_wait();
+
+            logger->debug("resubmitting task after delay of {} ms, {} attempts left", interval.count(), attempts);
+
             err = doca_task_submit(task);
             --attempts;
         } while(err == DOCA_ERROR_AGAIN && attempts > 0 && !connected_contexts_.empty());

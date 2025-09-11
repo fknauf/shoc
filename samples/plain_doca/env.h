@@ -3,7 +3,7 @@
 #include <doca_build_config.h>
 #include <stdlib.h>
 
-#define DEFAULT_HOST_PCI "e1:00.0"
+#define DEFAULT_HOST_PCI "e3:00.0"
 #define DEFAULT_DPU_PCI "03:00.0"
 
 static inline char const *env_device_pci_address() {

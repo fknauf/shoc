@@ -47,8 +47,8 @@ auto co_main(
     [[maybe_unused]] int argc,
     [[maybe_unused]] char *argv[]
 ) -> boost::cobalt::main {
-    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_WARNING);
-    shoc::logger->set_level(spdlog::level::info);
+    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
+    shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu {};
     auto engine = shoc::progress_engine{ };

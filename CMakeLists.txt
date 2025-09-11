@@ -8,6 +8,8 @@ set(CMAKE_CXX_COMPILER g++-12)
 set(CMAKE_CC_COMPILER gcc-12)
 
 add_compile_options(-Wall -Wextra -Werror $<$<COMPILE_LANGUAGE:CXX>:-Wno-mismatched-new-delete>)
+#add_compile_options(-fsanitize=address -fsanitize=undefined)
+#add_link_options(-fsanitize=address -fsanitize=undefined)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(

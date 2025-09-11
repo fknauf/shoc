@@ -19,13 +19,14 @@ auto devemu_dma_demo(
 ) -> boost::cobalt::detached try {
     shoc::logger->info("Creating PCI device type...");
 
-    auto dev_type = shoc::devemu::pci_type { "SHOC Sample Device" };
+    auto dev_type = shoc::devemu::pci_type { "SHOC Sample PCI Type" };
 
     shoc::logger->info("Looking for suitable host device (PCI {})...", pci_addr.addr);
 
     auto phys_dev = shoc::device::find(
         pci_addr,
-        dev_type.hotplug_device_predicate()
+        dev_type.hotplug_device_predicate(),
+        shoc::devemu::cap_is_mmap_add_dev_supported
     );
 
     shoc::logger->info("Found host device, configuring and starting PCI type...");
@@ -53,7 +54,7 @@ auto devemu_dma_demo(
         co_return;
     }
 
-    shoc::logger->info("started PCI device type, finding representor (VUID = {})...", vuid);
+    shoc::logger->info("started PCI device type, finding representor (VUID = {})...", vuid.empty() ? "newly created" : vuid);
 
     auto rep = vuid == ""
         ? dev_type.create_representor()

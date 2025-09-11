@@ -205,22 +205,62 @@ namespace shoc {
         template<auto AsTask>
         using deduce_as_task_arg_type_t = typename deduce_as_task_arg_type<AsTask>::type;
 
-        template<auto AllocInit, auto AsTask, typename AdditionalData, typename... Args>
+        template<
+            auto AllocInit,
+            auto AsTask,
+            typename AdditionalData,
+            typename... Args
+        >
+        auto create_task_object(
+            coro::status_receptable<AdditionalData> *receptable,
+            detail::deduce_as_task_arg_type_t<AsTask> **task,
+            Args&&... args
+        ) -> doca_error_t 
+            requires std::invocable<decltype(AllocInit), Args..., doca_data, detail::deduce_as_task_arg_type_t<AsTask> **>
+        {
+            doca_data task_user_data = { .ptr = receptable };
+            return AllocInit(std::forward<Args>(args)..., task_user_data, task);
+        }
+
+        template<
+            auto AllocInit,
+            auto AsTask,
+            typename AdditionalData,
+            typename... Args
+        >
+        auto create_task_object(
+            coro::status_receptable<AdditionalData> *receptable,
+            detail::deduce_as_task_arg_type_t<AsTask> **task,
+            Args&&... args
+        ) -> doca_error_t 
+            requires std::invocable<decltype(AllocInit), Args..., detail::deduce_as_task_arg_type_t<AsTask> **>
+        {
+            auto err = AllocInit(std::forward<Args>(args)..., task);
+
+            if(err == DOCA_SUCCESS) {
+                auto base_task = AsTask(*task);
+                doca_data task_user_data = { .ptr = receptable };
+                doca_task_set_user_data(base_task, task_user_data);
+            }
+
+            return err;
+        }
+
+        template<
+            auto AllocInit,
+            auto AsTask,
+            typename AdditionalData,
+            typename... Args
+        >
         auto status_offload(
             progress_engine *engine,
             coro::status_awaitable<AdditionalData> result,
             Args&&... args
         ) {
             auto receptable = result.receptable_ptr();
-
             detail::deduce_as_task_arg_type_t<AsTask> *task;
-            doca_data task_user_data = { .ptr = receptable };
 
-            auto err = AllocInit(
-                std::forward<Args>(args)...,
-                task_user_data,
-                &task
-            );
+            auto err = create_task_object<AllocInit, AsTask>(receptable, &task, std::forward<Args>(args)...);
 
             if(err != DOCA_SUCCESS) {
                 receptable->set_error(err);
