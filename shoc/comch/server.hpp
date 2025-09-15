@@ -39,7 +39,7 @@ namespace shoc::comch {
     class server_connection;
 
     struct server_limits {
-        std::uint32_t num_send_tasks = 1024;
+        std::uint32_t num_send_tasks = 32;
         std::uint32_t max_msg_size = 4080;
         std::uint32_t recv_queue_size = 16;
     };

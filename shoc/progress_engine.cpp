@@ -156,8 +156,9 @@ namespace shoc {
         } while(err == DOCA_ERROR_AGAIN && attempts <= cfg_.immediate_submission_attempts);
         
         if(err == DOCA_ERROR_AGAIN) {
-            delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval);
+            delayed_resubmission(task, reportee, cfg_.resubmission_attempts, cfg_.resubmission_interval, {}, executor_);
         } else if(err != DOCA_SUCCESS) {
+            logger->debug("failed submitting: {}", doca_error_get_descr(err));
             doca_task_free(task);
             reportee->set_error(err);
         }
@@ -167,19 +168,20 @@ namespace shoc {
         doca_task *task,
         coro::error_receptable *reportee,
         std::uint32_t attempts,
-        std::chrono::microseconds interval
+        std::chrono::microseconds interval,
+        boost::asio::executor_arg_t,
+        boost::cobalt::executor executor
     ) -> boost::cobalt::detached {
         using steady_timer = boost::cobalt::use_op_t::as_default_on_t<boost::asio::steady_timer>;
 
         doca_error_t err;
-        auto executor = co_await boost::cobalt::this_coro::executor;        
         auto timer = steady_timer(std::move(executor));
 
         do {
             timer.expires_after(interval);
             co_await timer.async_wait();
 
-            logger->debug("resubmitting task after delay of {} ms, {} attempts left", interval.count(), attempts);
+            logger->trace("resubmitting task after delay of {} us, {} attempts left", interval.count(), attempts);
 
             err = doca_task_submit(task);
             --attempts;
