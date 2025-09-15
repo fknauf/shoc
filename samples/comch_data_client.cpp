@@ -1,5 +1,6 @@
 #include "env.hpp"
 
+#include <shoc/aligned_memory.hpp>
 #include <shoc/buffer.hpp>
 #include <shoc/buffer_inventory.hpp>
 #include <shoc/comch/client.hpp>
@@ -15,31 +16,6 @@
 #include <iostream>
 #include <sstream>
 #include <string_view>
-
-struct cache_aligned_storage {
-    cache_aligned_storage(std::uint32_t block_count, std::uint32_t block_size):
-        block_count { block_count },
-        block_size { block_size },
-        buffer(block_count * block_size + 64),
-        blocks(block_count)
-    {
-        void *base_ptr = buffer.data();
-        auto space = buffer.size();
-
-        std::align(64, block_count * block_size, base_ptr, space);
-        bytes = std::span { static_cast<std::byte*>(base_ptr), block_count * block_size };
-
-        for(auto i : std::ranges::views::iota(std::uint32_t{}, block_count)) {
-            blocks[i] = bytes.subspan(i * block_size, block_size);
-        }
-    }
-
-    std::uint32_t block_count;
-    std::uint32_t block_size;
-    std::vector<std::byte> buffer;
-    std::span<std::byte> bytes;
-    std::vector<std::span<std::byte>> blocks;
-};
 
 auto receive_blocks(
     shoc::progress_engine_lease engine,
@@ -60,16 +36,20 @@ auto receive_blocks(
         co_return;
     }
 
-    auto memory = cache_aligned_storage { block_count, block_size };
-    auto mmap = shoc::memory_map { dev, memory.bytes, DOCA_ACCESS_FLAG_PCI_READ_WRITE };
+    shoc::logger->debug("received geometry {} x {}", block_count, block_size);
+
+    auto memory = shoc::aligned_blocks { block_count, block_size };
+    auto mmap = shoc::memory_map { dev, memory.as_writable_bytes(), DOCA_ACCESS_FLAG_PCI_READ_WRITE };
     auto bufinv = shoc::buffer_inventory { 1 };
 
     auto consumer = co_await client->create_consumer(mmap, 16);
 
     auto start = std::chrono::steady_clock::now();
 
-    for(auto block : memory.blocks) {
-        auto buffer = bufinv.buf_get_by_addr(mmap, block);
+    for(auto i : std::ranges::views::iota(std::size_t{}, memory.block_count())) {
+        shoc::logger->debug("receiving block {}...", i);
+
+        auto buffer = bufinv.buf_get_by_addr(mmap, memory.block(i));
         auto result = co_await consumer->post_recv(buffer);
 
         if(result.status != DOCA_SUCCESS) {
@@ -89,8 +69,8 @@ auto receive_blocks(
     json["data_error"] = false;
 
     if(!skip_verify) {
-        for(auto i : std::ranges::views::iota(std::uint32_t{}, memory.block_count)) {
-            if(std::ranges::any_of(memory.blocks[i], [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
+        for(auto i : std::ranges::views::iota(std::size_t{}, memory.block_count())) {
+            if(std::ranges::any_of(memory.block(i), [i](std::byte b) { return b != static_cast<std::byte>(i); })) {
                 shoc::logger->error("Block {} contains unexpected data", i);
                 json["data_error"] = true;
                 break;
@@ -109,7 +89,10 @@ auto co_main(
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto engine = shoc::progress_engine{};
+    auto engine_cfg = (shoc::progress_engine_config) {
+        .polling = shoc::polling_mode::epoll
+    };
+    auto engine = shoc::progress_engine{ engine_cfg };
 
     auto env_skip_verify = getenv("SKIP_VERIFY");
     auto skip_verify = env_skip_verify != nullptr && std::string(env_skip_verify) == "1";
