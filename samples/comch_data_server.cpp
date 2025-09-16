@@ -92,10 +92,7 @@ auto co_main(
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_dpu{};
-    auto engine_cfg = (shoc::progress_engine_config) {
-        .polling = shoc::polling_mode::epoll
-    };
-    auto engine = shoc::progress_engine{ engine_cfg };
+    auto engine = shoc::progress_engine{};
     
     serve(&engine, env.dev_pci, env.rep_pci);
     

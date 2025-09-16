@@ -89,10 +89,7 @@ auto co_main(
     //shoc::logger->set_level(spdlog::level::debug);
 
     auto env = bluefield_env_host{};
-    auto engine_cfg = (shoc::progress_engine_config) {
-        .polling = shoc::polling_mode::epoll
-    };
-    auto engine = shoc::progress_engine{ engine_cfg };
+    auto engine = shoc::progress_engine{};
 
     auto env_skip_verify = getenv("SKIP_VERIFY");
     auto skip_verify = env_skip_verify != nullptr && std::string(env_skip_verify) == "1";

@@ -45,7 +45,7 @@ namespace shoc {
         /// Delay between resubmission attempts
         std::chrono::microseconds resubmission_interval = std::chrono::milliseconds(1);
         /// How to wait for events, see polling_mode
-        polling_mode polling = polling_mode::busy;
+        polling_mode polling = polling_mode::epoll;
     };
 
     /**
