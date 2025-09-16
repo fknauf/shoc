@@ -141,7 +141,13 @@ namespace shoc::comch {
         );
 
         /**
-         * Send a data buffer to a specific consumer
+         * Send a data buffer to a specific consumer. Note that this expects a consumer to be
+         * listening for a send task on the remote side, so ideally this should be called when
+         * we know a consumer is already listening.
+         *
+         * If it isn't, this offload will behave as in the DOCA comch samples, i.e. spin for a
+         * while in hopes that a consumer will show up to accept the data. The exact behavior
+         * of this can be configured in the progress engine.
          *
          * @param buf buffer to send
          * @param immediate_data some immediate data to send in addition to the buffer

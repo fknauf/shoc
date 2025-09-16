@@ -28,14 +28,23 @@
 
 namespace shoc {
     enum class polling_mode {
+        /// Use epoll to wait for events and sleep when idle
         epoll,
+        /// Do not wait for events, just busily check and recheck and recheck
         busy
     };
 
+    /**
+     * Configuration for the progress engine
+     */
     struct progress_engine_config {
+        /// How often to immediately reattempt task submission when doca_task_submit returns DOCA_ERROR_AGAIN
         std::uint32_t immediate_submission_attempts = 64;
+        /// How often to reattempt task submission in regular intervals after the immediate resubmission attempts are exhausted
         std::uint32_t resubmission_attempts = 64;
+        /// Delay between resubmission attempts
         std::chrono::microseconds resubmission_interval = std::chrono::milliseconds(1);
+        /// How to wait for events, see polling_mode
         polling_mode polling = polling_mode::busy;
     };
 
@@ -116,13 +125,32 @@ namespace shoc {
         auto request_notification() const -> void;
         auto clear_notification() const -> void;
 
+        /**
+         * Some tasks can only be submitted when conditions are right, notably comch producer's
+         * send task can only be offloaded when there's a remote consumer waiting for it. In this
+         * case we might need to spin for a while to offload the task. Our strategy here is to
+         * immediately retry a couple of times (as in the DOCA comch samples) as configured in the
+         * progress_engine_config, then retry in regular intervals for another couple of times.
+         *
+         * delayed_submission is the background fiber that resubmits in regular intervals.
+         *
+         * @param task DOCA task to resubmit
+         * @param reportee receptable to report errors to in case of failure
+         * @param attempts how often to attempt resubmission
+         * @param delay Delay between resubmission attempts
+         * @param exec_tag Empty struct, tells boost.cobalt that the next argument is the executor
+        *                  for the coroutine.
+         * @param executor The Boost.Cobalt executor associated with the progress engine. Why this
+         *                 needs to be explictly passed is a bit of a mystery to me, but at time of
+         *                 writing, without it Boost.Cobalt fails to find the thread-local executor.
+         */
         auto delayed_resubmission(
             doca_task *task,
             coro::error_receptable *reportee,
             std::uint32_t attempts,
             std::chrono::microseconds delay,
-            boost::asio::executor_arg_t,
-            boost::cobalt::executor
+            boost::asio::executor_arg_t exec_tag,
+            boost::cobalt::executor executor
         ) -> boost::cobalt::detached;
 
         unique_handle<doca_pe, doca_pe_destroy> handle_;
@@ -135,6 +163,14 @@ namespace shoc {
         bool active_ = false;
     };
 
+    /**
+     * Lease on a progress engine, to be held by fibers for access to the progress engine and
+     * to let the progress engine know that it is still in use.
+     *
+     * We expect each client fiber to hold a lease on the progress engine until it exits.
+     * This way, the progress_engine::run() fiber continues working as long as there are client
+     * fibers even if there are currently no active contexts.
+     */
     class progress_engine_lease {
     public:
         progress_engine_lease(progress_engine *engine = nullptr):
@@ -187,7 +223,7 @@ namespace shoc {
             }
         }
 
-        auto get() const { return engine_; }
+        [[nodiscard]] auto get() const { return engine_; }
         auto operator->() const { return get(); }
         auto &operator*() const { return *get(); }
 
@@ -207,13 +243,19 @@ namespace shoc {
         template<auto AsTask>
         using deduce_as_task_arg_type_t = typename deduce_as_task_arg_type<AsTask>::type;
 
+        // Most DOCA tasks are created with associated user data (of type doca_data), always accepted
+        // as the last argument before the output parameter that accepts the constructed task.
+        // However, some don't accept these user data in their constructor, in which case the
+        // user data needs to be attached to the task object in a second step. We can tell thes
+        // two cases apart by their function signatures, which is what these two create_task_object
+        // function templates do.
         template<
             auto AllocInit,
             auto AsTask,
             typename AdditionalData,
             typename... Args
         >
-        auto create_task_object(
+        [[nodiscard]] auto create_task_object(
             coro::status_receptable<AdditionalData> *receptable,
             detail::deduce_as_task_arg_type_t<AsTask> **task,
             Args&&... args
@@ -230,7 +272,7 @@ namespace shoc {
             typename AdditionalData,
             typename... Args
         >
-        auto create_task_object(
+        [[nodiscard]] auto create_task_object(
             coro::status_receptable<AdditionalData> *receptable,
             detail::deduce_as_task_arg_type_t<AsTask> **task,
             Args&&... args
@@ -248,13 +290,27 @@ namespace shoc {
             return err;
         }
 
+        /**
+         * Task offloading for the most common case, where the offloading awaitable returns a
+         * status code upon co_await and the actual result is typically a side effect in a memory
+         * buffer. There is support for additional side-effect output data such as immediate_data
+         * in an RDMA receive task.
+         *
+         * @param AllocInit DOCA function that allocates a task object for the desired task type
+         * @param AsTask DOCA function that casts the concrete task object to doca_task*
+         * @param engine progress engine to which the task will be submitted. This has to be the
+         *               same to which the context in which the task is allocated is connected,
+         * @param args Arguments passed to AllocInit, generally consists of the context, memory
+         *             buffers and task-specific data. args does not include the user data that
+         *             will be attached to the task; that is handled internally.
+         */
         template<
             auto AllocInit,
             auto AsTask,
             typename AdditionalData,
             typename... Args
         >
-        auto status_offload(
+        [[nodiscard]] auto status_offload(
             progress_engine *engine,
             coro::status_awaitable<AdditionalData> result,
             Args&&... args
@@ -274,8 +330,11 @@ namespace shoc {
             return result;
         }
 
+        /**
+         * status_offload without support for additional side-effect output data (the most common case)
+         */
         template<auto AllocInit, auto AsTask, typename... Args>
-        auto plain_status_offload(
+        [[nodiscard]] auto plain_status_offload(
             progress_engine *engine,
             Args&&... args
         ) {
