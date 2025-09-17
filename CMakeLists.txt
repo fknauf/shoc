@@ -7,7 +7,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_COMPILER g++-12)
 set(CMAKE_CC_COMPILER gcc-12)
 
-add_compile_options(-Wall -Wextra -Werror $<$<COMPILE_LANGUAGE:CXX>:-Wno-mismatched-new-delete>)
+# -Wno-foo options are workarounds around gcc 12 compiler bugs. 
+# Without -Wno-restrict cxxopts in the samples triggers https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105329
+# Without -Wno-mismatched-new-delete just using coroutines gets a ton of those warnings
+add_compile_options(-Wall -Wextra -Werror $<$<COMPILE_LANGUAGE:CXX>:-Wno-mismatched-new-delete> $<$<COMPILE_LANGUAGE:CXX>:-Wno-restrict>)
 #add_compile_options(-fsanitize=address -fsanitize=undefined)
 #add_link_options(-fsanitize=address -fsanitize=undefined)
 
