@@ -1,9 +1,7 @@
-#include "../../env.hpp"
-
-#include <shoc/shoc.hpp>
-
 #include <cxxopts.hpp>
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <fcntl.h>
 #include <linux/vfio.h>
@@ -11,12 +9,24 @@
 #include <sys/mman.h>
 
 #include <chrono>
+#include <filesystem>
 #include <optional>
 #include <ranges>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 
 static constexpr std::size_t MEM_BUF_LEN = 4096;
+
+std::shared_ptr<spdlog::logger> const logger = spdlog::stderr_color_st("devemu_host_sample");
+
+template<typename... Args>
+[[noreturn]]
+auto throw_error(fmt::format_string<Args...> fmt, Args&& ...args) -> void {
+    auto message = fmt::format(fmt, std::forward<Args>(args)...);
+    logger->error(message);
+    throw std::runtime_error(message);
+}
 
 class file_descriptor {
 public:
@@ -79,7 +89,7 @@ public:
         auto operator()(void *base_ptr) const {
             if(base_ptr != MAP_FAILED) {
                 if(munmap(base_ptr, size_) != 0) {
-                    shoc::logger->error("munmap failed: {}", strerror(errno));
+                    logger->error("munmap failed: {}", strerror(errno));
                 }
             }
         }
@@ -106,8 +116,7 @@ public:
         container_fd_ { container_fd }
     {
         if(base_ptr_.get() == MAP_FAILED) {
-            shoc::logger->error("mmap failed: {}", strerror(errno));
-            throw shoc::doca_exception(DOCA_ERROR_OPERATING_SYSTEM);
+            throw_error("mmap failed: {}", strerror(errno));
         }
 
         vfio_iommu_type1_dma_map dma_map = {};
@@ -118,8 +127,7 @@ public:
         dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
 
         if(auto status = ioctl(container_fd_, VFIO_IOMMU_MAP_DMA, &dma_map); status != 0) {
-            shoc::logger->error("Failed to VFIO_IOMMU_MAP_DMA, status = {}, error = {}", status, strerror(errno));
-            throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+            throw_error("Failed to VFIO_IOMMU_MAP_DMA, status = {}, error = {}", status, strerror(errno));
         }
     }
 
@@ -130,7 +138,7 @@ public:
         dma_unmap.size = size_;
 
         if(auto status = ioctl(container_fd_, VFIO_IOMMU_UNMAP_DMA, &dma_unmap); status != 0) {
-            shoc::logger->error("Failed to VFIO_IOMMU_UNMAP_DMA, status = {}, error = {}", status, strerror(errno));
+            logger->error("Failed to VFIO_IOMMU_UNMAP_DMA, status = {}, error = {}", status, strerror(errno));
         }
     }
 
@@ -151,26 +159,22 @@ auto validate_vfio_group_and_container(
 ) -> void {
     auto vfio_api_version = ioctl(container_fd.value(), VFIO_GET_API_VERSION);
     if(vfio_api_version != VFIO_API_VERSION) {
-        shoc::logger->error("VFIO API version mismatch. compiled with {}, but runtime is {}", VFIO_API_VERSION, vfio_api_version);
-        throw shoc::doca_exception { DOCA_ERROR_NOT_SUPPORTED };
+        throw_error("VFIO API version mismatch. compiled with {}, but runtime is {}", VFIO_API_VERSION, vfio_api_version);
     }
 
     if(ioctl(container_fd.value(), VFIO_CHECK_EXTENSION, VFIO_TYPE1v2_IOMMU) != 0) {
-        shoc::logger->error("VFIO Type 1 IOMMU extension not supported");
-        throw shoc::doca_exception { DOCA_ERROR_NOT_SUPPORTED };
+        throw_error("VFIO Type 1 IOMMU extension not supported");
     }
 
     auto group_status = vfio_group_status { };
     group_status.argsz = sizeof(vfio_group_status);
 
     if(auto status = ioctl(group_fd.value(), VFIO_GROUP_GET_STATUS, &group_status); status != 0) {
-        shoc::logger->error("Failed to get status of VFIO group. Status = {}, error = {}", status, strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_NOT_SUPPORTED };
+        throw_error("Failed to get status of VFIO group. Status = {}, error = {}", status, strerror(errno));
     }
 
     if((group_status.flags & VFIO_GROUP_FLAGS_VIABLE) == 0) {
-        shoc::logger->error("VFIO group not viable. Not all devices in IOMMU group are bound to vfio driver");
-        throw shoc::doca_exception { DOCA_ERROR_NOT_SUPPORTED };
+        throw_error("VFIO group not viable. Not all devices in IOMMU group are bound to vfio driver");
     }
 }
 
@@ -179,13 +183,11 @@ auto add_vfio_group_to_container(
     file_descriptor &container_fd
 ) -> void {
     if(auto status = ioctl(group_fd.value(), VFIO_GROUP_SET_CONTAINER, container_fd.ptr()); status != 0) {
-        shoc::logger->error("Failed to set group for container. Status = {}, error = {}", status, strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to set group for container. Status = {}, error = {}", status, strerror(errno));
     }
 
     if(auto status = ioctl(container_fd.value(), VFIO_SET_IOMMU, VFIO_TYPE1v2_IOMMU); status != 0) {
-        shoc::logger->error("Failed to set IOMMU type 1 extension for container. Status = {}, error = {}", status, strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to set IOMMU type 1 extension for container. Status = {}, error = {}", status, strerror(errno));
     }
 }
 
@@ -202,15 +204,13 @@ auto init_vfio_device(
     auto container_fd = file_descriptor { open("/dev/vfio/vfio", O_RDWR) };
 
     if(!container_fd.is_valid()) {
-        shoc::logger->error("Failed to open VFIO container. error = {}", strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to open VFIO container. error = {}", strerror(errno));
     }
 
     auto group_fd = file_descriptor { open(fmt::format("/dev/vfio/{}", vfio_group).c_str(), O_RDWR) };
 
     if(!group_fd.is_valid()) {
-        shoc::logger->error("Failed to open VFIO group. error = {}", strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to open VFIO group. error = {}", strerror(errno));
     }
 
     validate_vfio_group_and_container(group_fd, container_fd);
@@ -218,8 +218,7 @@ auto init_vfio_device(
 
     auto device_fd = file_descriptor { ioctl(group_fd.value(), VFIO_GROUP_GET_DEVICE_FD, pci_address.c_str()) };
     if(!device_fd.is_valid()) {
-        shoc::logger->error("Failed to get device fd, error = {}", strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to get device fd, error = {}", strerror(errno));
     }
 
     auto reg = vfio_region_info { };
@@ -227,14 +226,12 @@ auto init_vfio_device(
     reg.index = VFIO_PCI_CONFIG_REGION_INDEX;
 
     if(auto status = ioctl(device_fd.value(), VFIO_DEVICE_GET_REGION_INFO, &reg); status != 0) {
-        shoc::logger->error("Failed to get Config Region info. Status = {}, error = {}", status, strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to get Config Region info. Status = {}, error = {}", status, strerror(errno));
     }
 
     auto cmd = std::uint16_t { 0x6 };
     if(pwrite(device_fd.value(), &cmd, 2, reg.offset + 0x4) != 2) {
-        shoc::logger->error("Failed to enable PCI cmd. Failed to write to Config Region Space. Error = {}", strerror(errno));
-        throw shoc::doca_exception { DOCA_ERROR_DRIVER };
+        throw_error("Failed to enable PCI cmd. Failed to write to Config Region Space. Error = {}", strerror(errno));
     }
 
     return {
@@ -252,41 +249,39 @@ auto devemu_dma_demo_host(
 ) -> void {
     auto [ container_fd, group_fd, device_fd ] = init_vfio_device(vfio_group, pci_address);
 
-    shoc::logger->info("obtained VFIO group and device");
+    logger->info("obtained VFIO group and device");
 
     auto dma_mem = vfio_dma_region { container_fd.value(), MEM_BUF_LEN, iova };
 
-    shoc::logger->info("mapped device memory");
+    logger->info("mapped device memory");
 
     write_data.resize(MEM_BUF_LEN, '\0');
     std::ranges::copy(write_data, dma_mem.as_chars().data());
 
-    shoc::logger->info("Wrote data to device");
+    logger->info("Wrote data to device");
 
     while(std::ranges::equal(dma_mem.as_chars(), write_data)) {
         using namespace std::chrono_literals;
-        shoc::logger->info("Waiting for new data from device");
+        logger->info("Waiting for new data from device");
         std::this_thread::sleep_for(1s);
     }
 
-    shoc::logger->info("Got new data from device");
+    logger->info("Got new data from device");
 }
 
 auto main(
-    int argc,
-    char *argv[]
+    [[maybe_unused]] int argc,
+    [[maybe_unused]] char *argv[]
 ) -> int try {
-    shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
-    shoc::logger->set_level(spdlog::level::debug);
+    logger->set_level(spdlog::level::debug);
 
-    auto env = bluefield_env_host {};
     auto options = cxxopts::Options("shoc-devemu-pci-dma", "PCI device emulation: DMA demo program");
 
     options.add_options()
         (
             "p,pci-addr",
             "PCI address of the emulated device",
-            cxxopts::value<std::string>()->default_value(env.dev_pci.addr)
+            cxxopts::value<std::string>()->default_value("e3:00.0")
         )
         (
             "a,addr",
@@ -294,8 +289,8 @@ auto main(
             cxxopts::value<std::uint64_t>()->default_value("0x1000000")
         )
         (
-            "g.vfio-group",
-            "VFIO group of the device. Integer",
+            "g,vfio-group",
+            "VFIO group of the device (integer)",
             cxxopts::value<int>()->default_value("-1")
         )
         (
@@ -319,5 +314,5 @@ auto main(
         write_data
     );
 } catch(std::exception &e) {
-    shoc::logger->error(e.what());
+    logger->error(e.what());
 }
