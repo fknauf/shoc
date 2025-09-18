@@ -21,7 +21,7 @@ namespace shoc {
         static auto constexpr as_task      = doca_compress_task_compress_deflate_as_task;
         static auto constexpr get_crc_cs   = doca_compress_task_compress_deflate_get_crc_cs;
         static auto constexpr get_adler_cs = doca_compress_task_compress_deflate_get_adler_cs;
-        static auto constexpr alloc_init   = doca_compress_task_compress_deflate_alloc_init;
+        static auto constexpr get_xxh_cs   = [](auto) -> std::uint32_t { return 0; };
         static auto constexpr get_src      = doca_compress_task_compress_deflate_get_src;
         static auto constexpr get_dst      = doca_compress_task_compress_deflate_get_dst;
     };
@@ -30,9 +30,27 @@ namespace shoc {
         static auto constexpr as_task      = doca_compress_task_decompress_deflate_as_task;
         static auto constexpr get_crc_cs   = doca_compress_task_decompress_deflate_get_crc_cs;
         static auto constexpr get_adler_cs = doca_compress_task_decompress_deflate_get_adler_cs;
-        static auto constexpr alloc_init   = doca_compress_task_decompress_deflate_alloc_init;
+        static auto constexpr get_xxh_cs   = [](auto) -> std::uint32_t { return 0; };
         static auto constexpr get_src      = doca_compress_task_decompress_deflate_get_src;
         static auto constexpr get_dst      = doca_compress_task_decompress_deflate_get_dst;
+    };
+
+    template<> struct compress_task_helpers<doca_compress_task_decompress_lz4_stream> {
+        static auto constexpr as_task      = doca_compress_task_decompress_lz4_stream_as_task;
+        static auto constexpr get_crc_cs   = doca_compress_task_decompress_lz4_stream_get_crc_cs;
+        static auto constexpr get_adler_cs = [](auto) -> std::uint32_t { return 0; };
+        static auto constexpr get_xxh_cs   = doca_compress_task_decompress_lz4_stream_get_xxh_cs;
+        static auto constexpr get_src      = doca_compress_task_decompress_lz4_stream_get_src;
+        static auto constexpr get_dst      = doca_compress_task_decompress_lz4_stream_get_dst;
+    };
+
+        template<> struct compress_task_helpers<doca_compress_task_decompress_lz4_block> {
+        static auto constexpr as_task      = doca_compress_task_decompress_lz4_block_as_task;
+        static auto constexpr get_crc_cs   = doca_compress_task_decompress_lz4_block_get_crc_cs;
+        static auto constexpr get_adler_cs = [](auto) -> std::uint32_t { return 0; };
+        static auto constexpr get_xxh_cs   = doca_compress_task_decompress_lz4_block_get_xxh_cs;
+        static auto constexpr get_src      = doca_compress_task_decompress_lz4_block_get_src;
+        static auto constexpr get_dst      = doca_compress_task_decompress_lz4_block_get_dst;
     };
 
     /**
@@ -41,13 +59,15 @@ namespace shoc {
     struct compress_checksums {
         std::uint32_t crc = 0;
         std::uint32_t adler = 0;
+        std::uint32_t xxh = 0;
 
         compress_checksums() = default;
 
         template<typename TaskType>
         compress_checksums(TaskType *task):
             crc { compress_task_helpers<TaskType>::get_crc_cs(task) },
-            adler { compress_task_helpers<TaskType>::get_adler_cs(task) }
+            adler { compress_task_helpers<TaskType>::get_adler_cs(task) },
+            xxh { compress_task_helpers<TaskType>::get_xxh_cs(task) }
         {}
     };
 
@@ -64,15 +84,27 @@ namespace shoc {
         >
     {
     public:
-        /**
-         * @param dev device on which the submitted tasks will run
-         * @param engine engine that processes the completion events
-         */
+        /// For internal use
         compress_context(
             progress_engine *parent,
             device dev,
-            std::uint32_t max_tasks = 1
+            std::uint32_t max_tasks
         );
+
+        /**
+         * Create a starting compression context connected to the supplied progress engine
+         *
+         * @param engine engine that processes the completion events
+         * @param dev device on which the submitted tasks will run
+         * @param max_tasks The maximum number of tasks that can be supplied to this context at the same time per task type
+         */
+        static auto create(
+            progress_engine_lease engine,
+            device dev,
+            std::uint32_t max_tasks = 32
+        ) {
+            return engine->create_context<compress_context>(std::move(dev), max_tasks);
+        }
 
         /**
          * Compress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
@@ -87,10 +119,7 @@ namespace shoc {
             buffer const &src,
             buffer &dest,
             compress_checksums *checksums = nullptr
-        ) {
-            logger->trace("{} start", __PRETTY_FUNCTION__);
-            return submit_task<doca_compress_task_compress_deflate>(src, dest, checksums);
-        }
+        ) -> compress_awaitable;
 
         /**
          * Decompress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
@@ -105,30 +134,43 @@ namespace shoc {
             buffer const &src,
             buffer &dest,
             compress_checksums *checksums = nullptr
-        ) {
-            logger->trace("{} start", __PRETTY_FUNCTION__);
-            return submit_task<doca_compress_task_decompress_deflate>(src, dest, checksums);
-        }
+        ) -> compress_awaitable;
+
+        /**
+         * Decompress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
+         * when the task finishes. At this point, the decompressed data will be in dest.
+         *
+         * @param src source data buffer
+         * @param dest destination data buffer
+         * @param checksums optional pointer to a struct that'll accept checksums
+         * @return a status awaitable that will be completed when the tasks completes
+         */
+        auto decompress_lz4_block(
+            buffer const &src,
+            buffer &dest,
+            compress_checksums *checksums = nullptr
+        ) -> compress_awaitable;
+
+        /**
+         * Decompress the data in src, write the results to dest. Returns immediately; the result of the call is an awaitable that'll be completed
+         * when the task finishes. At this point, the decompressed data will be in dest.
+         *
+         * @param has_block_checksum if the task should expect blocks in the stream to have a checksum
+         * @param are_blocks_independent if the task should expect blocks in the stream to be independent
+         * @param src source data buffer
+         * @param dest destination data buffer
+         * @param checksums optional pointer to a struct that'll accept checksums
+         * @return a status awaitable that will be completed when the tasks completes
+         */
+        auto decompress_lz4_stream(
+            bool has_block_checksum,
+            bool are_blocks_independent,
+            buffer const &src,
+            buffer &dest,
+            compress_checksums *checksums = nullptr
+        ) -> compress_awaitable;
 
     private:
-        template<typename TaskType>
-        auto submit_task(
-            buffer src,
-            buffer dest,
-            compress_checksums *checksums
-        ) -> compress_awaitable {
-            return detail::status_offload<
-                compress_task_helpers<TaskType>::alloc_init,
-                compress_task_helpers<TaskType>::as_task
-            >(
-                engine(),
-                compress_awaitable::create_space(checksums),
-                handle(),
-                src.handle(),
-                dest.handle()
-            );
-        }
-
         template<typename TaskType>
         static auto task_completion_callback(
             TaskType *compress_task,
