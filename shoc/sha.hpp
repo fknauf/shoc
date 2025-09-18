@@ -8,6 +8,7 @@
 #include <doca_sha.h>
 
 namespace shoc {
+    // Untested because doca_sha is not available on BF-3 and our BF-2 is crypto-disabled.
     class sha_context:
         public context<
             doca_sha,

@@ -65,6 +65,8 @@ namespace shoc {
     enum context_state {
         idle,
         running,
+        /// can mean either stop-requested or stopping proper. From the user's point of
+        /// view those behave the same way.
         stopping
     };
 
@@ -147,6 +149,11 @@ namespace shoc {
         context_base &operator=(context_base const &) = delete;
         context_base &operator=(context_base &&) = delete;
 
+        /**
+         * Returns whether the context is preparing to stop, i.e. in the stop-requested state.
+         * Default implementation is always false, but concrete contexts can override this.
+         * Used to map DOCA context states to SHOC context_state.
+         */
         [[nodiscard]]
         virtual auto preparing_stop() const noexcept -> bool {
             return false;
