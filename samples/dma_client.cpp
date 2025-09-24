@@ -58,7 +58,7 @@ auto dma_receive(
         shoc::device_capability::dma
     );
 
-    auto client = co_await engine->create_context<shoc::comch::client>("dma-test", dev);
+    auto client = co_await shoc::comch::client::create(engine, "dma-test", dev);
     auto extents_msg = co_await client->msg_recv();
     auto extents = data_extents::from_message(extents_msg);
 
@@ -73,7 +73,7 @@ auto dma_receive(
     auto inv = shoc::buffer_inventory { 1024 };
 
     auto slots = std::min(parallelism, extents.block_count);
-    auto dma = co_await engine->create_context<shoc::dma_context>(dev, slots + 1);
+    auto dma = co_await shoc::dma_context::create(engine, dev, slots + 1);
     auto pending = std::vector<shoc::coro::status_awaitable<>>(slots);
 
     auto start = std::chrono::steady_clock::now();

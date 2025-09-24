@@ -3,6 +3,7 @@
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
 #include "device.hpp"
+#include "progress_engine.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_sync_event.h>
@@ -48,6 +49,16 @@ namespace shoc {
             std::uint32_t max_tasks
         );
 
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            sync_event_publisher_location publisher,
+            sync_event_subscriber_location subscriber,
+            std::uint32_t max_tasks
+        ) {
+            return engine.create_context<sync_event>(std::move(publisher), std::move(subscriber), max_tasks);
+        }
+
         sync_event(
             context_parent *parent,
             std::ranges::range auto &&publishers,
@@ -67,12 +78,40 @@ namespace shoc {
             }
         }
 
+        template<
+            std::ranges::range PubRange,
+            std::ranges::range SubRange
+        >
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            PubRange &&publishers,
+            SubRange &&subscribers,
+            std::uint32_t max_tasks
+        ) {
+            return engine.create_context<sync_event>(
+                std::forward<PubRange>(publishers),
+                std::forward<SubRange>(subscribers),
+                max_tasks
+            );
+        }
+
         sync_event(
             context_parent *parent,
             device const &dev,
             std::span<std::byte const> export_data,
             std::uint32_t max_tasks
         );
+
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            device const &dev,
+            std::span<std::byte const> export_data,
+            std::uint32_t max_tasks
+        ) {
+            return engine.create_context<sync_event>(dev, export_data, max_tasks);
+        }
 
         [[nodiscard]]
         auto export_to_remote_pci(device const &dev) const -> std::span<std::byte const>;

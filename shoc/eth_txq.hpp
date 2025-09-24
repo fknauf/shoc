@@ -7,6 +7,7 @@
 #include "coro/value_awaitable.hpp"
 #include "device.hpp"
 #include "memory_map.hpp"
+#include "progress_engine.hpp"
 
 #include <doca_eth_txq.h>
 #include <doca_eth_txq_cpu_data_path.h>
@@ -56,6 +57,15 @@ namespace shoc {
             std::uint32_t max_tasks,
             eth_txq_config &cfg
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint32_t max_tasks,
+            eth_txq_config &cfg
+        ) {
+            return engine.create_context<eth_txq>(std::move(dev), max_tasks, cfg);
+        }
 
         /**
          * Send a raw ethernet frame

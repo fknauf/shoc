@@ -1,8 +1,9 @@
-#include "shoc/buffer_inventory.hpp"
-#include "shoc/compress.hpp"
-#include "shoc/logger.hpp"
-#include "shoc/memory_map.hpp"
-#include "shoc/progress_engine.hpp"
+#include <shoc/aligned_memory.hpp>
+#include <shoc/buffer_inventory.hpp>
+#include <shoc/compress.hpp>
+#include <shoc/logger.hpp>
+#include <shoc/memory_map.hpp>
+#include <shoc/progress_engine.hpp>
 
 #include <boost/cobalt.hpp>
 
@@ -17,20 +18,6 @@
 #include <nlohmann/json.hpp>
 
 #include <doca_log.h>
-
-struct cache_aligned_memory {
-    std::vector<char> storage;
-    std::span<char> data;
-
-    cache_aligned_memory(std::size_t size):
-        storage(size + 64)
-    {
-        auto *base = static_cast<void*>(storage.data());
-        auto space = storage.size();
-        std::align(64, size, base, space);
-        data = std::span { static_cast<char*>(base), size };
-    }
-};
 
 auto compress_file(
     shoc::progress_engine_lease engine,
@@ -47,27 +34,26 @@ auto compress_file(
     shoc::logger->debug("compressing {} batches of size {}", batches, batchsize);
 
     auto filesize = batches * batchsize;
-    auto src_mem = cache_aligned_memory(filesize + 64);
-    auto dst_mem = cache_aligned_memory(filesize + 64);
-    auto src_data = src_mem.data;
-    auto dst_data = dst_mem.data;
+    auto src_blocks = shoc::aligned_blocks(batches, batchsize);
+    auto dst_blocks = shoc::aligned_blocks(batches, batchsize);
+    auto src_data = src_blocks.as_writable_bytes();
+    auto dst_data = dst_blocks.as_writable_bytes();
     auto dst_ranges = std::vector<std::span<char>>(batches);
 
-    in.read(src_data.data(), filesize);
+    in.read(reinterpret_cast<char*>(src_data.data()), src_data.size());
 
     auto dev = shoc::device::find(shoc::device_capability::compress_deflate);
     auto mmap_src = shoc::memory_map { dev, src_data };
     auto mmap_dst = shoc::memory_map { dev, dst_data };
     auto buf_inv = shoc::buffer_inventory { 2 };
 
-    auto compress = co_await engine->create_context<shoc::compress_context>(dev, 16);
+    auto compress = co_await shoc::compress_context::create(engine, dev, 16);
 
     auto start = std::chrono::steady_clock::now();
 
     for(auto i : std::ranges::views::iota(0u, batches)) {
-        auto offset = i * batchsize;
-        auto src = buf_inv.buf_get_by_data(mmap_src, src_data.data() + offset, batchsize);
-        auto dst = buf_inv.buf_get_by_addr(mmap_dst, dst_data.data() + offset, batchsize);
+        auto src = buf_inv.buf_get_by_data(mmap_src, src_blocks.block(i));
+        auto dst = buf_inv.buf_get_by_addr(mmap_dst, dst_blocks.block(i));
 
         shoc::logger->debug("compressing chunk {}...", i);
 

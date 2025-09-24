@@ -27,14 +27,14 @@ TEST(docapp_dma, local_copy) {
     auto report = std::string { "fiber not started" };
 
     auto fiber_fn = [](
-        shoc::progress_engine *engine,
+        shoc::progress_engine_lease engine,
         std::string *report
     ) -> boost::cobalt::detached {
         try {
             *report = "";
 
             auto dev = shoc::device::find(shoc::device_capability::dma);
-            auto ctx = co_await engine->create_context<shoc::dma_context>(dev, 1);
+            auto ctx = co_await shoc::dma_context::create(engine, dev, 1);
 
             CO_ASSERT_EQ(shoc::context_state::running, ctx->state(), "state not running after acquiry");
 

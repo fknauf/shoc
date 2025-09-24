@@ -26,7 +26,7 @@ auto sync_event_remote(
     );
     auto rep = shoc::device_representor::find_by_pci_addr(dev, env.rep_pci);
 
-    auto server = co_await engine->create_context<shoc::comch::server>("shoc-sync-event-test", dev, rep);
+    auto server = co_await shoc::comch::server::create(engine, "shoc-sync-event-test", dev, rep);
     auto conn = co_await server->accept();
     msg = co_await conn->msg_recv();
 #else
@@ -36,7 +36,7 @@ auto sync_event_remote(
         shoc::device_capability::comch_client
     );
 
-    auto client = co_await engine->create_context<shoc::comch::client>("shoc-sync-event-test", dev);
+    auto client = co_await shoc::comch::client::create(engine, "shoc-sync-event-test", dev);
     msg = co_await client->msg_recv();
 #endif
 
@@ -45,7 +45,7 @@ auto sync_event_remote(
         msg.size()
     };
 
-    auto sync = co_await engine->create_context<shoc::sync_event>(dev, event_descriptor, 16);
+    auto sync = co_await shoc::sync_event::create(engine, dev, event_descriptor, 16);
 
     err = co_await sync->notify_set(23);
 

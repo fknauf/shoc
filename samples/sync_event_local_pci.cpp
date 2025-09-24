@@ -25,10 +25,10 @@ auto sync_event_local(
     );
     auto rep = shoc::device_representor::find_by_pci_addr(dev, env.rep_pci);
 
-    auto sync = co_await engine->create_context<shoc::sync_event>(dev, shoc::sync_event::location_pci{}, 16);
+    auto sync = co_await shoc::sync_event::create(engine, dev, shoc::sync_event::location_pci{}, 16);
     [[maybe_unused]] auto event_descriptor = sync->export_to_remote_pci(dev);
 
-    auto server = co_await engine->create_context<shoc::comch::server>("shoc-sync-event-test", dev, rep);
+    auto server = co_await shoc::comch::server::create(engine, "shoc-sync-event-test", dev, rep);
     auto conn = co_await server->accept();
     err = co_await conn->send(event_descriptor);
 #else
@@ -38,10 +38,10 @@ auto sync_event_local(
         shoc::device_capability::comch_client
     );
 
-    auto sync = co_await engine->create_context<shoc::sync_event>(dev, shoc::sync_event::location_pci{}, 16);
+    auto sync = co_await shoc::sync_event::create(engine, dev, shoc::sync_event::location_pci{}, 16);
     [[maybe_unused]] auto event_descriptor = sync->export_to_remote_pci(dev);
 
-    auto client = co_await engine->create_context<shoc::comch::client>("shoc-sync-event-test", dev);
+    auto client = co_await shoc::comch::client::create(engine, "shoc-sync-event-test", dev);
     err = co_await client->send(event_descriptor);
 #endif
 

@@ -27,7 +27,7 @@ auto ping_pong(
         // it, then suspend. The coroutine will be resumed by the state-changed handler when
         // the client context switches to DOCA_CTX_STATE_RUNNING.
         std::cout << "connecting... pe active = " << engine->active() << std::endl;
-        auto client = co_await engine->create_context<shoc::comch::client>("shoc-test", dev);
+        auto client = co_await shoc::comch::client::create(engine, "shoc-test", dev);
         std::cout << "connected." << std::endl;
 
         // send ping, wait for status result

@@ -6,6 +6,7 @@
 
 #include <shoc/context.hpp>
 #include <shoc/device.hpp>
+#include <shoc/progress_engine.hpp>
 #include <shoc/unique_handle.hpp>
 
 #include <doca_comch.h>
@@ -47,8 +48,18 @@ namespace shoc::comch {
             context_parent *parent,
             std::string const &server_name,
             device dev,
-            client_limits const &limits = {}
+            client_limits const &limits
         );
+
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            std::string const &server_name,
+            device dev,
+            client_limits const &limits = {}
+        ) {
+            return engine.create_context<client>(server_name, std::move(dev), limits);
+        }
 
         ~client();
 

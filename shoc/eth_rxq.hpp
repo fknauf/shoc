@@ -7,6 +7,7 @@
 #include "coro/value_awaitable.hpp"
 #include "device.hpp"
 #include "memory_map.hpp"
+#include "progress_engine.hpp"
 
 #include <doca_eth_rxq.h>
 #include <doca_eth_rxq_cpu_data_path.h>
@@ -151,6 +152,18 @@ namespace shoc {
             std::optional<eth_rxq_packet_buffer> pkt_buf = std::nullopt
         );
 
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint16_t queue_id,
+            std::uint32_t max_tasks,
+            eth_rxq_config const &cfg,
+            doca_eth_rxq_type type = DOCA_ETH_RXQ_TYPE_REGULAR,
+            std::optional<eth_rxq_packet_buffer> pkt_buf = std::nullopt
+        ) {
+            return engine.create_context<eth_rxq>(std::move(dev), queue_id, max_tasks, cfg, type, std::move(pkt_buf));
+        }
+
         /**
          * Receive a single ethernet frame in the supplied destination buffer
          */
@@ -174,6 +187,18 @@ namespace shoc {
             eth_rxq_config const &cfg,
             eth_rxq_packet_buffer pkt_buf
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint16_t queue_id,
+            eth_rxq_config const &cfg,
+            eth_rxq_packet_buffer pkt_buf
+        ) {
+            return engine.create_context<eth_rxq_managed>(
+                std::move(dev), queue_id, cfg, std::move(pkt_buf)
+            );
+        }
 
         /**
          * Receive a single ethernet frame. Memory is managed by DOCA.
@@ -209,6 +234,20 @@ namespace shoc {
             doca_event_batch_events_number events_number_max = DOCA_EVENT_BATCH_EVENTS_NUMBER_128,
             doca_event_batch_events_number events_number_min = DOCA_EVENT_BATCH_EVENTS_NUMBER_1
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint16_t queue_id,
+            eth_rxq_config const &cfg,
+            eth_rxq_packet_buffer pkt_buf,
+            doca_event_batch_events_number events_number_max = DOCA_EVENT_BATCH_EVENTS_NUMBER_128,
+            doca_event_batch_events_number events_number_min = DOCA_EVENT_BATCH_EVENTS_NUMBER_1
+        ) {
+            return engine.create_context<eth_rxq_batch_managed>(
+                std::move(dev), queue_id, cfg, std::move(pkt_buf), events_number_max, events_number_min
+            );
+        }
 
         /**
          * Receive a batch of ethernet frames. Memory is handled by DOCA

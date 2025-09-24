@@ -103,7 +103,7 @@ auto dma_serve(
     auto dev = shoc::device::find(dev_pci, shoc::device_capability::dma, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr ( dev, rep_pci );
 
-    auto server = co_await engine->create_context<shoc::comch::server>("dma-test", dev, rep);
+    auto server = co_await shoc::comch::server::create(engine, "dma-test", dev, rep);
 
     std::cout << "accepting connections\n";
 

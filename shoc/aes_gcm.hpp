@@ -4,6 +4,7 @@
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
 #include "device.hpp"
+#include "progress_engine.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_aes_gcm.h>
@@ -67,6 +68,14 @@ namespace shoc {
             device dev,
             std::uint32_t num_tasks
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint32_t num_tasks
+        ) {
+            return engine.create_context<aes_gcm_context>(std::move(dev), num_tasks);
+        }
 
         [[nodiscard]] auto stop() -> context_state_awaitable override;
 

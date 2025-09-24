@@ -4,7 +4,7 @@
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
 #include "device.hpp"
-
+#include "progress_engine.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_erasure_coding.h>
@@ -112,6 +112,14 @@ namespace shoc {
             device dev,
             std::uint32_t max_tasks = 16
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint32_t max_tasks = 16
+        ) {
+            return engine.create_context<ec_context>(std::move(dev), max_tasks);
+        }
 
         /**
          * Create an erasure encoding for the provided data

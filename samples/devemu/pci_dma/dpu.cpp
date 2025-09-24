@@ -62,11 +62,11 @@ auto devemu_dma_demo(
 
     shoc::logger->info("Found device representor (VUID = {}), creating emulated device context...", rep.get_vuid());
 
-    auto emu_dev = co_await engine->create_context<shoc::devemu::pci_dev>(dev_type, rep);
+    auto emu_dev = co_await shoc::devemu::pci_dev::create(engine, dev_type, rep);
 
     shoc::logger->info("Created device context (hotplug state = {}), setting up DMA context...", static_cast<int>(emu_dev->hotplug_state()));
 
-    auto dma = co_await engine->create_context<shoc::dma_context>(phys_dev, 1);
+    auto dma = co_await shoc::dma_context::create(engine, phys_dev, 1);
 
     shoc::logger->info("Created DMA context");
 

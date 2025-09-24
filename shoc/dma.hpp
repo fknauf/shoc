@@ -4,6 +4,7 @@
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
 #include "device.hpp"
+#include "progress_engine.hpp"
 
 #include <doca_dma.h>
 
@@ -29,6 +30,14 @@ namespace shoc {
             device dev,
             std::uint32_t max_tasks
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint32_t max_tasks
+        ) {
+            return engine.create_context<dma_context>(std::move(dev), max_tasks);
+        }
 
         /**
          * Offload a task for DMA memcpy. Typically (but not necessarily) one of the buffers

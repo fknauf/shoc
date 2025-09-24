@@ -4,6 +4,7 @@
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
 #include "device.hpp"
+#include "progress_engine.hpp"
 #include "sync_event.hpp"
 #include "unique_handle.hpp"
 
@@ -229,6 +230,15 @@ namespace shoc {
             device dev,
             rdma_config config = {}
         );
+
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            rdma_config config = {}
+        ) {
+            return engine.create_context<rdma_context>(std::move(dev), std::move(config));
+        }
 
         [[nodiscard]]
         auto export_connection() -> rdma_connection;

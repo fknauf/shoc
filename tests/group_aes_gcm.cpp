@@ -29,7 +29,7 @@ TEST(docapp_aes_gcm, single_shot) {
     shoc::logger->set_level(spdlog::level::warn);
 
     auto fiber_fn = [](
-        shoc::progress_engine *engine,
+        shoc::progress_engine_lease engine,
         std::string *report
     ) -> boost::cobalt::detached {
         try {
@@ -58,7 +58,7 @@ TEST(docapp_aes_gcm, single_shot) {
             auto encrypted_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_data.begin(), dst_mid });
             auto decrypted_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_mid, dst_data.end() });
 
-            auto ctx = co_await engine->create_context<shoc::aes_gcm_context>(dev, 1);
+            auto ctx = co_await shoc::aes_gcm_context::create(engine, dev, 1);
 
             shoc::logger->info("context created");
 

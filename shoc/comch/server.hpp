@@ -7,6 +7,7 @@
 #include <shoc/context.hpp>
 #include <shoc/coro/value_awaitable.hpp>
 #include <shoc/device.hpp>
+#include <shoc/progress_engine.hpp>
 #include <shoc/unique_handle.hpp>
 
 #include <doca_comch.h>
@@ -230,6 +231,17 @@ namespace shoc::comch {
             device_representor rep,
             server_limits const &limits = {}
         );
+
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            std::string const &server_name,
+            device dev,
+            device_representor rep,
+            server_limits const &limits = {}
+        ) {
+            return engine.create_context<server>(server_name, std::move(dev), std::move(rep), limits);
+        }
 
         auto stop() -> context_state_awaitable override;
 

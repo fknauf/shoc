@@ -113,7 +113,7 @@ auto recovery_fiber(
     std::vector<std::uint32_t> const &ignored
 ) -> boost::cobalt::detached try {
     auto dev = shoc::device::find(shoc::device_capability::erasure_coding);
-    auto ctx = co_await engine->create_context<shoc::ec_context>(dev);
+    auto ctx = co_await shoc::ec_context::create(engine, dev);
     auto bufinv = shoc::buffer_inventory { 2 };
 
     auto ec_data = erasure_coded_data { input_filename, ignored };

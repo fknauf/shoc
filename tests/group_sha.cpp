@@ -29,7 +29,7 @@ TEST(docapp_sha, hash) {
     shoc::logger->set_level(spdlog::level::warn);
 
     auto fiber_fn = [](
-        shoc::progress_engine *engine,
+        shoc::progress_engine_lease engine,
         std::string *report
     ) -> boost::cobalt::detached {
         try {
@@ -54,7 +54,7 @@ TEST(docapp_sha, hash) {
             auto dst_mmap = shoc::memory_map { dev, dst_data };
             auto dst_buf = buf_inv.buf_get_by_addr(dst_mmap, dst_data);
 
-            auto ctx = co_await engine->create_context<shoc::sha_context>(dev, 1);
+            auto ctx = co_await shoc::sha_context::create(engine, dev, 1);
 
             shoc::logger->info("context created");
 

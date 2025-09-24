@@ -59,7 +59,7 @@ auto hotplug_device(
 
     shoc::logger->info("Created device representor (VUID = {}), creating emulated device context...", rep.get_vuid());
 
-    auto emu_dev = co_await engine->create_context<shoc::devemu::pci_dev>(dev_type, rep);
+    auto emu_dev = co_await shoc::devemu::pci_dev::create(engine, dev_type, rep);
 
     shoc::logger->info("Created device context (hotplug state = {}), hottplugging...", static_cast<int>(emu_dev->hotplug_state()));
 

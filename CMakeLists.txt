@@ -83,6 +83,8 @@ target_link_libraries(
     ${DOCA_LIBRARIES}
 )
 
+enable_testing()
+
 add_executable(test-shoc
     tests/coro/group_value_awaitable.cpp
     tests/group_aes_gcm.cpp
@@ -95,6 +97,12 @@ add_executable(test-shoc
     tests/group_sha.cpp
 )
 target_link_libraries(test-shoc shoc GTest::gtest GTest::gtest_main)
+
+#configure_file("./tests/data/pg218.txt" "./tests/data/pg218.txt" COPYONLY)
+#configure_file("./tests/data/pg218.txt.lz4" "./tests/data/pg218.txt.lz4" COPYONLY)
+
+include(GoogleTest)
+gtest_discover_tests(test-shoc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 function(add_shoc_demo_executable name)
     add_executable(${name} ${ARGN})

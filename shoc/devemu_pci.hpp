@@ -5,6 +5,7 @@
 #include "coro/value_awaitable.hpp"
 #include "device.hpp"
 #include "memory_map.hpp"
+#include "progress_engine.hpp"
 #include "unique_handle.hpp"
 
 #include <doca_devemu_pci.h>
@@ -125,6 +126,14 @@ namespace shoc::devemu {
             pci_type const &type,
             device_representor rep
         );
+
+        [[nodiscard]] static auto create(
+            progress_engine_lease &engine,
+            pci_type const &type,
+            device_representor rep
+        ) {
+            return engine.create_context<pci_dev>(type, std::move(rep));
+        }
 
         [[nodiscard]] auto hotplug_state() const -> doca_devemu_pci_hotplug_state;
 

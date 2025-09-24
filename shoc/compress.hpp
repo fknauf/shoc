@@ -98,12 +98,12 @@ namespace shoc {
          * @param dev device on which the submitted tasks will run
          * @param max_tasks The maximum number of tasks that can be supplied to this context at the same time per task type
          */
-        static auto create(
+        [[nodiscard]] static auto create(
             progress_engine_lease engine,
             device dev,
             std::uint32_t max_tasks = 32
         ) {
-            return engine->create_context<compress_context>(std::move(dev), max_tasks);
+            return engine.create_context<compress_context>(std::move(dev), max_tasks);
         }
 
         /**

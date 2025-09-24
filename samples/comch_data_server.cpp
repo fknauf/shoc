@@ -74,7 +74,7 @@ auto serve(
     auto mmap = shoc::memory_map { dev, data.as_bytes(), DOCA_ACCESS_FLAG_PCI_READ_WRITE };
     auto bufinv = shoc::buffer_inventory { 32 };
 
-    auto server = co_await engine->create_context<shoc::comch::server>("shoc-data-test", dev, rep);
+    auto server = co_await shoc::comch::server::create(engine, "shoc-data-test", dev, rep);
 
     std::cout << "accepting connections." << std::endl;
 

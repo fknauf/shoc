@@ -120,7 +120,7 @@ auto partial_tap(
     auto packet_mmap = shoc::memory_map { dev, packet_memory.as_writable_bytes(), DOCA_ACCESS_FLAG_LOCAL_READ_WRITE };
     auto packet_buffer = shoc::eth_rxq_packet_buffer { packet_mmap, 0, static_cast<std::uint32_t>(packet_memory.as_bytes().size()) };
 
-    auto rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, 0, rxq_cfg, packet_buffer);
+    auto rss = co_await shoc::eth_rxq_managed::create(engine, dev, 0, rxq_cfg, packet_buffer);
 
     auto txq_cfg = shoc::eth_txq_config {
         .max_burst_size = 256,
@@ -128,7 +128,7 @@ auto partial_tap(
         .l4_chksum_offload = true
     };
 
-    auto txq = co_await engine->create_context<shoc::eth_txq>(dev, 16, txq_cfg);
+    auto txq = co_await shoc::eth_txq::create(engine, dev, 16, txq_cfg);
 
     shoc::logger->info("RSS started, creating filter pipe...");
 

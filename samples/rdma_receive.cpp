@@ -43,7 +43,7 @@ auto rdma_receive(
     shoc::ibdev_name ibdev_name
 ) -> boost::cobalt::detached try {
     auto dev = shoc::device::find(ibdev_name, shoc::device_capability::rdma);
-    auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
+    auto rdma = co_await shoc::rdma_context::create(engine, dev);
     auto conn = rdma->export_connection();
 
     auto remote_conn_details = co_await rdma_exchange_connection_details(conn.details());

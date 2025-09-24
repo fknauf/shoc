@@ -25,7 +25,7 @@ auto rdma_cm_client(
     std::uint16_t port
 ) -> boost::cobalt::detached try {
     auto dev = shoc::device::find(ibdev_name, shoc::device_capability::rdma);
-    auto rdma = co_await engine->create_context<shoc::rdma_context>(dev);
+    auto rdma = co_await shoc::rdma_context::create(engine, dev);
 
     auto addr = shoc::rdma_address(DOCA_RDMA_ADDR_TYPE_IPv4, server_address.c_str(), port);
     

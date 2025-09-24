@@ -4,6 +4,7 @@
 #include "context.hpp"
 #include "coro/status_awaitable.hpp"
 #include "device.hpp"
+#include "progress_engine.hpp"
 
 #include <doca_sha.h>
 
@@ -22,6 +23,15 @@ namespace shoc {
             device dev,
             std::uint32_t max_tasks = 16
         );
+
+        [[nodiscard]]
+        static auto create(
+            progress_engine_lease &engine,
+            device dev,
+            std::uint32_t max_tasks = 16
+        ) {
+            return engine.create_context<sha_context>(std::move(dev), max_tasks);
+        }
 
         auto hash(
             doca_sha_algorithm algorithm,

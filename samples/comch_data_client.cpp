@@ -24,7 +24,7 @@ auto receive_blocks(
 ) -> boost::cobalt::detached {
     auto dev = shoc::device::find(pci_addr, shoc::device_capability::comch_client);
 
-    auto client = co_await engine->create_context<shoc::comch::client>("shoc-data-test", dev);
+    auto client = co_await shoc::comch::client::create(engine, "shoc-data-test", dev);
     auto geometry_message = co_await client->msg_recv();
 
     std::uint32_t block_count, block_size;

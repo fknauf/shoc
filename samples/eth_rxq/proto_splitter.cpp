@@ -108,11 +108,11 @@ auto split_packets_on_l4_protocol(
     };
 
     auto tcp_packet_memory = shoc::eth_rxq_packet_memory { 1 << 28, dev };
-    auto tcp_rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, 0, cfg, tcp_packet_memory.as_buffer());
+    auto tcp_rss = co_await shoc::eth_rxq_managed::create(engine, dev, 0, cfg, tcp_packet_memory.as_buffer());
     auto udp_packet_memory = shoc::eth_rxq_packet_memory { 1 << 28, dev };
-    auto udp_rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, 1, cfg, udp_packet_memory.as_buffer());
+    auto udp_rss = co_await shoc::eth_rxq_managed::create(engine, dev, 1, cfg, udp_packet_memory.as_buffer());
     auto icmp_packet_memory = shoc::eth_rxq_packet_memory { 1 << 28, dev };
-    auto icmp_rss = co_await engine->create_context<shoc::eth_rxq_managed>(dev, 2, cfg, icmp_packet_memory.as_buffer());
+    auto icmp_rss = co_await shoc::eth_rxq_managed::create(engine, dev, 2, cfg, icmp_packet_memory.as_buffer());
 
     shoc::logger->info("RSS started, creating pipe...");    
 

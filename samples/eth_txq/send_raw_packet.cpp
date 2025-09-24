@@ -33,7 +33,7 @@ auto send_packet(
 
     shoc::logger->info("[{}] creating txq context", std::this_thread::get_id());
 
-    auto txq = co_await engine->create_context<shoc::eth_txq>(dev, 16, txq_cfg);
+    auto txq = co_await shoc::eth_txq::create(engine, dev, 16, txq_cfg);
 
     shoc::logger->info("[{}] context created, sending packet", std::this_thread::get_id());
 

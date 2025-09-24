@@ -31,7 +31,7 @@ TEST(docapp_erasure_coding, create_and_recover) {
     //shoc::set_sdk_log_level(DOCA_LOG_LEVEL_DEBUG);
 
     auto fiber_fn = [](
-        shoc::progress_engine *engine,
+        shoc::progress_engine_lease engine,
         std::string *report
     ) -> boost::cobalt::detached {
         try {
@@ -42,7 +42,7 @@ TEST(docapp_erasure_coding, create_and_recover) {
             auto dev = shoc::device::find(shoc::device_capability::erasure_coding);
             shoc::logger->info("device found");
 
-            auto ctx = co_await engine->create_context<shoc::ec_context>(dev, 2);
+            auto ctx = co_await shoc::ec_context::create(engine, dev, 2);
             shoc::logger->info("context created");
 
             std::uint32_t const blocksize = 64;

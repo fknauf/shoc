@@ -9,6 +9,8 @@
 
 #include <boost/cobalt.hpp>
 
+#include <filesystem>
+#include <fstream>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -27,7 +29,7 @@ TEST(docapp_compress, single_shot) {
     auto report = std::string { "fiber not started" };
 
     auto fiber_fn = [](
-        shoc::progress_engine *engine,
+        shoc::progress_engine_lease engine,
         std::string *report
     ) -> boost::cobalt::detached {
         try {
@@ -48,7 +50,7 @@ TEST(docapp_compress, single_shot) {
             auto compressed_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_data.begin(), dst_mid });
             auto decompressed_buf = buf_inv.buf_get_by_addr(dst_mmap, std::span { dst_mid, dst_data.end() });
 
-            auto ctx = co_await engine->create_context<shoc::compress_context>(dev, 1);
+            auto ctx = co_await shoc::compress_context::create(engine, dev, 1);
 
             auto checksums = shoc::compress_checksums {};
             auto compress_status = co_await ctx->compress(src_buf, compressed_buf, &checksums);
@@ -91,3 +93,64 @@ TEST(docapp_compress, single_shot) {
 
     ASSERT_EQ("", report);
 }
+
+//TEST(docapp_compress, lz4_stream) {
+//    auto report = std::string { "fiber not started" };
+//
+//    auto fiber_fn = [](
+//        shoc::progress_engine_lease engine,
+//        std::string *report
+//    ) -> boost::cobalt::detached {
+//        try {
+//            auto slurp_file = [](std::filesystem::path path) {
+//                auto size = file_size(path);
+//                auto in = std::ifstream(path, std::ios_base::in | std::ios_base::binary);
+//
+//                std::vector<char> content(size);
+//                in.read(content.data(), size);
+//                return content;
+//            };
+//
+//            auto compressed = slurp_file("tests/data/pg218.txt.lz4");
+//            auto plaintext = slurp_file("tests/data/pg218.txt");
+//
+//            CO_ASSERT_EQ(compressed[0], '\x04', "lz4 magic bytes not at start of input file");
+//            CO_ASSERT_EQ(compressed[1], '\x22', "lz4 magic bytes not at start of input file");
+//            CO_ASSERT_EQ(compressed[2], '\x4d', "lz4 magic bytes not at start of input file");
+//            CO_ASSERT_EQ(compressed[3], '\x18', "lz4 magic bytes not at start of input file");
+//
+//            CO_ASSERT_EQ(compressed[4], '\x74', "unexpected lz4 flags");
+//            CO_ASSERT_EQ(compressed[5], '\x40', "unexpected lz4 BD byte");
+//
+//            auto blocksize = std::uint32_t { 64 * 1024 };            
+//
+//            auto dev = shoc::device::find(
+//                doca_compress_cap_task_decompress_lz4_stream_is_supported,
+//                doca_compress_cap_task_decompress_lz4_block_is_supported
+//            );
+//            auto ctx = co_await shoc::compress_context::create(engine, dev);
+//
+//            *report = "";
+//        } catch(std::exception &ex) {
+//            CO_FAIL(ex.what());
+//        } catch(...) {
+//            CO_FAIL("unknown error");
+//        }
+//    };
+//
+//    auto task = [](
+//        auto fiber_fn,
+//        std::string *report
+//    ) -> boost::cobalt::task<void> {
+//        auto engine = shoc::progress_engine{};
+//        fiber_fn(&engine, report);
+//        co_await engine.run();
+//    } (
+//        fiber_fn,
+//        &report
+//    );
+//
+//    boost::cobalt::run(std::move(task));
+//
+//    ASSERT_EQ("", report);   
+//}

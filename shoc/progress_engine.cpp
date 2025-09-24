@@ -95,15 +95,16 @@ namespace shoc {
                 } while(num_popped > 0);
             } else {
                 request_notification();
-                logger->debug("progress engine: waiting for notification");
+                logger->trace("progress engine: waiting for notification");
                 auto [ ec ] = co_await notifier_.async_wait(
                     boost::asio::posix::descriptor::wait_read,
                     boost::asio::as_tuple(boost::cobalt::use_op)
                 );
-                logger->debug("progress engine: got notification");
+                logger->trace("progress engine: got notification");
                 clear_notification();
 
                 while(doca_pe_progress(handle()) > 0) {
+                    // intentionally left blank
                 }
 
                 if(ec == boost::asio::error::operation_aborted) {

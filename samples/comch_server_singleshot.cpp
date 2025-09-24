@@ -16,7 +16,7 @@ auto serve_ping_pong(
     auto dev = shoc::device::find(dev_pci, shoc::device_capability::comch_server);
     auto rep = shoc::device_representor::find_by_pci_addr(dev, rep_pci, DOCA_DEVINFO_REP_FILTER_NET);
 
-    auto server = co_await engine->create_context<shoc::comch::server>("shoc-test", dev, rep);
+    auto server = co_await shoc::comch::server::create(engine, "shoc-test", dev, rep);
     auto con = co_await server->accept();
     auto msg = co_await con->msg_recv();
 

@@ -79,12 +79,6 @@ namespace shoc {
         [[nodiscard]] auto handle() const { return handle_.get(); }
         [[nodiscard]] auto inflight_tasks() const -> std::size_t;
 
-        template<std::derived_from<context_base> Context, typename... Args>
-        auto create_context(Args&&... args) {
-            logger->trace("pe create_context this = {}", static_cast<void*>(this));
-            return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
-        }
-
         auto connect(context_base *ctx) -> void;
         auto signal_stopped_child(context_base *ctx) -> void override;
 
@@ -117,6 +111,12 @@ namespace shoc {
 
     private:
         friend class progress_engine_lease;
+
+        template<std::derived_from<context_base> Context, typename... Args>
+        auto create_context(Args&&... args) {
+            logger->trace("pe create_context this = {}", static_cast<void*>(this));
+            return connected_contexts_.create_context<Context>(this, std::forward<Args>(args)...);
+        }
 
         auto register_fiber() -> void;
         auto deregister_fiber() -> void;
@@ -226,6 +226,17 @@ namespace shoc {
         [[nodiscard]] auto get() const { return engine_; }
         auto operator->() const { return get(); }
         auto &operator*() const { return *get(); }
+
+        template<std::derived_from<context_base> Context, typename... Args>
+        [[nodiscard]]
+        auto create_context(Args&&... args) {
+            return engine_->create_context<Context>(std::forward<Args>(args)...);
+        }
+
+        [[nodiscard]]
+        auto yield() {
+            return engine_->yield();
+        }
 
     private:
         progress_engine *engine_;
